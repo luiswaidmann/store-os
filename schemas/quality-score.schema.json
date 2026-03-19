@@ -1,0 +1,147 @@
+{
+“$schema”: “https://json-schema.org/draft/2020-12/schema”,
+“$id”: “https://example.com/schemas/quality-score.schema.json”,
+“title”: “Quality Score Schema”,
+“description”: “Schema for overall store output quality scoring inside store-os”,
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“score_id”,
+“project_id”,
+“store_id”,
+“environment”,
+“generated_at”,
+“overall_score”,
+“launch_readiness”,
+“dimension_scores”
+],
+“properties”: {
+“score_id”: {
+“type”: “string”,
+“minLength”: 1,
+“pattern”: “^[a-z0-9-]+$”
+},
+“project_id”: {
+“type”: “string”,
+“minLength”: 1,
+“pattern”: “^[a-z0-9-]+$”
+},
+“store_id”: {
+“type”: “string”,
+“minLength”: 1,
+“pattern”: “^[a-z0-9-]+$”
+},
+“environment”: {
+“type”: “string”,
+“enum”: [
+“draft”,
+“staging”,
+“production”
+]
+},
+“generated_at”: {
+“type”: “string”,
+“format”: “date-time”
+},
+“overall_score”: {
+“type”: “integer”,
+“minimum”: 0,
+“maximum”: 100
+},
+“launch_readiness”: {
+“type”: “string”,
+“enum”: [
+“not-ready”,
+“needs-work”,
+“review-ready”,
+“launch-ready”
+]
+},
+“dimension_scores”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“dimension_name”,
+“score”
+],
+“properties”: {
+“dimension_name”: {
+“type”: “string”,
+“enum”: [
+“content-quality”,
+“seo-quality”,
+“aeo-quality”,
+“trust-quality”,
+“conversion-quality”,
+“ux-quality”,
+“media-quality”,
+“motion-quality”,
+“performance-safety”,
+“deployment-safety”
+]
+},
+“score”: {
+“type”: “integer”,
+“minimum”: 0,
+“maximum”: 100
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
+},
+“strengths”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“weaknesses”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“top_risks”: {
+“type”: “array”,
+“items”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“risk_name”,
+“severity”
+],
+“properties”: {
+“risk_name”: {
+“type”: “string”,
+“minLength”: 1
+},
+“severity”: {
+“type”: “string”,
+“enum”: [
+“low”,
+“medium”,
+“high”,
+“critical”
+]
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
+},
+“manual_review_recommended”: {
+“type”: “boolean”
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
