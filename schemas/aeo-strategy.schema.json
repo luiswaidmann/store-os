@@ -1,0 +1,224 @@
+{
+“$schema”: “https://json-schema.org/draft/2020-12/schema”,
+“$id”: “https://example.com/schemas/aeo-strategy.schema.json”,
+“title”: “AEO Strategy Schema”,
+“description”: “Schema for store-level answer engine optimization strategy inside store-os”,
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“strategy_name”,
+“primary_aeo_goal”,
+“answer_style”,
+“faq_strategy”,
+“entity_clarity_strategy”,
+“question_coverage_strategy”,
+“page_priority”,
+“structured_answer_priority”
+],
+“properties”: {
+“strategy_name”: {
+“type”: “string”,
+“minLength”: 1
+},
+“primary_aeo_goal”: {
+“type”: “string”,
+“enum”: [
+“product-understanding”,
+“category-understanding”,
+“comparison-readiness”,
+“trust-and-reassurance”,
+“hybrid”
+]
+},
+“answer_style”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“clarity_level”,
+“answer_length”,
+“semantic_directness”
+],
+“properties”: {
+“clarity_level”: {
+“type”: “string”,
+“enum”: [
+“very-clear”,
+“balanced”,
+“more-expressive”
+]
+},
+“answer_length”: {
+“type”: “string”,
+“enum”: [
+“short”,
+“balanced”,
+“detailed”
+]
+},
+“semantic_directness”: {
+“type”: “string”,
+“enum”: [
+“high”,
+“balanced”,
+“soft”
+]
+}
+}
+},
+“faq_strategy”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“faq_intensity”,
+“faq_distribution”
+],
+“properties”: {
+“faq_intensity”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“strong”
+]
+},
+“faq_distribution”: {
+“type”: “string”,
+“enum”: [
+“product-heavy”,
+“collection-heavy”,
+“knowledge-heavy”,
+“balanced”
+]
+},
+“faq_schema_priority”: {
+“type”: “string”,
+“enum”: [
+“low”,
+“medium”,
+“high”
+]
+}
+}
+},
+“entity_clarity_strategy”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“brand_entity_clarity”,
+“product_entity_clarity”,
+“category_entity_clarity”
+],
+“properties”: {
+“brand_entity_clarity”: {
+“type”: “string”,
+“enum”: [
+“medium”,
+“high”,
+“critical”
+]
+},
+“product_entity_clarity”: {
+“type”: “string”,
+“enum”: [
+“medium”,
+“high”,
+“critical”
+]
+},
+“category_entity_clarity”: {
+“type”: “string”,
+“enum”: [
+“medium”,
+“high”,
+“critical”
+]
+}
+}
+},
+“question_coverage_strategy”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“what_questions”,
+“why_questions”,
+“how_questions”,
+“comparison_questions”
+],
+“properties”: {
+“what_questions”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“strong”
+]
+},
+“why_questions”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“strong”
+]
+},
+“how_questions”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“strong”
+]
+},
+“comparison_questions”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“strong”
+]
+}
+}
+},
+“page_priority”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “string”,
+“enum”: [
+“homepage”,
+“product-pages”,
+“collection-pages”,
+“guide-pages”,
+“faq-pages”,
+“blog-articles”
+]
+}
+},
+“structured_answer_priority”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“enum”: [
+“faq-blocks”,
+“comparison-blocks”,
+“how-it-works-blocks”,
+“problem-solution-blocks”,
+“entity-definitions”,
+“spec-summaries”
+]
+}
+},
+“trust_answer_priority”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“strong”
+]
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
+
