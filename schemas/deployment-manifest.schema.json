@@ -1,0 +1,170 @@
+{
+“$schema”: “https://json-schema.org/draft/2020-12/schema”,
+“$id”: “https://example.com/schemas/deployment-manifest.schema.json”,
+“title”: “Deployment Manifest Schema”,
+“description”: “Schema for deployment state, validation outcome, and publish readiness inside store-os”,
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“manifest_id”,
+“project_id”,
+“store_id”,
+“environment”,
+“generated_at”,
+“workflow_version”,
+“artifacts”,
+“validation_summary”,
+“publish_decision”
+],
+“properties”: {
+“manifest_id”: {
+“type”: “string”,
+“minLength”: 1,
+“pattern”: “^[a-z0-9-]+$”
+},
+“project_id”: {
+“type”: “string”,
+“minLength”: 1,
+“pattern”: “^[a-z0-9-]+$”
+},
+“store_id”: {
+“type”: “string”,
+“minLength”: 1,
+“pattern”: “^[a-z0-9-]+$”
+},
+“environment”: {
+“type”: “string”,
+“enum”: [
+“draft”,
+“staging”,
+“production”
+]
+},
+“generated_at”: {
+“type”: “string”,
+“format”: “date-time”
+},
+“workflow_version”: {
+“type”: “string”,
+“minLength”: 1
+},
+“schema_version”: {
+“type”: “string”
+},
+“prompt_bundle_version”: {
+“type”: “string”
+},
+“theme_bundle_version”: {
+“type”: “string”
+},
+“artifacts”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“artifact_type”,
+“artifact_name”,
+“status”
+],
+“properties”: {
+“artifact_type”: {
+“type”: “string”,
+“enum”: [
+“theme”,
+“product-content”,
+“product-seo”,
+“collection-content”,
+“collection-seo”,
+“homepage-strategy”,
+“design-system”,
+“media-assets”,
+“structured-data”,
+“navigation”,
+“other”
+]
+},
+“artifact_name”: {
+“type”: “string”,
+“minLength”: 1
+},
+“status”: {
+“type”: “string”,
+“enum”: [
+“generated”,
+“validated”,
+“failed”,
+“skipped”,
+“published”
+]
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
+},
+“validation_summary”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“checks_passed”,
+“checks_failed”,
+“manual_review_required”
+],
+“properties”: {
+“checks_passed”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“checks_failed”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“warnings”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“manual_review_required”: {
+“type”: “boolean”
+}
+}
+},
+“publish_decision”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“publish_allowed”,
+“decision_reason”
+],
+“properties”: {
+“publish_allowed”: {
+“type”: “boolean”
+},
+“decision_reason”: {
+“type”: “string”,
+“minLength”: 1
+},
+“rollback_ready”: {
+“type”: “boolean”
+},
+“approval_required”: {
+“type”: “boolean”
+}
+}
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
