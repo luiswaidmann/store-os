@@ -1,0 +1,110 @@
+{
+“$schema”: “https://json-schema.org/draft/2020-12/schema”,
+“$id”: “https://example.com/schemas/product-faq.schema.json”,
+“title”: “Product FAQ Schema”,
+“description”: “Schema for product-level FAQ content inside store-os”,
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“product_id”,
+“faq_goal”,
+“faq_items”,
+“trust_role”,
+“support_role”
+],
+“properties”: {
+“product_id”: {
+“type”: “string”,
+“minLength”: 1,
+“pattern”: “^[a-z0-9-]+$”
+},
+“faq_goal”: {
+“type”: “string”,
+“enum”: [
+“conversion-support”,
+“trust-building”,
+“objection-handling”,
+“support-reduction”,
+“hybrid”
+]
+},
+“faq_items”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“question”,
+“answer”,
+“question_type”
+],
+“properties”: {
+“question”: {
+“type”: “string”,
+“minLength”: 1
+},
+“answer”: {
+“type”: “string”,
+“minLength”: 1
+},
+“question_type”: {
+“type”: “string”,
+“enum”: [
+“what-is-it”,
+“who-is-it-for”,
+“how-does-it-work”,
+“compatibility”,
+“care”,
+“shipping”,
+“returns”,
+“comparison”,
+“trust”,
+“use-case”,
+“general”
+]
+},
+“internal_link_target_type”: {
+“type”: “string”,
+“enum”: [
+“none”,
+“collection-page”,
+“guide-page”,
+“faq-page”,
+“homepage”,
+“product-page”
+]
+}
+}
+}
+},
+“trust_role”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“strong”
+]
+},
+“support_role”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“strong”
+]
+},
+“faq_schema_priority”: {
+“type”: “string”,
+“enum”: [
+“low”,
+“medium”,
+“high”
+]
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
+
