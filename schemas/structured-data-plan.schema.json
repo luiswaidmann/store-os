@@ -1,0 +1,180 @@
+{
+“$schema”: “https://json-schema.org/draft/2020-12/schema”,
+“$id”: “https://example.com/schemas/structured-data-plan.schema.json”,
+“title”: “Structured Data Plan Schema”,
+“description”: “Schema for store-level structured data planning inside store-os”,
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“plan_name”,
+“primary_goal”,
+“enabled_schema_types”,
+“page_type_mapping”,
+“entity_priority”,
+“validation_priority”
+],
+“properties”: {
+“plan_name”: {
+“type”: “string”,
+“minLength”: 1
+},
+“primary_goal”: {
+“type”: “string”,
+“enum”: [
+“search-clarity”,
+“rich-results-support”,
+“answer-readiness”,
+“hybrid”
+]
+},
+“enabled_schema_types”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “string”,
+“enum”: [
+“product”,
+“faq”,
+“breadcrumb”,
+“review”,
+“offer”,
+“article”,
+“organization”,
+“item-list”,
+“how-to”
+]
+}
+},
+“page_type_mapping”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“page_type”,
+“schema_types”
+],
+“properties”: {
+“page_type”: {
+“type”: “string”,
+“enum”: [
+“homepage”,
+“product-page”,
+“collection-page”,
+“guide-page”,
+“faq-page”,
+“blog-article”,
+“page”
+]
+},
+“schema_types”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “string”,
+“enum”: [
+“product”,
+“faq”,
+“breadcrumb”,
+“review”,
+“offer”,
+“article”,
+“organization”,
+“item-list”,
+“how-to”
+]
+}
+}
+}
+}
+},
+“entity_priority”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“brand_entity_priority”,
+“product_entity_priority”,
+“category_entity_priority”
+],
+“properties”: {
+“brand_entity_priority”: {
+“type”: “string”,
+“enum”: [
+“medium”,
+“high”,
+“critical”
+]
+},
+“product_entity_priority”: {
+“type”: “string”,
+“enum”: [
+“medium”,
+“high”,
+“critical”
+]
+},
+“category_entity_priority”: {
+“type”: “string”,
+“enum”: [
+“medium”,
+“high”,
+“critical”
+]
+}
+}
+},
+“validation_priority”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“required_validation”,
+“manual_review_required_for_advanced_markup”
+],
+“properties”: {
+“required_validation”: {
+“type”: “boolean”
+},
+“manual_review_required_for_advanced_markup”: {
+“type”: “boolean”
+},
+“strictness”: {
+“type”: “string”,
+“enum”: [
+“balanced”,
+“high”,
+“strict”
+]
+}
+}
+},
+“faq_markup_policy”: {
+“type”: “string”,
+“enum”: [
+“minimal”,
+“balanced”,
+“strong”
+]
+},
+“review_markup_policy”: {
+“type”: “string”,
+“enum”: [
+“none”,
+“balanced”,
+“strong”
+]
+},
+“offer_markup_policy”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“strong”
+]
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
+
