@@ -1,0 +1,204 @@
+{
+“$schema”: “https://json-schema.org/draft/2020-12/schema”,
+“$id”: “https://example.com/schemas/market-intelligence.schema.json”,
+“title”: “Market Intelligence Schema”,
+“description”: “Schema for market, audience, search, and positioning intelligence inside store-os”,
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“market_category”,
+“audience_segments”,
+“core_problems”,
+“purchase_motivators”,
+“search_intents”,
+“trust_factors”,
+“competitor_types”,
+“positioning_goals”
+],
+“properties”: {
+“market_category”: {
+“type”: “string”,
+“minLength”: 1
+},
+“market_subcategories”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“audience_segments”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“segment_name”,
+“description”,
+“purchase_drivers”
+],
+“properties”: {
+“segment_name”: {
+“type”: “string”,
+“minLength”: 1
+},
+“description”: {
+“type”: “string”,
+“minLength”: 1
+},
+“purchase_drivers”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“barriers”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+}
+}
+}
+},
+“core_problems”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“purchase_motivators”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“search_intents”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“intent_type”,
+“description”
+],
+“properties”: {
+“intent_type”: {
+“type”: “string”,
+“enum”: [
+“informational”,
+“commercial”,
+“transactional”,
+“navigational”,
+“comparison”
+]
+},
+“description”: {
+“type”: “string”,
+“minLength”: 1
+},
+“example_queries”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+}
+}
+}
+},
+“trust_factors”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“competitor_types”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“type_name”,
+“description”
+],
+“properties”: {
+“type_name”: {
+“type”: “string”,
+“minLength”: 1
+},
+“description”: {
+“type”: “string”,
+“minLength”: 1
+},
+“strengths”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“weaknesses”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+}
+}
+}
+},
+“positioning_goals”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“content_opportunities”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“media_opportunities”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“seo_considerations”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“aeo_considerations”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
+
