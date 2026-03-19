@@ -1,0 +1,173 @@
+{
+“$schema”: “https://json-schema.org/draft/2020-12/schema”,
+“$id”: “https://example.com/schemas/product-seo.schema.json”,
+“title”: “Product SEO Schema”,
+“description”: “Schema for product-level SEO and AEO planning inside store-os”,
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“primary_keyword”,
+“secondary_keywords”,
+“search_intent”,
+“seo_title”,
+“meta_description”,
+“slug”,
+“entity_clarity”,
+“internal_linking_targets”,
+“answer_targets”
+],
+“properties”: {
+“primary_keyword”: {
+“type”: “string”,
+“minLength”: 1
+},
+“secondary_keywords”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“search_intent”: {
+“type”: “string”,
+“enum”: [
+“informational”,
+“commercial”,
+“transactional”,
+“comparison”,
+“hybrid”
+]
+},
+“seo_title”: {
+“type”: “string”,
+“minLength”: 1,
+“maxLength”: 70
+},
+“meta_description”: {
+“type”: “string”,
+“minLength”: 1,
+“maxLength”: 180
+},
+“slug”: {
+“type”: “string”,
+“minLength”: 1,
+“pattern”: “^[a-z0-9-]+$”
+},
+“entity_clarity”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“product_type_clear”,
+“core_use_case_clear”,
+“brand_relation_clear”
+],
+“properties”: {
+“product_type_clear”: {
+“type”: “boolean”
+},
+“core_use_case_clear”: {
+“type”: “boolean”
+},
+“brand_relation_clear”: {
+“type”: “boolean”
+}
+}
+},
+“internal_linking_targets”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“target_type”,
+“target_reason”
+],
+“properties”: {
+“target_type”: {
+“type”: “string”,
+“enum”: [
+“collection”,
+“related-product”,
+“guide-page”,
+“faq-page”,
+“homepage”,
+“blog-article”
+]
+},
+“target_reason”: {
+“type”: “string”,
+“minLength”: 1
+}
+}
+}
+},
+“answer_targets”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“question_type”,
+“answer_goal”
+],
+“properties”: {
+“question_type”: {
+“type”: “string”,
+“enum”: [
+“what-is-it”,
+“who-is-it-for”,
+“why-is-it-better”,
+“how-does-it-work”,
+“is-it-worth-it”,
+“comparison”,
+“compatibility”,
+“care”,
+“shipping”,
+“returns”
+]
+},
+“answer_goal”: {
+“type”: “string”,
+“minLength”: 1
+}
+}
+}
+},
+“structured_data_targets”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“enum”: [
+“product”,
+“faq”,
+“review”,
+“breadcrumb”,
+“offer”
+]
+}
+},
+“canonical_strategy”: {
+“type”: “string”,
+“enum”: [
+“self-canonical”,
+“variant-aware”,
+“platform-default”
+]
+},
+“content_depth”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“deep”
+]
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
+
