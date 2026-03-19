@@ -32,11 +32,17 @@ Core Principle
 
 Global folders must remain generic.
 
-Anything that belongs only to one store, brand, market, niche, or visual direction must go into:projects/<project-id>/That means:
+Anything that belongs only to one store, brand, market, niche, or visual direction must go into:
+
+projects/<project-id>/
+
+That means:
 	•	no SuppliedTech defaults in global core logic
 	•	no hardcoded brand assumptions in shared prompts
 	•	no project-specific colors, themes, or market logic in generic folders
-Repository Structurestore-os/
+
+Repository Structure
+store-os/
 ├── docs/
 ├── core/
 ├── schemas/
@@ -48,7 +54,9 @@ Repository Structurestore-os/
 ├── projects/
 ├── outputs/
 ├── archives/
-└── scripts/Folder Overview
+└── scripts/
+
+Folder Overview
 
 docs/
 
@@ -106,7 +114,11 @@ Helper scripts for project creation, validation, backup, and migration.
 
 Project Structure
 
-Each project should live inside its own folder:projects/<project-id>/A project can contain:
+Each project should live inside its own folder:
+
+projects/<project-id>/
+
+A project can contain:
 	•	input data
 	•	research
 	•	manifests
@@ -116,7 +128,9 @@ Each project should live inside its own folder:projects/<project-id>/A project c
 	•	exports
 	•	notes
 
-Example:projects/suppliedtech/
+Example:
+
+projects/suppliedtech/
 ├── project.json
 ├── input/
 ├── research/
@@ -125,7 +139,9 @@ Example:projects/suppliedtech/
 ├── content/
 ├── assets/
 ├── exports/
-└── notes/Rules
+└── notes/
+
+Rules
 	1.	Global logic stays generic.
 	2.	Project-specific logic stays inside projects/<project-id>/.
 	3.	Existing themes are references, not default truth.
@@ -133,7 +149,11 @@ Example:projects/suppliedtech/
 	5.	Competitor patterns may inspire direction, but direct copying is forbidden.
 	6.	Live publishing should only happen after validation and review.
 
-For more details, see:docs/repo-rules.mdCurrent Projects
+For more details, see:
+
+docs/repo-rules.md
+
+Current Projects
 
 At the moment, the repository includes:
 	•	suppliedtech
