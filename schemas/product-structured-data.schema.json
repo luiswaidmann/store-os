@@ -1,0 +1,149 @@
+{
+“$schema”: “https://json-schema.org/draft/2020-12/schema”,
+“$id”: “https://example.com/schemas/product-structured-data.schema.json”,
+“title”: “Product Structured Data Schema”,
+“description”: “Schema for product-level structured data planning inside store-os”,
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“product_id”,
+“product_schema_enabled”,
+“offer_schema_enabled”,
+“review_schema_enabled”,
+“faq_schema_enabled”,
+“breadcrumb_schema_enabled”,
+“entity_fields”,
+“offer_fields”,
+“validation_priority”
+],
+“properties”: {
+“product_id”: {
+“type”: “string”,
+“minLength”: 1,
+“pattern”: “^[a-z0-9-]+$”
+},
+“product_schema_enabled”: {
+“type”: “boolean”
+},
+“offer_schema_enabled”: {
+“type”: “boolean”
+},
+“review_schema_enabled”: {
+“type”: “boolean”
+},
+“faq_schema_enabled”: {
+“type”: “boolean”
+},
+“breadcrumb_schema_enabled”: {
+“type”: “boolean”
+},
+“entity_fields”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“name_required”,
+“brand_required”,
+“description_required”,
+“image_required”,
+“sku_priority”
+],
+“properties”: {
+“name_required”: {
+“type”: “boolean”
+},
+“brand_required”: {
+“type”: “boolean”
+},
+“description_required”: {
+“type”: “boolean”
+},
+“image_required”: {
+“type”: “boolean”
+},
+“sku_priority”: {
+“type”: “string”,
+“enum”: [
+“optional”,
+“recommended”,
+“required”
+]
+},
+“gtin_priority”: {
+“type”: “string”,
+“enum”: [
+“optional”,
+“recommended”,
+“required”
+]
+},
+“mpn_priority”: {
+“type”: “string”,
+“enum”: [
+“optional”,
+“recommended”,
+“required”
+]
+}
+}
+},
+“offer_fields”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“price_required”,
+“currency_required”,
+“availability_required”
+],
+“properties”: {
+“price_required”: {
+“type”: “boolean”
+},
+“currency_required”: {
+“type”: “boolean”
+},
+“availability_required”: {
+“type”: “boolean”
+},
+“seller_required”: {
+“type”: “boolean”
+},
+“condition_required”: {
+“type”: “boolean”
+}
+}
+},
+“review_fields”: {
+“type”: “object”,
+“additionalProperties”: false,
+“properties”: {
+“rating_required”: {
+“type”: “boolean”
+},
+“review_count_required”: {
+“type”: “boolean”
+}
+}
+},
+“faq_fields”: {
+“type”: “object”,
+“additionalProperties”: false,
+“properties”: {
+“minimum_faq_items”: {
+“type”: “integer”,
+“minimum”: 0
+}
+}
+},
+“validation_priority”: {
+“type”: “string”,
+“enum”: [
+“balanced”,
+“high”,
+“strict”
+]
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
