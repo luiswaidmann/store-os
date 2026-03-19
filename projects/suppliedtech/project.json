@@ -1,0 +1,72 @@
+{
+  "project_id": "suppliedtech",
+  "project_type": "shopify-store",
+  "status": "active",
+  "vertical": "consumer-tech-accessories",
+  "business_model": "ecommerce",
+  "platform": "shopify",
+  "target_markets": ["DE", "EU", "EN"],
+  "languages": ["de", "en"],
+  "price_positioning": "mid-premium",
+  "design_direction": "derived-from-market-analysis",
+  "content_strategy": "derived-from-market-analysis",
+  "competitor_strategy": {
+    "mode": "cluster-and-extract",
+    "direct_copy_forbidden": true
+  },
+  "theme_strategy": {
+    "use_existing_theme_as_reference_only": true,
+    "allow_direct_theme_reuse": false
+  },
+  "deployment_strategy": {
+    "draft_first": true,
+    "publish_requires_validation": true
+  },
+  "paths": {
+    "input": "./input",
+    "research": "./research",
+    "manifests": "./manifests",
+    "theme": "./theme",
+    "content": "./content",
+    "assets": "./assets",
+    "exports": "./exports",
+    "notes": "./notes"
+  }
+}
+{
+  "project_id": "example-store",
+
+  "project_type": "shopify-store",
+  "status": "draft",
+  "vertical": "general",
+  "business_model": "ecommerce",
+  "platform": "shopify",
+  "target_markets": ["DE", "EN"],
+  "languages": ["de", "en"],
+  "price_positioning": "to-be-derived",
+  "design_direction": "derived-from-market-analysis",
+  "content_strategy": "derived-from-market-analysis",
+  "competitor_strategy": {
+    "mode": "cluster-and-extract",
+    "direct_copy_forbidden": true
+  },
+  "theme_strategy": {
+    "use_existing_theme_as_reference_only": true,
+    "allow_direct_theme_reuse": false
+  },
+  "deployment_strategy": {
+    "draft_first": true,
+    "publish_requires_validation": true
+  },
+  "paths": {
+    "input": "./input",
+    "research": "./research",
+    "manifests": "./manifests",
+    "theme": "./theme",
+    "content": "./content",
+    "assets": "./assets",
+    "exports": "./exports",
+    "notes": "./notes"
+  }
+}
+
