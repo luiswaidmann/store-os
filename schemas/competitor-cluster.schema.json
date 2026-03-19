@@ -1,0 +1,172 @@
+{
+“$schema”: “https://json-schema.org/draft/2020-12/schema”,
+“$id”: “https://example.com/schemas/competitor-cluster.schema.json”,
+“title”: “Competitor Cluster Schema”,
+“description”: “Schema for grouping and analyzing competitor clusters inside store-os”,
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“cluster_name”,
+“cluster_role”,
+“description”,
+“competitor_examples”,
+“shared_strengths”,
+“shared_weaknesses”,
+“shared_patterns”,
+“non_copyable_elements”,
+“adaptation_opportunities”
+],
+“properties”: {
+“cluster_name”: {
+“type”: “string”,
+“minLength”: 1
+},
+“cluster_role”: {
+“type”: “string”,
+“enum”: [
+“premium-brand-cluster”,
+“value-cluster”,
+“editorial-cluster”,
+“marketplace-like-cluster”,
+“trend-driven-cluster”,
+“problem-solver-cluster”,
+“specialist-cluster”
+]
+},
+“description”: {
+“type”: “string”,
+“minLength”: 1
+},
+“competitor_examples”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“name”,
+“url”
+],
+“properties”: {
+“name”: {
+“type”: “string”,
+“minLength”: 1
+},
+“url”: {
+“type”: “string”,
+“minLength”: 1
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
+},
+“shared_strengths”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“shared_weaknesses”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“shared_patterns”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“pattern_type”,
+“description”,
+“why_it_works”
+],
+“properties”: {
+“pattern_type”: {
+“type”: “string”,
+“enum”: [
+“layout”,
+“navigation”,
+“pdp-structure”,
+“collection-strategy”,
+“seo-pattern”,
+“aeo-pattern”,
+“trust-pattern”,
+“media-pattern”,
+“motion-pattern”,
+“offer-pattern”,
+“copy-pattern”
+]
+},
+“description”: {
+“type”: “string”,
+“minLength”: 1
+},
+“why_it_works”: {
+“type”: “string”,
+“minLength”: 1
+},
+“risk_if_overused”: {
+“type”: “string”
+}
+}
+}
+},
+“non_copyable_elements”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“adaptation_opportunities”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“recommended_use_cases”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“seo_relevance”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“aeo_relevance”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“media_relevance”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
+
