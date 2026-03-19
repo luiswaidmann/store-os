@@ -1,0 +1,160 @@
+{
+“$schema”: “https://json-schema.org/draft/2020-12/schema”,
+“$id”: “https://example.com/schemas/video-asset.schema.json”,
+“title”: “Video Asset Schema”,
+“description”: “Schema for storefront video assets inside store-os”,
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“video_id”,
+“video_role”,
+“source_type”,
+“title”,
+“status”,
+“allowed_pages”,
+“duration_seconds”,
+“autoplay”,
+“muted”,
+“loop”,
+“poster_required”,
+“mobile_fallback_required”,
+“seo_role”,
+“performance_risk”
+],
+“properties”: {
+“video_id”: {
+“type”: “string”,
+“minLength”: 1,
+“pattern”: “^[a-z0-9-]+$”
+},
+“video_role”: {
+“type”: “string”,
+“enum”: [
+“hero-video”,
+“product-demo”,
+“comparison-video”,
+“storytelling-video”,
+“trust-video”,
+“background-video”,
+“editorial-video”,
+“other”
+]
+},
+“source_type”: {
+“type”: “string”,
+“enum”: [
+“uploaded”,
+“generated-ai”,
+“external-embed”,
+“edited-derived”,
+“supplier”,
+“other”
+]
+},
+“title”: {
+“type”: “string”,
+“minLength”: 1
+},
+“caption”: {
+“type”: “string”
+},
+“transcript_available”: {
+“type”: “boolean”
+},
+“status”: {
+“type”: “string”,
+“enum”: [
+“draft”,
+“approved”,
+“rejected”,
+“archived”
+]
+},
+“allowed_pages”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “string”,
+“enum”: [
+“homepage”,
+“product-page”,
+“collection-page”,
+“page”,
+“article”,
+“blog-index”,
+“cart”
+]
+}
+},
+“duration_seconds”: {
+“type”: “integer”,
+“minimum”: 1
+},
+“autoplay”: {
+“type”: “boolean”
+},
+“muted”: {
+“type”: “boolean”
+},
+“loop”: {
+“type”: “boolean”
+},
+“lazy_load”: {
+“type”: “boolean”
+},
+“poster_required”: {
+“type”: “boolean”
+},
+“poster_asset_id”: {
+“type”: “string”,
+“pattern”: “^[a-z0-9-]+$”
+},
+“mobile_fallback_required”: {
+“type”: “boolean”
+},
+“mobile_fallback_asset_id”: {
+“type”: “string”,
+“pattern”: “^[a-z0-9-]+$”
+},
+“controls_visible”: {
+“type”: “boolean”
+},
+“primary_message”: {
+“type”: “string”
+},
+“seo_role”: {
+“type”: “string”,
+“enum”: [
+“decorative”,
+“supporting”,
+“index-relevant”,
+“answer-supporting”
+]
+},
+“entity_support”: {
+“type”: “string”,
+“enum”: [
+“none”,
+“brand”,
+“product”,
+“category”,
+“mixed”
+]
+},
+“performance_risk”: {
+“type”: “string”,
+“enum”: [
+“low”,
+“medium”,
+“high”
+]
+},
+“compliance_notes”: {
+“type”: “string”
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
+
