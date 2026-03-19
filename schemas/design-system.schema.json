@@ -1,0 +1,356 @@
+{
+“$schema”: “https://json-schema.org/draft/2020-12/schema”,
+“$id”: “https://example.com/schemas/design-system.schema.json”,
+“title”: “Design System Schema”,
+“description”: “Schema for visual, structural, motion, and media design rules inside store-os”,
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“design_style”,
+“layout_density”,
+“visual_hierarchy”,
+“color_strategy”,
+“typography_strategy”,
+“component_style”,
+“spacing_strategy”,
+“trust_visibility”,
+“media_strategy”,
+“motion_strategy”,
+“performance_guardrails”
+],
+“properties”: {
+“design_style”: {
+“type”: “string”,
+“enum”: [
+“minimal-modern”,
+“premium-clean”,
+“editorial-rich”,
+“technical-structured”,
+“playful-bold”,
+“conversion-focused”
+]
+},
+“layout_density”: {
+“type”: “string”,
+“enum”: [
+“airy”,
+“balanced”,
+“dense”
+]
+},
+“visual_hierarchy”: {
+“type”: “string”,
+“enum”: [
+“clean-linear”,
+“editorial-layered”,
+“conversion-first”
+]
+},
+“color_strategy”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“contrast_level”,
+“palette_complexity”,
+“accent_usage”
+],
+“properties”: {
+“contrast_level”: {
+“type”: “string”,
+“enum”: [
+“soft”,
+“balanced”,
+“strong”
+]
+},
+“palette_complexity”: {
+“type”: “string”,
+“enum”: [
+“minimal”,
+“balanced”,
+“expanded”
+]
+},
+“accent_usage”: {
+“type”: “string”,
+“enum”: [
+“subtle”,
+“balanced”,
+“strong”
+]
+}
+}
+},
+“typography_strategy”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“font_personality”,
+“heading_emphasis”,
+“readability_priority”
+],
+“properties”: {
+“font_personality”: {
+“type”: “string”,
+“enum”: [
+“neutral-modern”,
+“premium-refined”,
+“technical-precise”,
+“editorial-expressive”,
+“friendly-clear”
+]
+},
+“heading_emphasis”: {
+“type”: “string”,
+“enum”: [
+“subtle”,
+“balanced”,
+“strong”
+]
+},
+“readability_priority”: {
+“type”: “string”,
+“enum”: [
+“maximum”,
+“balanced”,
+“expressive”
+]
+}
+}
+},
+“component_style”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“corner_style”,
+“shadow_style”,
+“button_style”,
+“card_style”
+],
+“properties”: {
+“corner_style”: {
+“type”: “string”,
+“enum”: [
+“sharp”,
+“slightly-rounded”,
+“rounded”,
+“soft-rounded”
+]
+},
+“shadow_style”: {
+“type”: “string”,
+“enum”: [
+“none”,
+“light”,
+“balanced”,
+“pronounced”
+]
+},
+“button_style”: {
+“type”: “string”,
+“enum”: [
+“minimal”,
+“clean-solid”,
+“premium-solid”,
+“high-contrast-cta”
+]
+},
+“card_style”: {
+“type”: “string”,
+“enum”: [
+“flat”,
+“outlined”,
+“soft-elevated”,
+“strong-elevated”
+]
+}
+}
+},
+“spacing_strategy”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“section_spacing”,
+“component_spacing”,
+“content_breathing_room”
+],
+“properties”: {
+“section_spacing”: {
+“type”: “string”,
+“enum”: [
+“tight”,
+“balanced”,
+“generous”
+]
+},
+“component_spacing”: {
+“type”: “string”,
+“enum”: [
+“tight”,
+“balanced”,
+“generous”
+]
+},
+“content_breathing_room”: {
+“type”: “string”,
+“enum”: [
+“compact”,
+“balanced”,
+“open”
+]
+}
+}
+},
+“trust_visibility”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“proof_prominence”,
+“review_visibility”,
+“guarantee_visibility”
+],
+“properties”: {
+“proof_prominence”: {
+“type”: “string”,
+“enum”: [
+“low”,
+“medium”,
+“high”
+]
+},
+“review_visibility”: {
+“type”: “string”,
+“enum”: [
+“low”,
+“medium”,
+“high”
+]
+},
+“guarantee_visibility”: {
+“type”: “string”,
+“enum”: [
+“low”,
+“medium”,
+“high”
+]
+}
+}
+},
+“media_strategy”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“image_intensity”,
+“video_usage”,
+“embed_usage”,
+“fallback_required”
+],
+“properties”: {
+“image_intensity”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“rich”
+]
+},
+“video_usage”: {
+“type”: “string”,
+“enum”: [
+“none”,
+“supporting-only”,
+“balanced”,
+“hero-driven”
+]
+},
+“embed_usage”: {
+“type”: “string”,
+“enum”: [
+“none”,
+“limited”,
+“balanced”,
+“rich”
+]
+},
+“fallback_required”: {
+“type”: “boolean”
+}
+}
+},
+“motion_strategy”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“motion_level”,
+“scroll_animation_usage”,
+“interaction_animation_usage”,
+“performance_priority”
+],
+“properties”: {
+“motion_level”: {
+“type”: “string”,
+“enum”: [
+“none”,
+“subtle”,
+“moderate”,
+“cinematic”
+]
+},
+“scroll_animation_usage”: {
+“type”: “string”,
+“enum”: [
+“none”,
+“light”,
+“balanced”,
+“strong”
+]
+},
+“interaction_animation_usage”: {
+“type”: “string”,
+“enum”: [
+“none”,
+“light”,
+“balanced”,
+“strong”
+]
+},
+“performance_priority”: {
+“type”: “string”,
+“enum”: [
+“maximum”,
+“balanced”,
+“experience-led”
+]
+}
+}
+},
+“performance_guardrails”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“heavy_media_control”,
+“motion_limit_on_mobile”,
+“fallback_required_for_hero_media”
+],
+“properties”: {
+“heavy_media_control”: {
+“type”: “string”,
+“enum”: [
+“strict”,
+“balanced”,
+“flexible”
+]
+},
+“motion_limit_on_mobile”: {
+“type”: “boolean”
+},
+“fallback_required_for_hero_media”: {
+“type”: “boolean”
+}
+}
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
