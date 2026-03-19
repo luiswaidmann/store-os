@@ -1,0 +1,118 @@
+{
+“$schema”: “https://json-schema.org/draft/2020-12/schema”,
+“$id”: “https://example.com/schemas/publish-decision.schema.json”,
+“title”: “Publish Decision Schema”,
+“description”: “Schema for final publish readiness and release decision inside store-os”,
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“decision_id”,
+“project_id”,
+“store_id”,
+“environment”,
+“generated_at”,
+“publish_allowed”,
+“decision_reason”,
+“manual_approval_required”,
+“rollback_recommended”
+],
+“properties”: {
+“decision_id”: {
+“type”: “string”,
+“minLength”: 1,
+“pattern”: “^[a-z0-9-]+$”
+},
+“project_id”: {
+“type”: “string”,
+“minLength”: 1,
+“pattern”: “^[a-z0-9-]+$”
+},
+“store_id”: {
+“type”: “string”,
+“minLength”: 1,
+“pattern”: “^[a-z0-9-]+$”
+},
+“environment”: {
+“type”: “string”,
+“enum”: [
+“draft”,
+“staging”,
+“production”
+]
+},
+“generated_at”: {
+“type”: “string”,
+“format”: “date-time”
+},
+“publish_allowed”: {
+“type”: “boolean”
+},
+“decision_reason”: {
+“type”: “string”,
+“minLength”: 1
+},
+“manual_approval_required”: {
+“type”: “boolean”
+},
+“approval_role”: {
+“type”: “string”,
+“enum”: [
+“none”,
+“founder”,
+“operator”,
+“content-reviewer”,
+“technical-reviewer”,
+“legal-reviewer”,
+“mixed”
+]
+},
+“rollback_recommended”: {
+“type”: “boolean”
+},
+“rollback_reason”: {
+“type”: “string”
+},
+“open_risks”: {
+“type”: “array”,
+“items”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“risk_name”,
+“severity”
+],
+“properties”: {
+“risk_name”: {
+“type”: “string”,
+“minLength”: 1
+},
+“severity”: {
+“type”: “string”,
+“enum”: [
+“low”,
+“medium”,
+“high”,
+“critical”
+]
+},
+“description”: {
+“type”: “string”
+},
+“mitigation”: {
+“type”: “string”
+}
+}
+}
+},
+“blocking_reasons”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
