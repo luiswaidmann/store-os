@@ -1,0 +1,314 @@
+{
+“$schema”: “https://json-schema.org/draft/2020-12/schema”,
+“$id”: “https://example.com/schemas/pattern-manifest.schema.json”,
+“title”: “Pattern Manifest Schema”,
+“description”: “Schema for approved reusable market-derived patterns inside store-os”,
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“manifest_name”,
+“manifest_goal”,
+“approved_patterns”,
+“forbidden_patterns”,
+“layout_direction”,
+“trust_direction”,
+“pdp_direction”,
+“collection_direction”,
+“seo_direction”,
+“aeo_direction”,
+“media_direction”
+],
+“properties”: {
+“manifest_name”: {
+“type”: “string”,
+“minLength”: 1
+},
+“manifest_goal”: {
+“type”: “string”,
+“minLength”: 1
+},
+“approved_patterns”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“pattern_type”,
+“pattern_name”,
+“description”,
+“intended_effect”
+],
+“properties”: {
+“pattern_type”: {
+“type”: “string”,
+“enum”: [
+“layout”,
+“navigation”,
+“pdp-structure”,
+“collection-structure”,
+“trust-pattern”,
+“seo-pattern”,
+“aeo-pattern”,
+“copy-pattern”,
+“media-pattern”,
+“motion-pattern”,
+“offer-pattern”,
+“storytelling-pattern”
+]
+},
+“pattern_name”: {
+“type”: “string”,
+“minLength”: 1
+},
+“description”: {
+“type”: “string”,
+“minLength”: 1
+},
+“intended_effect”: {
+“type”: “string”,
+“minLength”: 1
+},
+“conditions”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“risks”: {
+“type”: “array”,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+}
+}
+}
+},
+“forbidden_patterns”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “string”,
+“minLength”: 1
+}
+},
+“layout_direction”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“page_density”,
+“visual_hierarchy”,
+“section_flow”
+],
+“properties”: {
+“page_density”: {
+“type”: “string”,
+“enum”: [
+“minimal”,
+“balanced”,
+“information-rich”
+]
+},
+“visual_hierarchy”: {
+“type”: “string”,
+“enum”: [
+“clean-linear”,
+“editorial-layered”,
+“conversion-first”
+]
+},
+“section_flow”: {
+“type”: “string”,
+“enum”: [
+“tight”,
+“balanced”,
+“story-led”
+]
+}
+}
+},
+“trust_direction”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“trust_visibility”,
+“proof_style”
+],
+“properties”: {
+“trust_visibility”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“moderate”,
+“strong”
+]
+},
+“proof_style”: {
+“type”: “string”,
+“enum”: [
+“specification-led”,
+“social-proof-led”,
+“authority-led”,
+“mixed”
+]
+}
+}
+},
+“pdp_direction”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“information_depth”,
+“objection_handling”,
+“cta_prominence”
+],
+“properties”: {
+“information_depth”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“deep”
+]
+},
+“objection_handling”: {
+“type”: “string”,
+“enum”: [
+“minimal”,
+“balanced”,
+“detailed”
+]
+},
+“cta_prominence”: {
+“type”: “string”,
+“enum”: [
+“subtle”,
+“balanced”,
+“strong”
+]
+}
+}
+},
+“collection_direction”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“seo_content_depth”,
+“navigation_depth”
+],
+“properties”: {
+“seo_content_depth”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“deep”
+]
+},
+“navigation_depth”: {
+“type”: “string”,
+“enum”: [
+“simple”,
+“balanced”,
+“rich”
+]
+}
+}
+},
+“seo_direction”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“keyword_targeting”,
+“content_depth”
+],
+“properties”: {
+“keyword_targeting”: {
+“type”: “string”,
+“enum”: [
+“focused”,
+“balanced”,
+“broad”
+]
+},
+“content_depth”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“deep”
+]
+}
+}
+},
+“aeo_direction”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“answer_density”,
+“faq_usage”
+],
+“properties”: {
+“answer_density”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“high”
+]
+},
+“faq_usage”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“strong”
+]
+}
+}
+},
+“media_direction”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“media_intensity”,
+“motion_usage”,
+“video_usage”
+],
+“properties”: {
+“media_intensity”: {
+“type”: “string”,
+“enum”: [
+“minimal”,
+“balanced”,
+“rich”
+]
+},
+“motion_usage”: {
+“type”: “string”,
+“enum”: [
+“none”,
+“subtle”,
+“moderate”,
+“cinematic”
+]
+},
+“video_usage”: {
+“type”: “string”,
+“enum”: [
+“none”,
+“supporting-only”,
+“balanced”,
+“hero-driven”
+]
+}
+}
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
+
