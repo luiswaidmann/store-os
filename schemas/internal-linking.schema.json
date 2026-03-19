@@ -1,0 +1,183 @@
+{
+“$schema”: “https://json-schema.org/draft/2020-12/schema”,
+“$id”: “https://example.com/schemas/internal-linking.schema.json”,
+“title”: “Internal Linking Schema”,
+“description”: “Schema for internal linking strategy inside store-os”,
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“strategy_name”,
+“linking_goal”,
+“link_rules”,
+“navigation_priority”,
+“contextual_linking”,
+“cross_page_support”
+],
+“properties”: {
+“strategy_name”: {
+“type”: “string”,
+“minLength”: 1
+},
+“linking_goal”: {
+“type”: “string”,
+“enum”: [
+“seo-support”,
+“conversion-support”,
+“discovery-support”,
+“hybrid”
+]
+},
+“link_rules”: {
+“type”: “array”,
+“minItems”: 1,
+“items”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“source_page_type”,
+“target_page_type”,
+“link_reason”
+],
+“properties”: {
+“source_page_type”: {
+“type”: “string”,
+“enum”: [
+“homepage”,
+“product-page”,
+“collection-page”,
+“guide-page”,
+“faq-page”,
+“blog-article”,
+“page”
+]
+},
+“target_page_type”: {
+“type”: “string”,
+“enum”: [
+“homepage”,
+“product-page”,
+“collection-page”,
+“guide-page”,
+“faq-page”,
+“blog-article”,
+“page”
+]
+},
+“link_reason”: {
+“type”: “string”,
+“minLength”: 1
+},
+“priority”: {
+“type”: “string”,
+“enum”: [
+“low”,
+“medium”,
+“high”
+]
+}
+}
+}
+},
+“navigation_priority”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“top_navigation_weight”,
+“footer_navigation_weight”,
+“in_page_navigation_weight”
+],
+“properties”: {
+“top_navigation_weight”: {
+“type”: “string”,
+“enum”: [
+“low”,
+“medium”,
+“high”
+]
+},
+“footer_navigation_weight”: {
+“type”: “string”,
+“enum”: [
+“low”,
+“medium”,
+“high”
+]
+},
+“in_page_navigation_weight”: {
+“type”: “string”,
+“enum”: [
+“low”,
+“medium”,
+“high”
+]
+}
+}
+},
+“contextual_linking”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“allowed”,
+“intensity”
+],
+“properties”: {
+“allowed”: {
+“type”: “boolean”
+},
+“intensity”: {
+“type”: “string”,
+“enum”: [
+“light”,
+“balanced”,
+“strong”
+]
+},
+“knowledge_to_commerce_links”: {
+“type”: “boolean”
+}
+}
+},
+“cross_page_support”: {
+“type”: “object”,
+“additionalProperties”: false,
+“required”: [
+“product_to_collection”,
+“collection_to_product”,
+“product_to_guide”,
+“guide_to_product”
+],
+“properties”: {
+“product_to_collection”: {
+“type”: “boolean”
+},
+“collection_to_product”: {
+“type”: “boolean”
+},
+“product_to_guide”: {
+“type”: “boolean”
+},
+“guide_to_product”: {
+“type”: “boolean”
+},
+“faq_to_product”: {
+“type”: “boolean”
+},
+“faq_to_collection”: {
+“type”: “boolean”
+}
+}
+},
+“anchor_text_strategy”: {
+“type”: “string”,
+“enum”: [
+“simple-descriptive”,
+“balanced”,
+“keyword-aware”
+]
+},
+“notes”: {
+“type”: “string”
+}
+}
+}
+
