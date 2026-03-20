@@ -1,0 +1,369 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, and node structure so that a future n8n implementation can be built safely. All LLM-synthesized output must be labeled as synthesis-based and not treated as externally validated market research. Do not treat this as a production workflow.",
+    "evidence_boundary_note": "This workflow produces LLM-synthesized market intelligence derived exclusively from internal signals (intake preferences, store profile, Shopify catalog context). It does NOT perform live web crawling, keyword research API calls, or external market data lookups. All outputs must be understood as structured planning hypotheses — starting points for human review, not confirmed market facts.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/market-intelligence.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+  "workflow": {
+    "id": "build-market-intelligence",
+    "name": "build-market-intelligence",
+    "category": "planning",
+    "phase": "Phase 2 — Strategic Intelligence",
+    "purpose": "Transform store profile, intake market signals, and Shopify catalog context into a structured market intelligence artifact. The output is a schema-validated planning document that synthesizes audience understanding, purchase motivators, search intents, trust factors, competitor types, and positioning goals. All synthesis is LLM-assisted and based exclusively on internal inputs. This artifact feeds downstream brand positioning and competitor clustering workflows.",
+
+    "inputs": {
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "fields_used": [
+          "store_id",
+          "store_name",
+          "store_type",
+          "vertical",
+          "price_positioning",
+          "primary_market",
+          "target_markets",
+          "primary_language",
+          "languages",
+          "catalog_type",
+          "brand_maturity",
+          "business_model",
+          "notes"
+        ],
+        "note": "Store profile is the primary planning anchor. All market intelligence synthesis is framed in the context of this profile."
+      },
+      "from_intake": {
+        "source": "intake-store-input → normalized_intake_payload",
+        "fields_used": [
+          "competitor_urls",
+          "seo_goal",
+          "aeo_goal",
+          "knowledge_content_priority",
+          "special_notes"
+        ],
+        "note": "These intake fields provide market orientation hints. competitor_urls are used as signals for competitor type classification only — not crawled or validated in this workflow."
+      },
+      "from_shopify_import": {
+        "source": "import-shopify-data → raw_products + raw_collections",
+        "artifact_paths": [
+          "projects/{project_id}/data/shopify-products.json",
+          "projects/{project_id}/data/shopify-collections.json"
+        ],
+        "fields_used": [
+          "raw_products[*].title",
+          "raw_products[*].product_type",
+          "raw_products[*].tags",
+          "raw_products[*].vendor",
+          "raw_collections[*].title"
+        ],
+        "note": "Catalog titles, types, and tags provide evidence for market category derivation and audience inference. This is catalog-level context, not keyword research. No product descriptions are used at this stage to keep the prompt lean."
+      },
+      "external_research": {
+        "status": "NOT AVAILABLE IN THIS PHASE",
+        "note": "External keyword research APIs, live competitor crawling, search volume data, and third-party market research tools are not integrated in Phase 2. If future phases add external research enrichment, this workflow must be extended with a dedicated research enrichment step before the LLM synthesis step. Until then, all outputs are synthesis-only."
+      }
+    },
+
+    "outputs": {
+      "market_intelligence": {
+        "description": "Validated market-intelligence.json conforming to schemas/market-intelligence.schema.json. A structured planning artifact containing synthesized market category, audience segments, core problems, purchase motivators, search intents, trust factors, competitor types, and positioning goals.",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "schema": "schemas/market-intelligence.schema.json",
+        "synthesis_label": "All string values in this artifact are LLM-synthesized from internal store signals. They are planning hypotheses, not confirmed market research.",
+        "field_mapping": {
+          "market_category": {
+            "source": "store_profile.vertical (direct label, refined by LLM)",
+            "type": "LLM-refined from intake vertical enum",
+            "note": "The vertical enum value is expanded into a human-readable market category string by the LLM. Example: 'consumer-tech-accessories' → 'Consumer Technology Accessories & Peripherals'."
+          },
+          "market_subcategories": {
+            "source": "derived from raw_products[*].product_type + raw_collections[*].title",
+            "type": "LLM-derived from catalog context",
+            "note": "Subcategories are inferred from the actual product types and collection titles in the Shopify catalog. Empty if catalog data is not available."
+          },
+          "audience_segments": {
+            "source": "LLM synthesis from vertical + price_positioning + catalog context",
+            "type": "LLM-synthesized planning hypothesis",
+            "note": "Minimum 1 segment required by schema. Segments are planning starting points for human review — not demographic research. Each segment includes segment_name, description, purchase_drivers, and optional barriers."
+          },
+          "core_problems": {
+            "source": "LLM synthesis from vertical + catalog context + audience segments",
+            "type": "LLM-synthesized planning hypothesis",
+            "note": "Problems the store's product category is expected to solve. Based on vertical and catalog signals only."
+          },
+          "purchase_motivators": {
+            "source": "LLM synthesis from vertical + price_positioning + brand_maturity",
+            "type": "LLM-synthesized planning hypothesis"
+          },
+          "search_intents": {
+            "source": "LLM synthesis from vertical + seo_goal + aeo_goal + knowledge_content_priority",
+            "type": "LLM-synthesized planning hypothesis",
+            "note": "Intent types constrained to schema enum: informational, commercial, transactional, navigational, comparison. Example queries are illustrative, not keyword-researched."
+          },
+          "trust_factors": {
+            "source": "LLM synthesis from vertical + price_positioning + brand_maturity",
+            "type": "LLM-synthesized planning hypothesis"
+          },
+          "competitor_types": {
+            "source": "LLM inference from vertical + price_positioning + intake.competitor_urls (as naming hints only)",
+            "type": "LLM-inferred archetype classification",
+            "note": "Competitor types describe archetypes in this market (e.g. 'large-marketplace-generalist', 'vertical-specialist', 'budget-dropshipper'). If intake.competitor_urls is provided, those URLs are used as labeling hints for LLM classification. No live crawling. Strengths and weaknesses are archetype-level inference, not evidence from actual competitor analysis."
+          },
+          "positioning_goals": {
+            "source": "LLM synthesis from vertical + price_positioning + seo_goal + aeo_goal + store_type",
+            "type": "LLM-synthesized planning hypothesis"
+          },
+          "content_opportunities": {
+            "source": "LLM synthesis from knowledge_content_priority + vertical + aeo_goal",
+            "type": "LLM-synthesized optional output",
+            "note": "Optional field in schema. Only populated if knowledge_content_priority is not 'none'."
+          },
+          "seo_considerations": {
+            "source": "LLM synthesis from seo_goal + vertical + market",
+            "type": "LLM-synthesized optional output"
+          },
+          "aeo_considerations": {
+            "source": "LLM synthesis from aeo_goal + vertical + faq_intensity",
+            "type": "LLM-synthesized optional output"
+          },
+          "notes": {
+            "source": "synthesis metadata",
+            "type": "workflow-generated",
+            "note": "The notes field is populated with a machine-generated synthesis notice: source inputs used, synthesis timestamp, and evidence boundary reminder."
+          }
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-store-profile",
+        "provides": ["store-profile.json"],
+        "required": true
+      },
+      {
+        "workflow": "intake-store-input",
+        "provides": ["normalized_intake_payload"],
+        "required": true,
+        "note": "Specifically requires competitor_urls, seo_goal, aeo_goal, knowledge_content_priority. These may be null/empty for optional fields."
+      },
+      {
+        "workflow": "import-shopify-data",
+        "provides": ["raw_products", "raw_collections"],
+        "required": false,
+        "note": "Catalog context improves synthesis quality but is not strictly required. If raw product/collection data is unavailable, the workflow falls back to vertical-only synthesis. A warning is logged."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-brand-positioning",
+        "receives": ["market-intelligence.json"]
+      },
+      {
+        "workflow": "build-competitor-clusters",
+        "receives": ["market-intelligence.json"]
+      },
+      {
+        "workflow": "build-seo-strategy",
+        "receives": ["market-intelligence.json"],
+        "note": "Out of scope for Phase 2. Documented for future reference."
+      },
+      {
+        "workflow": "build-aeo-strategy",
+        "receives": ["market-intelligence.json"],
+        "note": "Out of scope for Phase 2. Documented for future reference."
+      }
+    ],
+
+    "schema_alignment": {
+      "market-intelligence.schema.json": {
+        "required_fields_covered": [
+          "market_category",
+          "audience_segments",
+          "core_problems",
+          "purchase_motivators",
+          "search_intents",
+          "trust_factors",
+          "competitor_types",
+          "positioning_goals"
+        ],
+        "optional_fields_covered": [
+          "market_subcategories",
+          "content_opportunities",
+          "seo_considerations",
+          "aeo_considerations",
+          "notes"
+        ],
+        "optional_fields_not_covered": [
+          "media_opportunities — deferred to build-media-plan phase"
+        ],
+        "validation_note": "The output must be validated against schemas/market-intelligence.schema.json before being persisted and before downstream workflows consume it. If validation fails, the workflow must halt and report the specific schema violation. LLM output must be parsed and coerced into schema-valid structure before validation — raw LLM text is never passed as the artifact."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects store_profile (or artifact path), normalized_intake_payload (or the specific fields listed above), and optionally raw_products + raw_collections. All upstream workflows (build-store-profile and intake-store-input) must have completed successfully before this workflow begins.",
+        "input": "store_profile + normalized_intake_payload + (optional) raw_products + raw_collections",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify that required upstream inputs are present and valid. store_profile must have: store_id, vertical, price_positioning, primary_market, store_type, catalog_type. normalized_intake_payload must exist (even if optional fields are null). Log a warning if raw_products or raw_collections are absent — the workflow continues in fallback mode without catalog context. Halt only if store_profile or normalized_intake_payload are missing.",
+        "input": "all upstream inputs",
+        "output": "validated inputs + has_catalog_context boolean flag"
+      },
+      {
+        "step": 3,
+        "name": "Extract Market Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Extract and normalize the signals needed for the LLM prompt. From store_profile: vertical, price_positioning, primary_market, target_markets, store_type, catalog_type, brand_maturity, business_model. From intake: competitor_urls (array, may be empty), seo_goal, aeo_goal, knowledge_content_priority, special_notes. From catalog (if available): deduplicated product_type values, collection titles, distinct vendor names (max 10 each to keep prompt bounded). Produce a clean signal object for the LLM prompt builder.",
+        "input": "validated store_profile + normalized_intake_payload + (optional) catalog data",
+        "output": "market_signals object"
+      },
+      {
+        "step": 4,
+        "name": "Build LLM Synthesis Prompt",
+        "type": "Code node (JavaScript)",
+        "description": "Assemble the structured LLM prompt for market intelligence synthesis. The prompt must: (1) describe the task as synthesis from internal signals only, (2) instruct the model not to claim external market research certainty, (3) provide all market_signals in structured form, (4) request output as valid JSON matching schemas/market-intelligence.schema.json, (5) specify enum constraints for search_intents.intent_type explicitly, (6) instruct the model to label all outputs as synthesis-based in the notes field. Include the JSON schema structure in the prompt as a reference so the model produces schema-aligned output.",
+        "input": "market_signals object",
+        "output": "assembled LLM prompt string",
+        "prompt_safety_note": "The prompt must explicitly instruct the model: 'Do not invent specific statistics, market share figures, or keyword volume data. All outputs are planning hypotheses derived from the input signals provided.'"
+      },
+      {
+        "step": 5,
+        "name": "LLM Synthesis: Market Analysis",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API and receive the market intelligence synthesis as a JSON response. Use GPT-4o or the configured model. Request JSON output mode if supported by the model version. Temperature: 0.3 (low variance, structured output). Max tokens: 2000 (sufficient for all required fields without excessive elaboration).",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o. The credential name must be confirmed by inspecting the n8n credential vault — it is not stored in this definition.",
+        "input": "assembled LLM prompt",
+        "output": "raw LLM response string (expected to be JSON)"
+      },
+      {
+        "step": 6,
+        "name": "Parse and Normalize LLM Response",
+        "type": "Code node (JavaScript)",
+        "description": "Parse the raw LLM response string as JSON. Handle common LLM output issues: strip markdown code fences if present (```json ... ```), handle trailing commas, normalize null vs missing fields. Ensure all required schema fields are present — if the LLM omitted a required field, log the omission and attempt to apply a safe default (e.g. empty array for optional array fields) or halt with a clear error for required fields with no safe default. Inject the synthesis metadata note into the notes field: include source signals used, synthesis timestamp, evidence boundary label.",
+        "input": "raw LLM response string",
+        "output": "parsed market_intelligence object (pre-validation)"
+      },
+      {
+        "step": 7,
+        "name": "Validate Against Schema",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate the parsed market_intelligence object against schemas/market-intelligence.schema.json using ajv. If validation passes, proceed. If validation fails, halt with a clear error identifying the field and violation. Do not persist or pass downstream an invalid artifact. Common failure modes to handle explicitly: missing required array fields (minItems: 1 violations), search_intents.intent_type not matching the allowed enum, audience_segments missing purchase_drivers.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/market-intelligence.schema.json",
+        "failure_behavior": "Halt workflow. Report exact schema violation. Do not continue with an invalid artifact.",
+        "input": "parsed market_intelligence object",
+        "output": "validated market_intelligence object or validation error"
+      },
+      {
+        "step": 8,
+        "name": "Persist market-intelligence.json",
+        "type": "GitHub node or Write File node",
+        "description": "Write the validated market-intelligence.json to the project artifacts path: projects/{project_id}/market-intelligence.json. If using the GitHub node: commit to the project branch with a message such as 'chore: generate market-intelligence for {store_id}'. This artifact must be committed to Git — it is the source-of-truth planning document for downstream strategic workflows.",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "git_note": "The market-intelligence.json must be committed to Git. n8n execution logs are not sufficient persistence for a planning artifact that downstream workflows depend on.",
+        "input": "validated market_intelligence object",
+        "output": "confirmation of write + artifact path"
+      },
+      {
+        "step": 9,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the artifact path and a reference to the validated market-intelligence object to the master orchestrator for routing to build-brand-positioning and build-competitor-clusters.",
+        "input": "artifact_path + validated market_intelligence object",
+        "output": "workflow output payload"
+      }
+    ],
+
+    "assumptions": [
+      "store-profile.json is the primary anchor for all synthesis. If it changes after market-intelligence.json is generated, market-intelligence.json must be regenerated.",
+      "All LLM output is treated as synthesis-based planning hypotheses. Human review is expected before these artifacts drive major strategic decisions.",
+      "competitor_urls from intake are used only as naming hints for LLM competitor type classification. No live crawling, DNS resolution, or page fetching is performed against these URLs in this workflow.",
+      "The OpenAI credential is already configured in n8n. The actual credential name is unknown at Git-definition time and must be confirmed during n8n implementation.",
+      "GPT-4o is the assumed model. If a different model is configured, the prompt structure may need adjustment, particularly for JSON output mode compatibility.",
+      "catalog context from Shopify (product types, collection titles) improves synthesis quality but is not required. The workflow degrades gracefully without it.",
+      "The market-intelligence.json notes field is used as a machine-generated synthesis audit trail, not a freeform user notes field.",
+      "media_opportunities is intentionally not synthesized in this phase — it is deferred to the media planning phase where media strategy context is available."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should market-intelligence.json be regenerated automatically if the store-profile.json changes, or should regeneration be explicitly triggered?",
+        "impact": "If store-profile is updated post-generation, derived intelligence artifacts may become stale.",
+        "recommended_default": "Mark derived artifacts as stale in their notes field when their upstream dependency changes. Require explicit re-trigger for regeneration."
+      },
+      {
+        "question": "Should the LLM prompt include a language instruction to generate output in the store's primary_language, or always in English?",
+        "impact": "Planning artifacts that feed copy generation may benefit from being in the store's target language.",
+        "recommended_default": "Generate in English for Phase 2. Localization of planning artifacts is a future concern. Document the assumption in the notes field."
+      },
+      {
+        "question": "What is the fallback behavior if the OpenAI API call fails or returns invalid JSON after retries?",
+        "impact": "The workflow must not silently produce an empty or malformed artifact.",
+        "recommended_default": "Retry once with a simplified prompt. If the second attempt also fails, halt the workflow and log the failure. Do not attempt to manually construct an artifact from partial output."
+      },
+      {
+        "question": "Should market_subcategories be synthesized even when catalog data is unavailable?",
+        "impact": "Without catalog context, subcategories would be pure LLM speculation about the vertical.",
+        "recommended_default": "If catalog data is unavailable, omit market_subcategories (it is an optional schema field). Do not synthesize subcategories from vertical alone without catalog evidence."
+      }
+    ],
+
+    "evidence_boundaries": {
+      "what_is_internal_signal": [
+        "store_profile.vertical",
+        "store_profile.price_positioning",
+        "store_profile.primary_market",
+        "store_profile.catalog_type",
+        "intake.competitor_urls (as labels only)",
+        "intake.seo_goal",
+        "intake.aeo_goal",
+        "raw_products[*].product_type (catalog context)",
+        "raw_collections[*].title (catalog context)"
+      ],
+      "what_is_not_available": [
+        "live search volume data",
+        "real keyword research",
+        "live competitor page analysis",
+        "real demographic research",
+        "market share figures",
+        "external trend data",
+        "Google Search Console data",
+        "paid research tool outputs"
+      ],
+      "labeling_requirement": "The notes field of the output artifact must include a machine-generated label: 'SYNTHESIS-ONLY: This artifact was generated by LLM synthesis from internal store signals. It has not been validated against external market research. Treat all values as planning hypotheses requiring human review.'"
+    },
+
+    "runtime_dependencies": [
+      "n8n Execute Workflow Trigger node — receives subworkflow call from master orchestrator",
+      "n8n Code node (JavaScript) — for signal extraction, prompt building, response parsing, and schema validation",
+      "n8n OpenAI node OR HTTP Request node (OpenAI API) — for LLM synthesis",
+      "n8n GitHub node OR Write File node — for persisting market-intelligence.json",
+      "ajv (Ajv JSON Schema Validator) — for schema validation inside Code node",
+      "schemas/market-intelligence.schema.json — must be accessible to the validation step",
+      "OpenAI API credential — stored in n8n, never in Git",
+      "build-store-profile and intake-store-input must complete successfully before this workflow runs"
+    ]
+  }
+}

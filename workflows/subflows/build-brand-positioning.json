@@ -1,0 +1,434 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. Brand positioning outputs must be reviewed by a human before they drive copy generation or design decisions.",
+    "evidence_boundary_note": "Brand positioning in this workflow is synthesized from intake preferences (strong, user-decided signals) and market intelligence (LLM-synthesized context). The output is a structured planning artifact — not a finalized brand strategy validated by brand specialists. Intake-provided brand preferences (brand_role, tone_of_voice, trust_style, conversion_style) are treated as hard constraints and must not be overridden by LLM synthesis.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/brand-positioning.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+  "workflow": {
+    "id": "build-brand-positioning",
+    "name": "build-brand-positioning",
+    "category": "planning",
+    "phase": "Phase 2 — Strategic Intelligence",
+    "purpose": "Synthesize a schema-validated brand positioning artifact from user intake preferences, store profile, and market intelligence context. The output defines the store's brand role, value proposition, positioning statement, differentiators, tone of voice, trust style, and conversion style. Intake-provided brand preferences are treated as hard user decisions and passed through directly. LLM synthesis fills the remaining positioning fields using market intelligence context. The result must be reviewable by a human before it informs copy generation, design system, or section planning.",
+
+    "inputs": {
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "fields_used": [
+          "store_id",
+          "store_name",
+          "store_type",
+          "vertical",
+          "price_positioning",
+          "primary_market",
+          "target_markets",
+          "primary_language",
+          "catalog_type",
+          "brand_maturity",
+          "business_model"
+        ],
+        "note": "Store profile provides the operational and structural context that frames all brand positioning decisions."
+      },
+      "from_market_intelligence": {
+        "source": "build-market-intelligence → market-intelligence.json",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "fields_used": [
+          "market_category",
+          "audience_segments",
+          "core_problems",
+          "purchase_motivators",
+          "trust_factors",
+          "competitor_types",
+          "positioning_goals"
+        ],
+        "note": "Market intelligence provides the strategic context for LLM synthesis of value proposition, differentiators, and positioning statement. It is a synthesized planning input — see its own evidence boundaries."
+      },
+      "from_intake": {
+        "source": "intake-store-input → normalized_intake_payload",
+        "fields_used_as_hard_constraints": [
+          {
+            "field": "brand_role",
+            "treatment": "DIRECT — maps to brand_role in output. If user provided this value, it must be preserved exactly. LLM must not override it.",
+            "fallback": "If null, LLM synthesizes a recommended value from vertical + price_positioning + positioning_goals"
+          },
+          {
+            "field": "tone_of_voice",
+            "treatment": "DIRECT — maps to tone_of_voice.style in output. Schema requires nested object; intake provides a flat enum string. This workflow maps the intake string to the style sub-field.",
+            "fallback": "If null, LLM synthesizes from vertical + price_positioning + brand_role"
+          },
+          {
+            "field": "trust_style",
+            "treatment": "DIRECT — maps to trust_style.proof_mode in output. Schema requires nested object; intake provides a flat enum string.",
+            "fallback": "If null, LLM synthesizes from price_positioning + audience trust_factors"
+          },
+          {
+            "field": "conversion_style",
+            "treatment": "DIRECT — maps to conversion_style.cta_style in output. Schema requires nested object; intake provides a flat enum string.",
+            "fallback": "If null, LLM synthesizes from price_positioning + brand_role"
+          },
+          {
+            "field": "objection_handling_style",
+            "treatment": "DIRECT — maps to objection_handling_style in output if provided.",
+            "fallback": "If null, LLM synthesizes from audience barriers + trust_factors"
+          }
+        ],
+        "fields_used_as_synthesis_hints": [
+          {
+            "field": "must_feel_like",
+            "treatment": "HINT — included in LLM prompt as a positive direction signal. Influences value_proposition and positioning_statement tone.",
+            "note": "Free-text field. Sanitize before including in prompt."
+          },
+          {
+            "field": "must_not_feel_like",
+            "treatment": "HINT — included in LLM prompt as a negative direction signal. Maps to forbidden_impressions in output.",
+            "note": "Free-text field. Sanitize before including in prompt."
+          },
+          {
+            "field": "desired_style_hints",
+            "treatment": "HINT — included in LLM prompt as a positive visual positioning signal. Influences visual_positioning_hint in output.",
+            "note": "Array of enum strings."
+          },
+          {
+            "field": "forbidden_styles",
+            "treatment": "HINT — included in LLM prompt as a negative visual signal. Also contributes to forbidden_impressions in output.",
+            "note": "Array of enum strings."
+          },
+          {
+            "field": "special_notes",
+            "treatment": "HINT — included in LLM prompt if non-null. May contain brand context not captured in structured fields.",
+            "note": "Free-text field. Sanitize before including in prompt."
+          }
+        ],
+        "schema_mismatch_note": "The intake form provides brand_role, tone_of_voice, trust_style, and conversion_style as flat enum strings. The brand-positioning schema requires nested objects for tone_of_voice (style + clarity_level + emotional_intensity), trust_style (proof_mode + reassurance_level), and conversion_style (cta_style + sales_pressure). This workflow resolves the mismatch: intake enum values map to the primary sub-field; LLM synthesizes the secondary sub-fields."
+      }
+    },
+
+    "outputs": {
+      "brand_positioning": {
+        "description": "Validated brand-positioning.json conforming to schemas/brand-positioning.schema.json. A structured planning artifact defining brand role, value proposition, positioning statement, differentiators, brand traits, tone of voice, trust style, and conversion style.",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "schema": "schemas/brand-positioning.schema.json",
+        "field_mapping": {
+          "brand_role": {
+            "source": "intake.brand_role (direct if provided) OR LLM synthesis",
+            "type": "direct-or-synthesized",
+            "schema_enum": ["specialist", "curator", "problem-solver", "premium-innovator", "editorial-guide", "value-leader"]
+          },
+          "value_proposition": {
+            "source": "LLM synthesis from audience_segments + core_problems + purchase_motivators + store profile",
+            "type": "LLM-synthesized",
+            "note": "A short, concrete statement of the store's unique offer. Must be human-reviewable."
+          },
+          "positioning_statement": {
+            "source": "LLM synthesis from value_proposition + brand_role + differentiators + market context",
+            "type": "LLM-synthesized",
+            "note": "A single sentence describing the store's strategic position relative to competitor types."
+          },
+          "differentiators": {
+            "source": "LLM synthesis from competitor_types + purchase_motivators + price_positioning + catalog_type",
+            "type": "LLM-synthesized",
+            "note": "Array of differentiator strings. Must contain at least 1 per schema. Should be grounded in the market intelligence — not generic platitudes. LLM instructed to derive from competitor_types weaknesses and store profile strengths."
+          },
+          "brand_traits": {
+            "source": "LLM synthesis from brand_role + tone_of_voice + must_feel_like hint",
+            "type": "LLM-synthesized",
+            "note": "Array, minimum 2 per schema. Adjective or short phrase descriptions of the brand personality."
+          },
+          "tone_of_voice": {
+            "source": "hybrid — intake provides style; LLM synthesizes clarity_level and emotional_intensity",
+            "type": "hybrid direct + LLM-synthesized",
+            "field_breakdown": {
+              "style": "DIRECT from intake.tone_of_voice enum (or LLM fallback if null)",
+              "clarity_level": "LLM synthesis based on tone style + vertical + price_positioning. Default mapping: clear-direct → very-clear, premium-confident → balanced, warm-helpful → balanced, editorial-smart → more-expressive, playful-bold → more-expressive, technical-trustworthy → very-clear",
+              "emotional_intensity": "LLM synthesis based on tone style + price_positioning. Default mapping: premium-confident → medium, playful-bold → high, clear-direct → low, technical-trustworthy → low, warm-helpful → medium, editorial-smart → medium"
+            },
+            "schema_enum_style": ["clear-direct", "premium-confident", "warm-helpful", "editorial-smart", "playful-bold", "technical-trustworthy"],
+            "schema_enum_clarity_level": ["very-clear", "balanced", "more-expressive"],
+            "schema_enum_emotional_intensity": ["low", "medium", "high"]
+          },
+          "trust_style": {
+            "source": "hybrid — intake provides proof_mode; LLM synthesizes reassurance_level",
+            "type": "hybrid direct + LLM-synthesized",
+            "field_breakdown": {
+              "proof_mode": "DIRECT from intake.trust_style enum (or LLM fallback if null)",
+              "reassurance_level": "LLM synthesis from price_positioning + catalog_type + brand_maturity. Higher-priced or new brands typically need stronger reassurance."
+            },
+            "schema_enum_proof_mode": ["evidence-led", "social-proof-led", "authority-led", "guarantee-led", "mixed"],
+            "schema_enum_reassurance_level": ["light", "moderate", "strong"]
+          },
+          "conversion_style": {
+            "source": "hybrid — intake provides cta_style; LLM synthesizes sales_pressure",
+            "type": "hybrid direct + LLM-synthesized",
+            "field_breakdown": {
+              "cta_style": "DIRECT from intake.conversion_style enum (or LLM fallback if null)",
+              "sales_pressure": "LLM synthesis from price_positioning + brand_role. Premium brands generally have lower sales_pressure; value-leaders higher. Enum: low, medium, high."
+            },
+            "schema_enum_cta_style": ["subtle", "balanced", "assertive"],
+            "schema_enum_sales_pressure": ["low", "medium", "high"]
+          },
+          "objection_handling_style": {
+            "source": "intake.objection_handling_style (direct if provided) OR LLM synthesis",
+            "type": "direct-or-synthesized",
+            "schema_enum": ["minimal", "balanced", "detailed"]
+          },
+          "visual_positioning_hint": {
+            "source": "LLM synthesis from desired_style_hints + brand_role + price_positioning",
+            "type": "LLM-synthesized optional output",
+            "note": "A short description to orient the design system phase. Not a detailed design spec."
+          },
+          "media_style_hint": {
+            "source": "LLM synthesis from price_positioning + brand_role + vertical",
+            "type": "LLM-synthesized optional output"
+          },
+          "seo_tone_hint": {
+            "source": "LLM synthesis from tone_of_voice + seo_goal",
+            "type": "LLM-synthesized optional output"
+          },
+          "aeo_tone_hint": {
+            "source": "LLM synthesis from tone_of_voice + aeo_goal",
+            "type": "LLM-synthesized optional output"
+          },
+          "forbidden_impressions": {
+            "source": "intake.must_not_feel_like + intake.forbidden_styles (merged and normalized)",
+            "type": "direct from intake (merged)",
+            "note": "Combines the free-text must_not_feel_like and the enum array forbidden_styles into a single array of string descriptions. LLM may supplement with inferences from competitor_types that should be avoided."
+          },
+          "notes": {
+            "source": "workflow-generated synthesis metadata",
+            "type": "machine-generated",
+            "note": "Populated with: which intake fields were direct vs LLM-synthesized, synthesis timestamp, evidence boundary reminder, and a human review prompt."
+          }
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-store-profile",
+        "provides": ["store-profile.json"],
+        "required": true
+      },
+      {
+        "workflow": "build-market-intelligence",
+        "provides": ["market-intelligence.json"],
+        "required": true,
+        "note": "Market intelligence is required to produce meaningful differentiators and a grounded positioning statement. Without it, the LLM would synthesize entirely from intake, which may produce generic output."
+      },
+      {
+        "workflow": "intake-store-input",
+        "provides": ["normalized_intake_payload"],
+        "required": true,
+        "note": "Brand preference fields (brand_role, tone_of_voice, trust_style, conversion_style) are direct user decisions. Must be preserved exactly."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-pattern-manifest",
+        "receives": ["brand-positioning.json"],
+        "note": "Out of scope for Phase 2. Documented for future reference."
+      },
+      {
+        "workflow": "build-design-system",
+        "receives": ["brand-positioning.json"],
+        "note": "Out of scope for Phase 2. Documented for future reference."
+      },
+      {
+        "workflow": "build-product-content",
+        "receives": ["brand-positioning.json"],
+        "note": "Out of scope for Phase 2. Documented for future reference."
+      },
+      {
+        "workflow": "build-collection-content",
+        "receives": ["brand-positioning.json"],
+        "note": "Out of scope for Phase 2. Documented for future reference."
+      }
+    ],
+
+    "schema_alignment": {
+      "brand-positioning.schema.json": {
+        "required_fields_covered": [
+          "brand_role",
+          "value_proposition",
+          "positioning_statement",
+          "differentiators",
+          "brand_traits",
+          "tone_of_voice",
+          "trust_style",
+          "conversion_style"
+        ],
+        "optional_fields_covered": [
+          "objection_handling_style",
+          "visual_positioning_hint",
+          "media_style_hint",
+          "seo_tone_hint",
+          "aeo_tone_hint",
+          "forbidden_impressions",
+          "notes"
+        ],
+        "nested_object_handling": "tone_of_voice, trust_style, and conversion_style are nested objects in the schema but flat enum fields in the intake form. This workflow bridges the mismatch explicitly — see field_mapping above.",
+        "validation_note": "The output must be validated against schemas/brand-positioning.schema.json before persisting. LLM output must be parsed and coerced into schema-valid structure. Enum values must be validated against the schema enums, not against intake enum lists (they overlap but are defined in the schema)."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects store_profile (or path), market_intelligence (or path), and normalized_intake_payload. All three upstream inputs must be present before this workflow begins.",
+        "input": "store_profile + market_intelligence + normalized_intake_payload",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify that required upstream inputs are present and have the expected structure. store_profile must have: store_id, vertical, price_positioning, store_type. market_intelligence must have: audience_segments (non-empty), core_problems (non-empty), purchase_motivators (non-empty), competitor_types (non-empty), positioning_goals (non-empty). normalized_intake_payload must exist. Halt with a clear error if any required input is missing.",
+        "input": "all upstream inputs",
+        "output": "validated inputs or error"
+      },
+      {
+        "step": 3,
+        "name": "Extract and Classify Intake Brand Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Extract intake brand preference fields and classify each as: DIRECT (user-set, must be preserved) or NULL (not provided, LLM will synthesize). Produce a structured brand_signals object with: brand_role (value or null), tone_of_voice_style (intake.tone_of_voice or null), trust_proof_mode (intake.trust_style or null), conversion_cta_style (intake.conversion_style or null), objection_handling (intake.objection_handling_style or null), must_feel_like (sanitized string or null), must_not_feel_like (sanitized string or null), desired_style_hints (array or []), forbidden_styles (array or []), special_notes (sanitized string or null). Log which fields were user-provided vs will-be-synthesized.",
+        "input": "normalized_intake_payload",
+        "output": "brand_signals object with provenance annotations"
+      },
+      {
+        "step": 4,
+        "name": "Build LLM Synthesis Prompt",
+        "type": "Code node (JavaScript)",
+        "description": "Assemble the structured LLM prompt for brand positioning synthesis. The prompt must: (1) Clearly separate DIRECT fields (user decisions, must not be changed) from fields to be synthesized. (2) Provide store_profile context (vertical, price_positioning, store_type, catalog_type, brand_maturity). (3) Provide relevant market_intelligence context (audience_segments, core_problems, purchase_motivators, competitor_types weaknesses, positioning_goals). (4) Include all brand_signals (direct values and synthesis hints). (5) Request output as valid JSON matching schemas/brand-positioning.schema.json. (6) Provide the nested object structure for tone_of_voice, trust_style, and conversion_style explicitly in the prompt so the model produces correct structure. (7) Instruct the model that brand positioning is a planning hypothesis and must include a clear synthesis note in the notes field.",
+        "input": "brand_signals + validated store_profile + validated market_intelligence",
+        "output": "assembled LLM prompt string",
+        "prompt_safety_note": "The prompt must explicitly state: 'Fields marked as DIRECT are user decisions. Do not change their values. Synthesize only the fields marked as SYNTHESIZE. All outputs are planning hypotheses for human review.'"
+      },
+      {
+        "step": 5,
+        "name": "LLM Synthesis: Brand Positioning",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API. Request JSON output mode if supported. Temperature: 0.3. Max tokens: 1500. The LLM is expected to return a JSON object for brand-positioning.json with all required and relevant optional fields.",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt",
+        "output": "raw LLM response string (expected to be JSON)"
+      },
+      {
+        "step": 6,
+        "name": "Parse, Merge, and Enforce Direct Fields",
+        "type": "Code node (JavaScript)",
+        "description": "Parse the raw LLM response as JSON. Then enforce direct-field integrity: overwrite any LLM-synthesized values for brand_role, tone_of_voice.style, trust_style.proof_mode, conversion_style.cta_style, and objection_handling_style with the original user-provided intake values where those values were non-null. This step is critical: the LLM may have drifted from user-provided values even when instructed not to. Merge forbidden_impressions from intake (must_not_feel_like + forbidden_styles) with any LLM additions. Inject the synthesis metadata note into the notes field: list which fields were direct vs synthesized, synthesis timestamp, evidence boundary label.",
+        "input": "raw LLM response string + brand_signals (for direct-field enforcement)",
+        "output": "parsed and merged brand_positioning object (pre-validation)"
+      },
+      {
+        "step": 7,
+        "name": "Validate Against Schema",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate the parsed brand_positioning object against schemas/brand-positioning.schema.json using ajv. Common failure modes to handle explicitly: brand_role not in enum, tone_of_voice.style not in enum, differentiators array is empty (minItems: 1), brand_traits array has fewer than 2 items (minItems: 2). If validation fails, halt and report the specific violation. Do not persist an invalid artifact.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/brand-positioning.schema.json",
+        "failure_behavior": "Halt workflow. Report exact schema violation. Do not continue with an invalid artifact.",
+        "input": "parsed and merged brand_positioning object",
+        "output": "validated brand_positioning object or validation error"
+      },
+      {
+        "step": 8,
+        "name": "Persist brand-positioning.json",
+        "type": "GitHub node or Write File node",
+        "description": "Write the validated brand-positioning.json to the project artifacts path: projects/{project_id}/brand-positioning.json. Commit with a message such as 'chore: generate brand-positioning for {store_id}'. This artifact is required by downstream design and content workflows.",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "git_note": "The brand-positioning.json must be committed to Git. It is a key planning anchor for downstream generation workflows.",
+        "input": "validated brand_positioning object",
+        "output": "confirmation of write + artifact path"
+      },
+      {
+        "step": 9,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the artifact path and a reference to the validated brand_positioning object to the master orchestrator.",
+        "input": "artifact_path + validated brand_positioning object",
+        "output": "workflow output payload"
+      }
+    ],
+
+    "assumptions": [
+      "brand_role, tone_of_voice, trust_style, conversion_style, and objection_handling_style from intake are treated as hard user decisions when non-null. The LLM must not override these values regardless of what market intelligence suggests.",
+      "The schema mismatch between flat intake enums and nested schema objects is resolved at Step 6 (merge step). The LLM receives both the flat intake values (as direct constraints) and the schema structure (as the required output format).",
+      "market-intelligence.json must be generated and valid before this workflow runs. Brand positioning without market intelligence context risks producing generic, ungrounded output.",
+      "brand-positioning.json is explicitly a planning hypothesis for human review. It should not be consumed directly by generation workflows without a human review step — this is enforced by the manual_review_required governance field from intake.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "seo_tone_hint and aeo_tone_hint are synthesized even though SEO/AEO strategy workflows are out of scope for Phase 2 — they are useful early signals that downstream phases will consume.",
+      "media_style_hint is synthesized as a brief orientation signal for the future design system phase. It is not a detailed design specification."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should brand-positioning.json be generated even if market-intelligence.json is only a synthesis-based artifact with no external research validation?",
+        "impact": "Both artifacts are synthesis-based in Phase 2. Brand positioning built on unvalidated market intelligence inherits the same uncertainty. This should be clearly communicated in both artifacts' notes fields.",
+        "recommended_default": "Proceed with synthesis-based inputs for Phase 2. Both artifacts must carry the synthesis-only evidence boundary label. A future enrichment phase can add external research before these artifacts drive final decisions."
+      },
+      {
+        "question": "What should happen if the LLM returns a brand_role value that conflicts with the user's intake-provided value?",
+        "impact": "The merge step in Step 6 overrides the LLM value with the intake value for direct fields. But the LLM may have synthesized other fields (e.g. positioning_statement) assuming its own brand_role choice.",
+        "recommended_default": "After enforcing the direct brand_role, re-run a secondary LLM pass to re-synthesize dependent fields (value_proposition, positioning_statement) using the correct brand_role. Document this as a potential two-pass pattern if coherence issues arise."
+      },
+      {
+        "question": "Should forbidden_impressions also include inferences from market intelligence competitor_types that the store explicitly wants to differentiate from?",
+        "impact": "This would make forbidden_impressions richer and more grounded, but adds LLM inference complexity.",
+        "recommended_default": "Yes, include this as an instruction in the LLM prompt: 'From the competitor_types weaknesses, infer additional impressions the store should explicitly avoid, and add them to forbidden_impressions.' Label LLM-inferred additions clearly in the artifact."
+      }
+    ],
+
+    "evidence_boundaries": {
+      "direct_from_user": [
+        "brand_role (if provided in intake)",
+        "tone_of_voice.style (mapped from intake.tone_of_voice)",
+        "trust_style.proof_mode (mapped from intake.trust_style)",
+        "conversion_style.cta_style (mapped from intake.conversion_style)",
+        "objection_handling_style (if provided in intake)",
+        "forbidden_impressions base (from intake.must_not_feel_like + forbidden_styles)"
+      ],
+      "synthesized_from_internal_signals": [
+        "value_proposition",
+        "positioning_statement",
+        "differentiators",
+        "brand_traits",
+        "tone_of_voice.clarity_level",
+        "tone_of_voice.emotional_intensity",
+        "trust_style.reassurance_level",
+        "conversion_style.sales_pressure",
+        "visual_positioning_hint",
+        "media_style_hint",
+        "seo_tone_hint",
+        "aeo_tone_hint"
+      ],
+      "labeling_requirement": "The notes field must include: 'BRAND POSITIONING — SYNTHESIS ARTIFACT: Direct fields (brand_role, tone style, trust proof mode, conversion CTA style) reflect user intake decisions. All other fields are LLM-synthesized from store profile and market intelligence context. Human review is required before these values are used to drive copy generation or design decisions.'"
+    },
+
+    "runtime_dependencies": [
+      "n8n Execute Workflow Trigger node — receives subworkflow call from master orchestrator",
+      "n8n Code node (JavaScript) — for signal extraction, prompt building, response parsing, direct-field enforcement, and schema validation",
+      "n8n OpenAI node OR HTTP Request node (OpenAI API) — for LLM synthesis",
+      "n8n GitHub node OR Write File node — for persisting brand-positioning.json",
+      "ajv (Ajv JSON Schema Validator) — for schema validation inside Code node",
+      "schemas/brand-positioning.schema.json — must be accessible to the validation step",
+      "OpenAI API credential — stored in n8n, never in Git",
+      "build-store-profile, build-market-intelligence, and intake-store-input must all complete successfully before this workflow runs"
+    ]
+  }
+}
