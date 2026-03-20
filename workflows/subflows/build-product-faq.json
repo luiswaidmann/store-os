@@ -1,0 +1,506 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. Product FAQ outputs are planning artifacts — not validated customer research, not finalized AEO-strategy-aligned FAQ sets, and not published FAQ copy. FAQ items generated here are editorial syntheses grounded in product data signals. They represent likely objection-handling, support-reduction, and trust-building questions — not questions proven through user research. They are useful planning seeds for later AEO work, but must not be presented as verified buyer intent data.",
+    "faq_certainty_note": "IMPORTANT — FAQ ITEMS ARE NOT PROVEN CUSTOMER QUESTIONS: FAQ items in this workflow are synthesized from product-content signals (faq_items seeds, objection_handling, use_cases), product-seo answer_targets, and brand positioning context. They are editorial framings of likely questions a buyer might have — not questions derived from actual user research, search query data, or customer support records. Do not present these FAQs as 'questions customers are asking' unless they are explicitly sourced. The notes field must include: 'FAQ-PLANNING-ARTIFACT: These FAQ items are synthesized planning content grounded in available product signals. They are not proven customer questions. Human review is required before use in a live store.'",
+    "aeo_provisional_note": "IMPORTANT — AEO STRATEGY IS NOT AVAILABLE IN PHASE 5: aeo-strategy.json (workflow 12) is out of Phase 5 scope. FAQ items generated here are provisional AEO seeds — they are not aligned to a finalized AEO strategy. When aeo-strategy.json becomes available in a later phase, FAQ items should be reviewed and updated against the finalized AEO question taxonomy and answer format strategy. All FAQ items are marked PROVISIONAL-PENDING-AEO-STRATEGY in the output notes.",
+    "claim_safety_note": "FAQ answers must not make claims that go beyond what is inferable from the actual Shopify product data and content plan. This means: no invented specifications, no fabricated certifications, no unsupported health or performance claims, no exaggerated before-after outcomes, no guarantee promises not present in the brand-positioning trust_style. If an FAQ answer cannot be written honestly from available data, the answer must be populated with 'PLACEHOLDER-REQUIRES-REVIEW — answer requires product data or expert input before publishing.' rather than invented content.",
+    "sparse_data_note": "If product-content notes contain a SPARSE DATA flag, this workflow must activate conservative FAQ behavior: limit FAQ set to 2-3 minimal items (shipping, returns, general use case), mark all items as SPARSE-FAQ-REQUIRES-ENRICHMENT, and populate notes with 'SPARSE DATA: FAQ plan is minimal due to limited product data. Human enrichment required before this FAQ set is usable.'",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/product-faq.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-product-faq",
+    "name": "build-product-faq",
+    "category": "planning",
+    "phase": "Phase 5 — Commerce Content Planning (Extended)",
+    "purpose": "Synthesize schema-validated product FAQ planning artifacts for each product, drawing from product-content plans, product-seo answer targets, brand positioning, and store profile context. FAQ items are editorial framings of likely buyer questions — grounded in product signals but not proven by user research. The output per product is a product-faq.json that defines: faq_goal (conversion-support, trust-building, objection-handling, support-reduction, or hybrid), faq_items (synthesized Q&A pairs with question_type classification), trust_role, support_role, faq_schema_priority, and notes. Because aeo-strategy.json is not yet available in Phase 5, all FAQ items are provisional AEO seeds — planning artifacts useful for downstream structured data planning and eventual AEO alignment, not finalized answer engine content. Sparse product data triggers conservative fallback behavior. FAQ answers must never exceed what the available product data can honestly support.",
+
+    "phase_ordering_note": "In the full workflow chain, build-product-faq (step 15) is intended to receive aeo-strategy.json (step 12) as an optional input for AEO alignment. Phase 5 implements steps 15, 16, and 17 without steps 11 or 12 available. This workflow operates safely without aeo-strategy.json through explicit provisional flagging. When aeo-strategy.json becomes available in a later phase, a review pass on all product-faq artifacts is strongly recommended to align question_types and answer framing with the finalized AEO question taxonomy.",
+
+    "inputs": {
+      "from_product_content": {
+        "source": "build-product-content → product-content.json (per product)",
+        "artifact_path": "projects/{project_id}/product-content/{product_handle}.json",
+        "data_treatment": "PRIMARY INPUT — product content plan is the main source of FAQ synthesis signals",
+        "fields_used": [
+          {
+            "field": "faq_items",
+            "treatment": "FAQ SEEDS — the faq_items in the product-content plan are editorial planning seeds generated during content planning. They are the starting point for this workflow's FAQ synthesis. However, this workflow must not simply copy them — it should enrich, restructure, and type-classify them using the full product signal context available here.",
+            "note": "product-content faq_items are planning seeds, not finalized FAQ content. They may be shallow or incomplete — this workflow deepens them using product-seo answer_targets, brand positioning signals, and question_type classification."
+          },
+          {
+            "field": "objection_handling",
+            "treatment": "STRONG FAQ SIGNAL — objection_handling items represent real buyer hesitations derived from market intelligence. Each objection-response pair is a strong candidate for a conversion-support or trust FAQ item. The objection text orients the question; the response text orients the answer.",
+            "note": "Objection handling items are the most evidence-grounded source for FAQ synthesis in this workflow. Prioritize them for question_type = 'trust', 'comparison', or 'use-case' style FAQs."
+          },
+          {
+            "field": "use_cases",
+            "treatment": "FAQ SIGNAL — use cases reveal who the product is for and how it is applied. Each use case is a candidate for question_type = 'who-is-it-for', 'how-does-it-work', or 'use-case' style FAQs.",
+            "note": "Use cases are synthesized planning content — they orient FAQ thinking without being verified product facts."
+          },
+          {
+            "field": "trust_elements",
+            "treatment": "FAQ FRAMING SIGNAL — trust elements inform the trust_role assignment and suggest what trust-building FAQ topics are most relevant for this product (e.g. warranty, returns, quality signals).",
+            "note": "trust_elements are planning artifacts — they must not be inflated into guarantee claims in FAQ answers."
+          },
+          {
+            "field": "shipping_notes",
+            "treatment": "DIRECT FAQ INPUT — if shipping_notes is present and non-empty, it provides factual content for a shipping FAQ item. Treat as operational-truth-adjacent input (sourced from store policy or Shopify data).",
+            "note": "If shipping_notes is absent, a shipping FAQ item must use: 'PLACEHOLDER-REQUIRES-REVIEW — shipping details must be confirmed before publishing.'"
+          },
+          {
+            "field": "returns_notes",
+            "treatment": "DIRECT FAQ INPUT — if returns_notes is present and non-empty, it provides factual content for a returns FAQ item.",
+            "note": "If returns_notes is absent, a returns FAQ item must use: 'PLACEHOLDER-REQUIRES-REVIEW — returns policy must be confirmed before publishing.'"
+          },
+          {
+            "field": "cta_direction.primary_cta",
+            "treatment": "FAQ GOAL SIGNAL — CTA direction helps determine faq_goal. buy-now or add-to-cart → conversion-support FAQs are important. learn-more → trust-building or informational FAQs are important. choose-variant → compatibility and comparison FAQs are important.",
+            "note": "Cross-referenced with product-seo search_intent to determine faq_goal."
+          },
+          {
+            "field": "notes",
+            "treatment": "SPARSE DATA PROPAGATION — the product-content notes field may contain SPARSE DATA flags that must propagate to this workflow. If the content plan notes contain 'SPARSE DATA:', activate conservative FAQ behavior for this product.",
+            "note": "Sparse flag propagation prevents this workflow from synthesizing full FAQ sets for products whose underlying data cannot support honest answers."
+          }
+        ]
+      },
+
+      "from_product_seo": {
+        "source": "build-product-seo → product-seo.json (per product)",
+        "artifact_path": "projects/{project_id}/product-seo/{product_handle}.json",
+        "data_treatment": "SECONDARY INPUT — product SEO plan provides answer_targets and search_intent as directional AEO signals for FAQ planning",
+        "fields_used": [
+          {
+            "field": "answer_targets",
+            "treatment": "AEO ORIENTATION — answer_targets from product-seo are provisional AEO seeds that describe what questions the product page should be able to answer. Each answer_target with a question_type and answer_goal provides structural orientation for FAQ item synthesis. question_type in answer_targets maps directly to the question_type enum in product-faq.schema.json.",
+            "note": "answer_targets are provisional (PROVISIONAL-PENDING-AEO-STRATEGY). They are planning seeds — not validated AEO strategy decisions. Use them as directional guidance for which question_types to cover in the FAQ set."
+          },
+          {
+            "field": "search_intent",
+            "treatment": "FAQ GOAL SIGNAL — search_intent from product-seo helps determine faq_goal. transactional → faq_goal leans conversion-support. informational → faq_goal leans trust-building. commercial/comparison → faq_goal leans objection-handling. hybrid → faq_goal = hybrid.",
+            "note": "Cross-referenced with cta_direction.primary_cta from product-content."
+          },
+          {
+            "field": "structured_data_targets",
+            "treatment": "FAQ SCHEMA PRIORITY SIGNAL — if structured_data_targets contains 'faq', it means the product-seo plan identified FAQ schema as a structured data target. This elevates faq_schema_priority to 'high' for this product.",
+            "note": "structured_data_targets may be absent in sparse-data products. Handle gracefully."
+          },
+          {
+            "field": "notes",
+            "treatment": "PROVISIONAL STATUS PROPAGATION — if product-seo notes contain PROVISIONAL-PENDING-AEO-STRATEGY flags, these propagate to the FAQ artifact notes.",
+            "note": "Ensures downstream consumers know the AEO strategy gap persists across the full Phase 5 artifact set."
+          }
+        ]
+      },
+
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "data_treatment": "STYLE AND TRUST CONSTRAINTS — brand positioning shapes FAQ tone, trust_role, and support_role",
+        "fields_used": [
+          {
+            "field": "objection_handling_style",
+            "treatment": "SUPPORT ROLE MAPPING — objection_handling_style maps directly to support_role. detailed → support_role = strong. balanced → support_role = balanced. minimal → support_role = light.",
+            "note": "Direct mapping — no LLM synthesis needed for this field."
+          },
+          {
+            "field": "trust_style.proof_mode",
+            "treatment": "TRUST ROLE SIGNAL — proof_mode shapes trust_role. guarantee-led → trust_role = strong. authority-led → trust_role = balanced. social-proof-led → trust_role = light. evidence-led → trust_role = balanced.",
+            "note": "trust_role = light does not mean trust FAQs are absent — it means trust FAQs are secondary to functional FAQs."
+          },
+          {
+            "field": "trust_style.reassurance_level",
+            "treatment": "TRUST ROLE MODIFIER — strong reassurance_level pushes trust_role up one level if not already strong. light reassurance_level keeps trust_role at balanced or lower.",
+            "note": "Combined with proof_mode to determine final trust_role assignment."
+          },
+          {
+            "field": "tone_of_voice.style",
+            "treatment": "FAQ COPY TONE — shapes how FAQ questions and answers are phrased. clear-direct → plain language. premium-confident → elevated, benefit-forward framing. warm-helpful → approachable. editorial-smart → insightful. technical-trustworthy → spec-aware, precise. playful-bold → engaging.",
+            "note": "Tone is enforced in the LLM prompt as a non-negotiable style constraint for all FAQ copy."
+          },
+          {
+            "field": "forbidden_impressions",
+            "treatment": "HARD CONSTRAINT — FAQ answers must not create any of the listed forbidden impressions.",
+            "note": "Optional field — handle gracefully if absent."
+          }
+        ]
+      },
+
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "data_treatment": "CONTEXTUAL SIGNALS — store profile provides price positioning and catalog context for FAQ planning",
+        "fields_used": [
+          {
+            "field": "price_positioning",
+            "treatment": "FAQ DEPTH SIGNAL — premium or luxury → more trust-building FAQs recommended (4-6 items). budget or mass-market → lighter FAQ set appropriate (2-4 items).",
+            "note": "price_positioning is a planning signal — it influences FAQ quantity and depth, not the question types themselves."
+          },
+          {
+            "field": "catalog_type",
+            "treatment": "CONTEXT — single-product → highly specific FAQ set. broad-catalog → concise per-product FAQs. small-curated-catalog → balanced specificity.",
+            "note": "Used as a structural planning hint."
+          },
+          {
+            "field": "business_model",
+            "treatment": "SAFETY FLAG — business_model = dropshipping means the store may not control fulfillment. Shipping and returns FAQ answers must use PLACEHOLDER-REQUIRES-REVIEW if no explicit policy details are available.",
+            "note": "Dropshipping stores must not invent fulfillment specifics in FAQ answers."
+          }
+        ]
+      },
+
+      "from_aeo_strategy": {
+        "source": "build-aeo-strategy → aeo-strategy.json (OPTIONAL — NOT AVAILABLE IN PHASE 5)",
+        "artifact_path": "projects/{project_id}/aeo-strategy.json",
+        "availability": "NOT AVAILABLE IN PHASE 5 — build-aeo-strategy (workflow 12) is out of Phase 5 scope",
+        "treatment_when_absent": "All FAQ items are provisional AEO seeds. question_type assignments are oriented by answer_targets from product-seo (themselves provisional) and market intelligence content_opportunities. All FAQ items are marked PROVISIONAL-PENDING-AEO-STRATEGY in the output notes.",
+        "treatment_when_present": "If aeo-strategy.json is passed as an optional input in a later run, use it to: constrain question_types to the store's approved AEO question taxonomy, validate answer framing against the store's declared answer format strategy, and confirm faq_schema_priority alignment with the store's structured data priorities.",
+        "fields_that_would_be_used": [
+          "question_taxonomy (would constrain question_type selection per product)",
+          "answer_format_strategy (would constrain FAQ answer length and structure)",
+          "structured_data_priority (would inform faq_schema_priority assignments)"
+        ]
+      }
+    },
+
+    "outputs": {
+      "product_faq_set": {
+        "description": "A set of product-faq.json artifacts, one per imported Shopify product. Each artifact conforms to schemas/product-faq.schema.json. These are provisional planning artifacts — not validated customer FAQ sets, not finalized AEO content, and not published FAQ copy.",
+        "artifact_path": "projects/{project_id}/product-faq/{product_handle}.json",
+        "schema": "schemas/product-faq.schema.json",
+        "field_mapping": {
+          "product_id": {
+            "source": "Shopify product handle (operational truth — consistent with product-seo.json slug)",
+            "type": "operational truth string",
+            "note": "Must conform to pattern ^[a-z0-9-]+$."
+          },
+          "faq_goal": {
+            "source": "Derived from product-seo search_intent + product-content cta_direction.primary_cta + brand-positioning trust_style.proof_mode + store-profile price_positioning",
+            "type": "derived enum",
+            "derivation_logic": {
+              "conversion-support": "search_intent = transactional AND cta = buy-now or add-to-cart",
+              "trust-building": "search_intent = informational OR price_positioning = premium or luxury",
+              "objection-handling": "search_intent = comparison OR objection_handling in content plan has 3+ items",
+              "support-reduction": "product has complex use cases AND catalog_type = broad-catalog",
+              "hybrid": "mixed or conflicting signals — safe default"
+            },
+            "schema_enum": ["conversion-support", "trust-building", "objection-handling", "support-reduction", "hybrid"],
+            "note": "hybrid is the safe default when derivation signals are unclear or conflicting."
+          },
+          "faq_items": {
+            "source": "LLM synthesis grounded in: product-content faq_items (seeds), objection_handling, use_cases, product-seo answer_targets, brand-positioning tone and trust signals",
+            "type": "LLM-synthesized array (minItems: 1)",
+            "quantity_guidance": {
+              "sparse_data": "2-3 items maximum — shipping, returns, one generic use case. All marked SPARSE-FAQ-REQUIRES-ENRICHMENT.",
+              "standard_product": "3-5 items covering use case, trust, and transactional questions.",
+              "high_consideration_product": "5-7 items covering use case, comparison, trust, compatibility, shipping, and returns.",
+              "premium_priced_product": "4-6 items with heavier weight on trust and objection-handling questions."
+            },
+            "question_type_guidance": {
+              "what-is-it": "For products where product_type_clear = false or where category context needs educational framing",
+              "who-is-it-for": "For most products — oriented by audience_segments from market intelligence",
+              "how-does-it-work": "For products with a mechanism of action, setup process, or functional complexity",
+              "compatibility": "For products where fit, size, system requirements, or technical compatibility are relevant",
+              "care": "Only if care_instructions are present in product-content — do not invent care instructions",
+              "shipping": "For all products — answer must use shipping_notes if present, placeholder if absent",
+              "returns": "For all products — answer must use returns_notes if present, placeholder if absent",
+              "comparison": "For products in competitive categories where comparison questions appear in market search_intents",
+              "trust": "For high-price or high-commitment products where buyer reassurance is important",
+              "use-case": "When use_cases in product-content suggest specific application scenarios worth addressing",
+              "general": "Fallback type for questions that do not cleanly fit another type"
+            },
+            "answer_safety_rules": [
+              "Answers must not invent product specifications not present in Shopify data",
+              "Answers must not make performance claims not inferable from product-content signals",
+              "Answers must not promise certifications, guarantees, or warranties not stated in brand-positioning trust_style",
+              "Answers must not include invented shipping times, costs, or carrier names",
+              "Answers must not state returns conditions not present in returns_notes",
+              "If an answer requires information not available in inputs, use PLACEHOLDER-REQUIRES-REVIEW with a clear description of what information is needed"
+            ]
+          },
+          "trust_role": {
+            "source": "Derived from brand-positioning.trust_style.proof_mode + trust_style.reassurance_level",
+            "type": "derived enum",
+            "derivation_logic": {
+              "strong": "proof_mode = guarantee-led OR reassurance_level = strong",
+              "balanced": "proof_mode = evidence-led OR authority-led OR mixed",
+              "light": "proof_mode = social-proof-led AND reassurance_level != strong"
+            },
+            "schema_enum": ["light", "balanced", "strong"]
+          },
+          "support_role": {
+            "source": "Derived from brand-positioning.objection_handling_style",
+            "type": "derived enum",
+            "derivation_logic": {
+              "strong": "objection_handling_style = detailed",
+              "balanced": "objection_handling_style = balanced",
+              "light": "objection_handling_style = minimal"
+            },
+            "schema_enum": ["light", "balanced", "strong"]
+          },
+          "faq_schema_priority": {
+            "source": "Derived from product-seo structured_data_targets + search_intent + price_positioning",
+            "type": "derived enum",
+            "derivation_logic": {
+              "high": "product-seo structured_data_targets contains 'faq' OR (search_intent = informational or comparison AND price_positioning = premium or luxury)",
+              "medium": "standard product with commercial or transactional intent and moderate price positioning",
+              "low": "sparse product OR simple commodity with transactional intent and budget or mass-market price positioning"
+            },
+            "schema_enum": ["low", "medium", "high"],
+            "note": "faq_schema_priority feeds into product-structured-data planning (workflow 16). high → faq_schema_enabled = true in the downstream structured data artifact."
+          },
+          "notes": {
+            "source": "Workflow-generated synthesis metadata per product",
+            "type": "machine-generated string",
+            "required_content": "Must include: synthesis timestamp, Shopify product handle, PROVISIONAL-PENDING-AEO-STRATEGY flag, FAQ-PLANNING-ARTIFACT disclaimer, sparse data flags if applicable, list of inputs used, evidence boundary label, and instruction to review when aeo-strategy.json becomes available."
+          }
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-product-content",
+        "provides": ["product-content.json per product"],
+        "required": true,
+        "note": "Primary synthesis input. faq_items seeds, objection_handling, use_cases, trust_elements, shipping_notes, returns_notes, cta_direction, and notes (sparse flags) are all consumed here. build-product-faq cannot run before build-product-content completes."
+      },
+      {
+        "workflow": "build-product-seo",
+        "provides": ["product-seo.json per product"],
+        "required": true,
+        "note": "Provides answer_targets (provisional AEO seeds for question_type orientation), search_intent (for faq_goal derivation), and structured_data_targets (for faq_schema_priority elevation). build-product-faq should run after build-product-seo."
+      },
+      {
+        "workflow": "build-brand-positioning",
+        "provides": ["brand-positioning.json"],
+        "required": true,
+        "note": "Provides tone_of_voice.style (FAQ copy tone), trust_style (trust_role derivation), objection_handling_style (support_role derivation), and forbidden_impressions."
+      },
+      {
+        "workflow": "build-store-profile",
+        "provides": ["store-profile.json"],
+        "required": true,
+        "note": "Provides price_positioning (FAQ depth signal), catalog_type (FAQ scope signal), and business_model (dropshipping safety flag for fulfillment FAQs)."
+      },
+      {
+        "workflow": "build-aeo-strategy",
+        "provides": ["aeo-strategy.json"],
+        "required": false,
+        "note": "OPTIONAL — NOT AVAILABLE IN PHASE 5. When available, its question taxonomy and answer format strategy should be used to align and revise FAQ question_types and answer framing."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-product-structured-data",
+        "receives": ["product-faq.json"],
+        "note": "In Phase 5 scope (workflow 16). Consumes faq_items (presence and count → faq_schema_enabled and faq_fields.minimum_faq_items) and faq_schema_priority (structured data priority signal)."
+      },
+      {
+        "workflow": "run-validation",
+        "receives": ["product-faq.json"],
+        "note": "Out of Phase 5 scope (workflow 28). Validates product-faq artifacts against schema and AEO strategy alignment when it becomes available."
+      }
+    ],
+
+    "schema_alignment": {
+      "product-faq.schema.json": {
+        "required_fields_covered": [
+          "product_id",
+          "faq_goal",
+          "faq_items",
+          "trust_role",
+          "support_role"
+        ],
+        "optional_fields_covered": [
+          "faq_schema_priority",
+          "notes"
+        ],
+        "faq_items_note": "Schema requires minItems: 1. At least one FAQ item must be produced per product — even for sparse-data products (minimum: one placeholder shipping FAQ). Each item requires: question (non-empty string), answer (non-empty string), question_type (from enum). internal_link_target_type is optional per item.",
+        "question_type_enum_note": "question_type must be one of: what-is-it, who-is-it-for, how-does-it-work, compatibility, care, shipping, returns, comparison, trust, use-case, general. The LLM must receive this enum explicitly in the prompt.",
+        "internal_link_target_type_enum_note": "internal_link_target_type must be one of: none, collection-page, guide-page, faq-page, homepage, product-page. Default to 'none' if no natural linking target is evident.",
+        "validation_note": "Each product-faq object must be validated against schemas/product-faq.schema.json using ajv. faq_items minItems = 1. All question_type values must be from the enum. All internal_link_target_type values must be from the enum if present. Required top-level fields must all be present."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: product_content_paths (list of product-content artifact paths or objects), product_seo_paths (list of product-seo artifact paths or objects, matching product_content_paths 1:1 by product handle), brand_positioning, store_profile. Optional: aeo_strategy.",
+        "input": "product_content_paths + product_seo_paths + brand_positioning + store_profile + optional aeo_strategy",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present and matched. product_content list and product_seo list must both be non-empty and have matching product handles (1:1 correspondence). brand_positioning must have tone_of_voice, trust_style, and objection_handling_style. store_profile must have price_positioning and business_model. Check whether aeo_strategy is present — if absent, set provisional_mode.aeo = true and log it prominently. If a product_seo artifact is absent for a given product, flag that product as PRODUCT-SEO-MATCH-REQUIRED and continue with a degraded FAQ set (no answer_target orientation, no faq_schema_priority elevation).",
+        "input": "all inputs",
+        "output": "validated inputs + provisional_mode flags or halt error"
+      },
+      {
+        "step": 3,
+        "name": "Derive Store-Level FAQ Planning Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Extract and prepare store-level and brand-level FAQ planning signals shared across all products. Produce a faq_signals object: (1) TRUST ROLE DEFAULT: from trust_style.proof_mode + trust_style.reassurance_level → derive default trust_role. (2) SUPPORT ROLE DEFAULT: from objection_handling_style → derive default support_role. (3) COPY TONE: tone_of_voice.style → copy tone constraint for LLM prompts. (4) FORBIDDEN IMPRESSIONS: from brand_positioning.forbidden_impressions (optional) → inject as hard LLM constraint. (5) PRICE DEPTH SIGNAL: from store_profile.price_positioning → derive FAQ depth guidance. (6) DROPSHIPPING SAFETY: from store_profile.business_model — if dropshipping, set dropshipping_safety_flag = true. (7) PROVISIONAL MODE: aeo = true/false — injected into all prompts and output notes.",
+        "input": "validated brand_positioning + store_profile + provisional_mode flags",
+        "output": "faq_signals object"
+      },
+      {
+        "step": 4,
+        "name": "Merge Per-Product Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "For each product, merge the product-content artifact with the corresponding product-seo artifact into a single per-product planning context. From product-content: faq_items seeds, objection_handling, use_cases, trust_elements, shipping_notes, returns_notes, cta_direction, notes. From product-seo: answer_targets, search_intent, structured_data_targets, notes. Check product-content notes for SPARSE DATA flags — set sparse_mode = true per product if detected.",
+        "input": "product_content list + product_seo list",
+        "output": "merged per-product planning context objects array with sparse_mode flags"
+      },
+      {
+        "step": 5,
+        "name": "Derive Per-Product FAQ Goal and Schema Priority",
+        "type": "Code node (JavaScript)",
+        "description": "For each product, deterministically derive faq_goal and faq_schema_priority. faq_goal: resolve from weighted signals (search_intent + cta_direction + price_positioning + objection_handling item count), defaulting to 'hybrid' if signals conflict. faq_schema_priority: 'high' if product-seo structured_data_targets contains 'faq' OR (informational intent + premium price). 'low' if sparse. Otherwise 'medium'.",
+        "input": "merged per-product planning context + faq_signals",
+        "output": "per-product faq_goal and faq_schema_priority values"
+      },
+      {
+        "step": 6,
+        "name": "Build LLM Product FAQ Prompt (per product)",
+        "type": "Code node (JavaScript)",
+        "description": "For each product, assemble a structured LLM prompt. The prompt must: (1) Present product-content signals (faq_items seeds, objection_handling, use_cases, trust_elements, shipping_notes, returns_notes) as planning context. (2) Present product-seo answer_targets as AEO directional orientation. (3) Apply faq_signals: copy tone, trust_role, support_role, forbidden impressions. (4) State PROVISIONAL AEO notice: 'AEO STRATEGY IS NOT AVAILABLE. Mark all FAQ items as PROVISIONAL-PENDING-AEO-STRATEGY in the notes field.' (5) Apply SPARSE MODE guard if sparse_mode = true: 'SPARSE DATA DETECTED. Limit FAQ set to 2-3 items. Mark all as SPARSE-FAQ-REQUIRES-ENRICHMENT.' (6) Apply DROPSHIPPING SAFETY if dropshipping_safety_flag = true: 'Do not invent shipping times, costs, or carrier names. Use PLACEHOLDER-REQUIRES-REVIEW for shipping and returns answers if specific details are not provided.' (7) Include question_type enum values explicitly. (8) Request valid JSON output with faq_items array. (9) Prohibit: fabricated specifications, invented certifications, assumed guarantees, specific shipping or returns conditions not provided in input.",
+        "input": "merged per-product planning context + faq_signals + faq_goal + faq_schema_priority + provisional_mode flags",
+        "output": "assembled LLM prompt string per product",
+        "prompt_safety_note": "Prompt must explicitly state: 'If an answer requires information not available in the inputs, write: PLACEHOLDER-REQUIRES-REVIEW — [describe what information is needed]. Do not invent product details, shipping specifics, or guarantee terms. All FAQ items are planning artifacts requiring human review before publication.'"
+      },
+      {
+        "step": 7,
+        "name": "LLM Synthesis: Product FAQ Items (per product)",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API for each product. Request JSON output mode. Temperature: 0.3 (FAQ synthesis benefits from consistency — question framing should be plausible and grounded, not creative). Max tokens: 2000 per product.",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt per product",
+        "output": "raw LLM response string per product (expected to be JSON)"
+      },
+      {
+        "step": 8,
+        "name": "Parse and Apply Safety Constraints (per product)",
+        "type": "Code node (JavaScript)",
+        "description": "For each product, parse the raw LLM response as JSON. Enforce safety and completeness constraints: (1) QUESTION TYPE VALIDATION: Verify each FAQ item's question_type is from the schema enum. If not, correct to closest valid value or 'general'. (2) INTERNAL LINK TARGET VALIDATION: Verify internal_link_target_type (if present) is from the schema enum. Default to 'none' if invalid. (3) SPARSE MODE ENFORCEMENT: If sparse_mode was set, verify at most 3 items — truncate and mark notes with SPARSE-FAQ-TRUNCATED if LLM returned more. (4) MINIMUM FAQ ITEMS: If faq_items is empty after parsing, add a minimal placeholder item with question_type = 'general'. (5) SHIPPING FAQ SAFETY: If shipping_notes was absent and LLM generated a specific shipping answer without PLACEHOLDER-REQUIRES-REVIEW, override with placeholder. Same for returns. (6) PROVISIONAL FLAG INJECTION: Inject PROVISIONAL-PENDING-AEO-STRATEGY into notes. (7) PRODUCT ID: Set product_id = Shopify product handle.",
+        "input": "raw LLM response per product + product signals + faq_signals + sparse_mode flags",
+        "output": "parsed and constrained product_faq object per product (pre-validation)"
+      },
+      {
+        "step": 9,
+        "name": "Validate Against Schema (per product)",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate each product_faq object against schemas/product-faq.schema.json using ajv. Key validations: product_id non-empty matching pattern ^[a-z0-9-]+$, faq_goal in enum, faq_items minItems = 1 with each item having non-empty question and answer and question_type in enum, trust_role in enum, support_role in enum. Log validation failures per product without halting the entire workflow.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/product-faq.schema.json",
+        "failure_behavior": "Log validation failure for the specific product. Do not halt the entire workflow. Report all failed products in the review-required manifest.",
+        "input": "constrained product_faq object per product",
+        "output": "validated product_faq objects or per-product validation errors"
+      },
+      {
+        "step": 10,
+        "name": "Persist product-faq.json (per product)",
+        "type": "GitHub node or Write File node",
+        "description": "Write each validated product-faq.json to projects/{project_id}/product-faq/{product_handle}.json. Commit with a message such as 'chore: generate product-faq for {store_id} — Phase 5 draft (provisional AEO seeds)'. Products that failed validation are logged to projects/{project_id}/product-faq/_review-required.json.",
+        "artifact_path": "projects/{project_id}/product-faq/{product_handle}.json",
+        "review_manifest_path": "projects/{project_id}/product-faq/_review-required.json",
+        "git_note": "Each product-faq.json must be committed to Git. These artifacts are consumed by build-product-structured-data (workflow 16) in Phase 5.",
+        "input": "validated product_faq object per product",
+        "output": "confirmation of write per product + list of persisted artifact paths"
+      },
+      {
+        "step": 11,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the list of persisted product-faq artifact paths and the review-required manifest path to the master orchestrator. Include provisional_mode.aeo flag — downstream workflows (especially build-product-structured-data) must know FAQ items are provisional AEO seeds.",
+        "input": "artifact_paths list + review_required manifest path + provisional_mode flags",
+        "output": "workflow output payload with provisional AEO status metadata"
+      }
+    ],
+
+    "assumptions": [
+      "product-content.json and product-seo.json are both required inputs per product. If product-seo is missing for a product, that product's FAQ set is degraded (no faq_schema_priority elevation, no answer_target orientation) and flagged for review.",
+      "FAQ items are editorial syntheses — not proven customer questions. This is a non-negotiable evidence boundary. The LLM prompt must enforce this explicitly. Human review is required before any FAQ item is used in a live store.",
+      "aeo-strategy.json is NOT available in Phase 5. All FAQ items are provisional AEO seeds. When aeo-strategy.json becomes available, a review pass should be triggered.",
+      "Shipping and returns FAQ answers are always PLACEHOLDER-REQUIRES-REVIEW unless shipping_notes and returns_notes are explicitly provided in the product-content artifact. This rule is enforced programmatically.",
+      "Dropshipping stores require extra caution on fulfillment FAQs. If business_model = dropshipping, all shipping/returns answers default to PLACEHOLDER-REQUIRES-REVIEW unless explicit policy details are provided.",
+      "Sparse product-content notes propagate to this workflow. A product flagged as SPARSE DATA in its content plan triggers conservative FAQ behavior.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "product_id in the FAQ artifact matches the Shopify product handle, consistent with product-content.json and product-seo.json.",
+      "trust_role and support_role are derived deterministically from brand_positioning — not LLM-synthesized. This ensures brand consistency across all product FAQ artifacts.",
+      "faq_schema_priority is derived deterministically from product-seo signals — not LLM-synthesized. This ensures consistent downstream consumption by build-product-structured-data."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should FAQ items sourced from verified store policies be flagged differently from fully synthesized FAQ items?",
+        "impact": "A machine-readable distinction between 'verified-source' and 'synthesized' FAQ items would help downstream validation and AEO strategy alignment.",
+        "recommended_default": "Yes — an optional source_confidence field per FAQ item (values: 'verified', 'inferred', 'synthesized', 'placeholder') would improve downstream processing. This requires a schema update to product-faq.schema.json. In Phase 5, PLACEHOLDER-REQUIRES-REVIEW markers serve as the proxy. Propose adding source_confidence in a future schema iteration."
+      },
+      {
+        "question": "How many FAQ items per product is optimal for AEO purposes?",
+        "impact": "Too few FAQ items under-support AEO planning. Too many create noise.",
+        "recommended_default": "3-5 items for standard products. 2 minimum. 5-7 for high-consideration or technically complex products. Sparse products: 2-3 maximum. Revisit these guidelines when aeo-strategy.json defines the store's specific AEO depth strategy."
+      },
+      {
+        "question": "Should shipping and returns FAQ answers be extracted into a shared store-level policy artifact rather than duplicated per product?",
+        "impact": "Duplicating placeholder shipping and returns FAQs across every product creates maintenance debt when policies are eventually confirmed.",
+        "recommended_default": "A future optimization would extract store-level policy FAQs into a shared policy artifact consumed by all product FAQ artifacts. Out of Phase 5 scope — document as a future architectural suggestion."
+      },
+      {
+        "question": "Should product-faq.json include a revision_required boolean to make the provisional nature machine-readable beyond the notes field?",
+        "impact": "A machine-readable revision flag would allow orchestration to automatically queue provisional FAQ artifacts for re-processing.",
+        "recommended_default": "Yes — propose adding revision_required or provisional_status as an optional boolean to product-faq.schema.json. In Phase 5, the notes field and commit message serve this purpose."
+      }
+    ],
+
+    "evidence_boundaries": {
+      "direct_operational_truth_from_shopify": [
+        "product_id (derived from Shopify product handle — direct)",
+        "shipping_notes (if present in product-content — sourced from store policy or Shopify data)",
+        "returns_notes (if present in product-content — sourced from store policy or Shopify data)"
+      ],
+      "derived_deterministically_from_planning_artifacts": [
+        "trust_role (derived from brand-positioning trust_style — deterministic logic)",
+        "support_role (derived from brand-positioning objection_handling_style — deterministic logic)",
+        "faq_goal (derived from product-seo + product-content + store-profile signals — deterministic logic)",
+        "faq_schema_priority (derived from product-seo structured_data_targets + intent signals — deterministic logic)"
+      ],
+      "provisional_from_product_content_and_seo_seeds": [
+        "faq_items question framing (oriented by product-content faq_items seeds, objection_handling, use_cases — synthesized planning content)",
+        "faq_items question_type classification (oriented by product-seo answer_targets — themselves provisional)"
+      ],
+      "llm_synthesized_planning_content": [
+        "faq_items question text (LLM synthesis — editorial framing of likely buyer questions, not proven customer research)",
+        "faq_items answer text (LLM synthesis — grounded in product signals, subject to PLACEHOLDER-REQUIRES-REVIEW for missing data)"
+      ],
+      "not_available_in_this_phase": [
+        "Verified customer question data from user research, surveys, or search query analysis",
+        "Store-level aeo-strategy.json (workflow 12 — out of Phase 5 scope)",
+        "Confirmed shipping policies (unless explicitly provided in shipping_notes)",
+        "Confirmed returns conditions (unless explicitly provided in returns_notes)",
+        "Actual FAQ page strategy (build-faq-page is workflow 22 — far out of Phase 5 scope)",
+        "Finalized structured data plan (build-structured-data-plan is workflow 24 — far out of Phase 5 scope)"
+      ],
+      "labeling_requirement": "The notes field per product-faq artifact must include: 'PRODUCT FAQ — PROVISIONAL PLANNING ARTIFACT: This artifact was generated in Phase 5 without access to aeo-strategy.json (workflow 12). All FAQ items are editorial syntheses of available product signals — PROVISIONAL-PENDING-AEO-STRATEGY. These FAQ items are not proven customer questions. They are planning seeds that require human review and AEO strategy alignment before use in a live store. Shipping and returns FAQ answers marked PLACEHOLDER-REQUIRES-REVIEW require actual store policy confirmation before publishing.'"
+    }
+  }
+}

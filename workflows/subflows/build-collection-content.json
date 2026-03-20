@@ -1,0 +1,547 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. Collection content outputs are planning artifacts — not final production copy, not SEO-validated text, and not published page content. Collection intro text, category promises, selection guidance, and FAQ items generated here are editorial syntheses grounded in Shopify collection data and strategic planning context. They require human review before use in a live store.",
+    "collection_operational_truth_note": "IMPORTANT — SHOPIFY COLLECTION DATA IS OPERATIONAL TRUTH: Collection title, handle, existing description (if any), sort order, and product membership are operational truth from the live store. This workflow must not rename collections, rewrite existing Shopify descriptions as if they were final content, or contradict factual Shopify collection data. The synthesized content (intro_text, category_summary, selection_guidance, etc.) is editorial framing built on top of the operational collection reality — not a replacement for it.",
+    "seo_boundary_note": "IMPORTANT — NO SEO KEYWORD CLAIMS IN THIS WORKFLOW: collection-seo.json (workflow 18) is out of Phase 5 scope. Collection content generated here must not make SEO-validated keyword claims, target specific search terms, or imply that collection copy has been optimized for search. This workflow produces editorial content planning — not SEO copy. The collection-seo workflow will handle keyword alignment in a later phase.",
+    "sparse_collection_note": "Collections with zero or very few products require conservative content planning behavior. An empty collection cannot support specific selection guidance, category highlights, or comparison notes. Conservative fallback behavior is documented in the nodes below. Do not synthesize confident category copy for collections that do not yet have products.",
+    "claim_safety_note": "Collection content must not make product-specific claims not supported by the actual products in the collection. Trust elements must not invent certifications, review counts, or guarantees unless they are present in the store's actual product or brand data. FAQ answers for collection-level questions must use PLACEHOLDER-REQUIRES-REVIEW for any specifics (shipping, returns, brand partnerships) not confirmed in available inputs.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/collection-content.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-collection-content",
+    "name": "build-collection-content",
+    "category": "planning",
+    "phase": "Phase 5 — Commerce Content Planning (Extended)",
+    "purpose": "Synthesize schema-validated collection content planning artifacts for each Shopify collection. Shopify collection data (title, handle, existing description, product membership) enters this workflow as operational truth. Market intelligence, brand positioning, and store profile provide the strategic framing layer. The output per collection is a collection-content.json that defines: collection_title (from Shopify), collection_subtitle, category_promise, intro_text, category_summary, selection_guidance, trust_elements, faq_items, cta_direction, and optional category_highlights, comparison_notes, and internal_navigation_hints. Collection content is categorically different from product content: it addresses the category as a whole, guides product selection within the collection, and positions the store as a knowledgeable guide for this type of product. It must not duplicate product-page copy. Because collection-seo.json is out of Phase 5 scope, all synthesized copy is planning content — not SEO-validated copy. Sparse or empty collections trigger explicit conservative fallback behavior.",
+
+    "collection_vs_product_note": "Collection content serves a different purpose than product content. Product content answers: 'Should I buy this specific product?' Collection content answers: 'Is this the right place to find what I need? Can I trust this store's selection? How do I choose?' This distinction must be preserved in all synthesized content. Collection copy must be category-oriented, selection-guiding, and trust-building — not a repetition of individual product marketing claims.",
+
+    "inputs": {
+      "from_shopify_import": {
+        "source": "import-shopify-data → raw collection dataset",
+        "artifact_path": "projects/{project_id}/shopify-import/collections.json",
+        "data_treatment": "OPERATIONAL TRUTH — Shopify collection data is the factual foundation for all collection content planning",
+        "fields_used_per_collection": [
+          {
+            "field": "title",
+            "treatment": "OPERATIONAL TRUTH — the Shopify collection title is the canonical category name. collection_title in the content plan must be the exact Shopify collection title. It may not be renamed or rewritten for SEO or brand purposes in this workflow.",
+            "note": "Do not rename collections. The Shopify title is the canonical category label."
+          },
+          {
+            "field": "handle",
+            "treatment": "OPERATIONAL TRUTH — the Shopify collection handle is the canonical slug. Used as the artifact identifier (collection_handle). It must not be changed by this workflow.",
+            "note": "Used as the primary key for artifact naming and artifact path construction."
+          },
+          {
+            "field": "body_html / description",
+            "treatment": "OPERATIONAL TRUTH REFERENCE — if a Shopify collection description exists (non-empty), it is factual content that the synthesized copy must not contradict. It may be used as context for intro_text and category_summary framing but must not be silently overwritten.",
+            "note": "Shopify collection descriptions are often empty or very short. Empty description is common and is not a sparse data flag by itself — it just means intro_text must be synthesized from product membership signals and strategic context."
+          },
+          {
+            "field": "products (array / product_count)",
+            "treatment": "OPERATIONAL TRUTH — the products in this collection define what content is plausible. Product count, product types, price range, and vendor diversity inform what category promises and selection guidance can honestly be made.",
+            "note": "product_count = 0 triggers EMPTY-COLLECTION conservative behavior. product_count = 1-2 triggers SPARSE-COLLECTION conservative behavior. product_count >= 3 allows standard content synthesis."
+          },
+          {
+            "field": "products[].product_type",
+            "treatment": "OPERATIONAL TRUTH — the distribution of product types within the collection informs whether this collection is homogeneous (one product type) or mixed (multiple product types). Homogeneous → focused selection guidance. Mixed → broader comparison_notes.",
+            "note": "Product type diversity within a collection affects comparison_notes and selection_guidance depth."
+          },
+          {
+            "field": "products[].price (range)",
+            "treatment": "OPERATIONAL TRUTH — the price range of products within the collection informs cta_direction (compare-options vs shop-now) and how selection_guidance is framed (by price tier vs by use case vs by specification).",
+            "note": "Wide price range → selection guidance by budget tier makes sense. Narrow price range → selection guidance by use case or specification is more relevant."
+          },
+          {
+            "field": "image",
+            "treatment": "CONTEXT — if a collection-level image exists in Shopify, it confirms that visual category identity is present. Relevant for media_plan later but not directly for content planning.",
+            "note": "Collection image presence/absence does not change content planning decisions in this workflow."
+          },
+          {
+            "field": "metafields",
+            "treatment": "OPTIONAL ENRICHMENT — if collection metafields exist, they may contain curated category descriptions, SEO hints, or merchandising notes. Treat as operational truth if present.",
+            "note": "Metafields may be absent. Do not depend on them."
+          }
+        ],
+        "sparse_collection_thresholds": {
+          "empty_collection": "product_count = 0 → EMPTY-COLLECTION. Activate empty fallback mode: collection_title = Shopify title (direct), all synthesized fields = PLACEHOLDER-REQUIRES-ENRICHMENT. Notes must include: 'EMPTY COLLECTION: No products found in this collection. Content plan is minimal scaffolding only. Enrich when products are added.'",
+          "sparse_collection": "product_count = 1 or 2 → SPARSE-COLLECTION. Activate sparse fallback mode: limit selection_guidance to 1 generic item, limit faq_items to 2, mark category_summary with SPARSE-COLLECTION-REQUIRES-ENRICHMENT, avoid comparison_notes.",
+          "standard_collection": "product_count >= 3 → standard content synthesis applies"
+        }
+      },
+
+      "from_market_intelligence": {
+        "source": "build-market-intelligence → market-intelligence.json",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "data_treatment": "STRATEGIC FRAMING LAYER — market intelligence provides audience, intent, and trust signals that shape how collection content is framed",
+        "fields_used": [
+          {
+            "field": "audience_segments",
+            "treatment": "COLLECTION FRAMING SIGNAL — audience segments from market intelligence describe who shops in this market. The collection intro_text and category_promise should speak to the relevant audience segments for this collection's product type.",
+            "note": "Not all audience segments are equally relevant to every collection — select the segments most aligned with the collection's product type."
+          },
+          {
+            "field": "purchase_motivators",
+            "treatment": "CATEGORY PROMISE SIGNAL — what drives purchase decisions in this market informs what the category_promise should emphasize. If the market is driven by reliability → category_promise emphasizes quality and curation. If by price → category_promise emphasizes value clarity.",
+            "note": "purchase_motivators are market-level signals — they inform framing but must not be applied mechanically to every collection."
+          },
+          {
+            "field": "trust_factors",
+            "treatment": "TRUST ELEMENTS SIGNAL — trust factors from market intelligence indicate what buyers in this category rely on for trust. Used to orient trust_elements selection in the collection content.",
+            "note": "trust_elements in the collection are planning seeds — they must be honest reflections of actual store capabilities, not marketing wishlist items."
+          },
+          {
+            "field": "search_intents",
+            "treatment": "COLLECTION INTENT SIGNAL — search intents (especially commercial and comparison intents) help frame how collection intro_text and selection_guidance should be positioned relative to buyer stages.",
+            "note": "commercial intent → collection intro_text should help buyers compare and choose. transactional intent → collection intro_text should make shopping easy and confident."
+          },
+          {
+            "field": "content_opportunities",
+            "treatment": "COLLECTION FAQ SIGNAL — content opportunities from market intelligence suggest what questions buyers are researching at the category level. These orient collection-level faq_items (distinct from product-level FAQs).",
+            "note": "content_opportunities are market-level signals — they inform which collection FAQ question types are most relevant."
+          },
+          {
+            "field": "core_problems",
+            "treatment": "CATEGORY PROMISE FRAMING — core buyer problems inform what pain points the category_promise should implicitly or explicitly address.",
+            "note": "Used as a framing signal for category_promise — the collection should position itself as a solution to these problems."
+          }
+        ]
+      },
+
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "data_treatment": "STYLE AND CONVERSION CONSTRAINTS — brand positioning shapes collection copy tone, CTA direction, and trust framing",
+        "fields_used": [
+          {
+            "field": "brand_role",
+            "treatment": "COLLECTION FRAMING ANGLE — brand_role determines the editorial stance of the collection intro. specialist → collection intro emphasizes depth of knowledge and curation expertise. curator → collection intro emphasizes selection quality and editorial judgment. problem-solver → collection intro leads with how this category helps. premium-innovator → collection intro emphasizes innovation and quality leadership. editorial-guide → collection intro is informative and advisory. value-leader → collection intro emphasizes price clarity and value proposition.",
+            "note": "brand_role is a primary framing constraint that shapes the collection's editorial personality."
+          },
+          {
+            "field": "tone_of_voice.style",
+            "treatment": "COPY TONE CONSTRAINT — shapes the voice of all synthesized collection text. clear-direct → no-nonsense, practical. premium-confident → elevated, assured. warm-helpful → approachable, friendly. editorial-smart → insightful, knowledgeable. technical-trustworthy → precise, specification-aware. playful-bold → engaging, energetic.",
+            "note": "Tone is enforced in the LLM prompt as a non-negotiable style constraint for all collection copy."
+          },
+          {
+            "field": "value_proposition",
+            "treatment": "CATEGORY PROMISE ANCHOR — the store's value proposition provides the highest-level brand promise that collection copy should echo and reinforce at the category level.",
+            "note": "Collection category_promise should be a category-specific expression of the store's broader value proposition — not a repetition of it."
+          },
+          {
+            "field": "trust_style.proof_mode",
+            "treatment": "TRUST ELEMENTS ORIENTATION — proof_mode shapes which trust signals are emphasized in collection trust_elements. evidence-led → emphasize product quality signals, specs, curation criteria. social-proof-led → emphasize customer satisfaction signals if available. guarantee-led → emphasize store policies. authority-led → emphasize selection expertise.",
+            "note": "Trust elements must be honest planning seeds — not invented proof points."
+          },
+          {
+            "field": "conversion_style.cta_style",
+            "treatment": "CTA TONE DIRECT MAPPING — cta_style maps directly to cta_direction.cta_tone in the collection content artifact. subtle → cta_tone = subtle. balanced → cta_tone = balanced. assertive → cta_tone = assertive.",
+            "note": "Direct mapping — no LLM synthesis needed for cta_tone."
+          },
+          {
+            "field": "differentiators",
+            "treatment": "SELECTION GUIDANCE SIGNAL — the store's differentiators inform why a buyer should choose products from this collection over competitors. Relevant for selection_guidance framing.",
+            "note": "Differentiators are planning-level claims — they should be referenced in selection_guidance as editorial framing, not as guaranteed promises."
+          },
+          {
+            "field": "forbidden_impressions",
+            "treatment": "HARD CONSTRAINT — collection copy must not create any of the listed forbidden impressions.",
+            "note": "Optional field — handle gracefully if absent."
+          }
+        ]
+      },
+
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "data_treatment": "STRUCTURAL CONTEXT — store profile provides market, catalog, and pricing context that shapes collection content scope",
+        "fields_used": [
+          {
+            "field": "store_type",
+            "treatment": "COLLECTION SCOPE SIGNAL — store_type influences collection content depth. category-specialist → deeper selection guidance and category expertise copy is appropriate. multi-product-store → lighter category framing. single-brand-store → collection as product family framing.",
+            "note": "Collection content depth should align with the store's declared expertise level."
+          },
+          {
+            "field": "price_positioning",
+            "treatment": "CTA AND TRUST SIGNAL — price_positioning helps determine primary_cta and trust framing emphasis. premium or luxury → more trust-building in collection copy, less aggressive CTA. budget or mass-market → value clarity and confidence in selection guidance.",
+            "note": "price_positioning informs tone and trust_elements emphasis — not a hard structural rule."
+          },
+          {
+            "field": "catalog_type",
+            "treatment": "COLLECTION DEPTH SIGNAL — small-curated-catalog → each collection can have rich, detailed content. broad-catalog → collection content should be concise and scannable. single-product → collection context may not be relevant.",
+            "note": "catalog_type informs the appropriate content density per collection."
+          },
+          {
+            "field": "primary_market",
+            "treatment": "CONTEXT — primary_market provides geographic and cultural context that may influence copy examples, seasonal references, or regional trust signals.",
+            "note": "primary_market is a contextual signal — it should not be overused but may inform trust element framing (e.g. local delivery, EU consumer rights)."
+          },
+          {
+            "field": "brand_maturity",
+            "treatment": "TRUST FRAMING SIGNAL — established or legacy brand maturity → collection copy can reference brand heritage and track record. new or growing → collection copy should focus on product quality and buyer guidance rather than brand history.",
+            "note": "brand_maturity affects how trust_elements are framed — not the content structure."
+          }
+        ]
+      }
+    },
+
+    "outputs": {
+      "collection_content_set": {
+        "description": "A set of collection-content.json artifacts, one per Shopify collection. Each artifact conforms to schemas/collection-content.schema.json. These are planning artifacts — not final production copy, not SEO-validated text. collection_title is operational truth from Shopify. All other synthesized fields are editorial planning content requiring human review.",
+        "artifact_path": "projects/{project_id}/collection-content/{collection_handle}.json",
+        "schema": "schemas/collection-content.schema.json",
+        "field_mapping": {
+          "collection_title": {
+            "source": "OPERATIONAL TRUTH — exact Shopify collection title",
+            "type": "operational truth string",
+            "note": "Never changed or rewritten by this workflow. If the collection title is poor quality or needs SEO improvement, that is a separate decision requiring human review and explicit changelog — not an automatic rewrite."
+          },
+          "collection_subtitle": {
+            "source": "LLM synthesis — a concise editorial subtitle for the collection page",
+            "type": "LLM-synthesized string",
+            "synthesis_guidance": "The subtitle should express the category's value proposition in one short sentence. It supports the collection_title without repeating it. Framed according to brand_role and tone_of_voice. For EMPTY or SPARSE collections: use PLACEHOLDER-REQUIRES-ENRICHMENT.",
+            "note": "Planning artifact — not final copy. No keyword targeting in this workflow."
+          },
+          "category_promise": {
+            "source": "LLM synthesis — what this collection commits to deliver for the buyer",
+            "type": "LLM-synthesized string",
+            "synthesis_guidance": "category_promise is a short editorial statement of what a buyer can expect from shopping this collection. It should be grounded in actual collection product signals (product types, price range, quality tier). It must not make promises that cannot be kept (e.g. 'the best products available' without product evidence). Oriented by purchase_motivators and value_proposition.",
+            "note": "Not a marketing claim — an honest editorial framing of the collection's purpose."
+          },
+          "intro_text": {
+            "source": "LLM synthesis — opening editorial text for the collection page",
+            "type": "LLM-synthesized string",
+            "synthesis_guidance": "intro_text is the opening paragraph or block of copy for the collection page. It should: welcome the buyer to the category, quickly establish what makes this collection valuable, set the selection context. It should NOT: duplicate the product titles, keyword-stuff, or list products by name. Tone follows tone_of_voice.style. For EMPTY collections: minimal scaffold only — PLACEHOLDER-REQUIRES-ENRICHMENT.",
+            "note": "Planning artifact — not SEO-validated copy. Length planning guideline: 50-120 words for most collections."
+          },
+          "category_summary": {
+            "source": "LLM synthesis — educational category context paragraph",
+            "type": "LLM-synthesized string",
+            "synthesis_guidance": "category_summary provides editorial context about the product category itself — what it is, who it is for, why it matters. It is more informational than intro_text and supports buyer decision-making. Relevant for complex or unfamiliar categories. For SPARSE collections: mark as REQUIRES-ENRICHMENT.",
+            "note": "category_summary is especially valuable for collection-seo later (informational content that supports search intent). But keyword strategy is out of Phase 5 scope."
+          },
+          "selection_guidance": {
+            "source": "LLM synthesis — array of buyer guidance items for choosing within this collection",
+            "type": "LLM-synthesized array (minItems: 1)",
+            "synthesis_guidance": "Each selection_guidance item has a guidance_title and guidance_text. Guidance should help buyers navigate the collection by explaining how to choose. Possible angles: by use case, by budget, by technical specification, by experience level. Must be grounded in the actual products present in the collection. For SPARSE collections: 1 item maximum. For EMPTY collections: 1 placeholder item.",
+            "note": "Selection guidance is the most collection-specific content type. It must reflect the actual collection composition — not generic category advice."
+          },
+          "category_highlights": {
+            "source": "Optional LLM synthesis — key differentiating highlights for this collection",
+            "type": "LLM-synthesized string array (optional)",
+            "synthesis_guidance": "Short highlight strings that express why this collection is worth browsing. Oriented by differentiators and brand_role. Omit for EMPTY or SPARSE collections. Omit if the collection is too generic for meaningful highlights.",
+            "note": "Optional field — only include if the collection has clear, honest differentiating qualities."
+          },
+          "comparison_notes": {
+            "source": "Optional LLM synthesis — notes to help buyers compare options within the collection",
+            "type": "LLM-synthesized string array (optional)",
+            "synthesis_guidance": "Useful when a collection contains products with meaningfully different price tiers, product types, or use cases. For example: 'Entry-level options for new users vs professional-grade for experienced buyers.' Only include if the collection has enough product diversity to make comparison meaningful. Omit for homogeneous collections or SPARSE/EMPTY collections.",
+            "note": "comparison_notes become more valuable when collection-seo addresses comparison search intent in a later phase."
+          },
+          "trust_elements": {
+            "source": "LLM synthesis — array of trust signals relevant to this collection",
+            "type": "LLM-synthesized string array (minItems: 1)",
+            "synthesis_guidance": "trust_elements are short trust-building statements relevant to the collection category. Oriented by trust_style.proof_mode. evidence-led → quality signals, curation criteria, product standards. social-proof-led → customer satisfaction signals (only if real review data exists). guarantee-led → store policy signals (returns, shipping, warranty). Must not invent proof points. Must use PLACEHOLDER-REQUIRES-REVIEW if specific trust details are not available.",
+            "note": "Trust elements are planning seeds. They must be validated against actual store policies and product data before use."
+          },
+          "faq_items": {
+            "source": "LLM synthesis — category-level FAQ items for the collection page",
+            "type": "LLM-synthesized array (minItems: 1)",
+            "synthesis_guidance": "Collection FAQ items address category-level questions, not product-specific questions. Appropriate question types: what kinds of products are in this collection, how to choose, compatibility and size guidance for the category, category-level shipping or returns questions. For SPARSE collections: 2 items maximum. For EMPTY collections: 1 placeholder item. FAQ answers must use PLACEHOLDER-REQUIRES-REVIEW for any specifics not available in inputs.",
+            "note": "These are distinct from product-level FAQs. Do not duplicate product FAQ content here."
+          },
+          "internal_navigation_hints": {
+            "source": "Optional structural hints for downstream navigation planning",
+            "type": "LLM-synthesized or derived string array (optional)",
+            "synthesis_guidance": "Hints about which other collections or pages might be logically related to this collection (for downstream navigation and internal linking planning). For example: 'this collection relates to [complementary collection type]' or 'users who browse this collection may also look for [related category]'. These are planning hints — not implemented navigation links.",
+            "note": "internal_navigation_hints feed into build-collection-navigation (workflow 19) and build-internal-linking (workflow 23). Both are out of Phase 5 scope."
+          },
+          "cta_direction": {
+            "primary_cta": {
+              "source": "Derived from collection product diversity + price range + brand_role",
+              "type": "derived enum",
+              "derivation_logic": {
+                "explore-products": "Multi-product collection — default for most standard collections",
+                "shop-now": "Collection with clear, confident category identity and assertive brand_role",
+                "compare-options": "Collection with wide price range or multiple product types — buyer benefit from comparison",
+                "learn-more": "Educational category where informational intent dominates (e.g. category-specialist store with complex products)",
+                "mixed": "Use for collections where product diversity or brand positioning makes a single CTA unclear"
+              },
+              "schema_enum": ["shop-now", "explore-products", "compare-options", "learn-more", "mixed"],
+              "note": "'explore-products' is the safe default for most collections."
+            },
+            "cta_tone": {
+              "source": "Direct mapping from brand-positioning.conversion_style.cta_style",
+              "type": "direct mapping",
+              "note": "subtle → cta_tone = subtle. balanced → cta_tone = balanced. assertive → cta_tone = assertive. No LLM synthesis needed."
+            }
+          },
+          "notes": {
+            "source": "Workflow-generated synthesis metadata per collection",
+            "type": "machine-generated string",
+            "required_content": "Must include: synthesis timestamp, Shopify collection handle, product_count used as basis, sparse or empty mode flags if activated, list of inputs used, collection content planning disclaimer (not SEO-validated copy), and instruction to review before use in live store."
+          }
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "import-shopify-data",
+        "provides": ["raw collection dataset"],
+        "required": true,
+        "note": "Primary operational truth input. Collection title, handle, existing description, product membership, product types, and price range all come from Shopify. This workflow cannot run without the Shopify import."
+      },
+      {
+        "workflow": "build-market-intelligence",
+        "provides": ["market-intelligence.json"],
+        "required": true,
+        "note": "Provides audience_segments (collection framing), purchase_motivators (category_promise direction), trust_factors (trust_elements seeds), search_intents (commercial/comparison intent framing), content_opportunities (collection FAQ direction), and core_problems (category promise framing)."
+      },
+      {
+        "workflow": "build-brand-positioning",
+        "provides": ["brand-positioning.json"],
+        "required": true,
+        "note": "Provides brand_role (collection editorial stance), tone_of_voice.style (copy tone), value_proposition (category promise anchor), trust_style (trust_elements framing), conversion_style.cta_style (cta_tone direct mapping), differentiators (selection guidance framing), and forbidden_impressions."
+      },
+      {
+        "workflow": "build-store-profile",
+        "provides": ["store-profile.json"],
+        "required": true,
+        "note": "Provides store_type (collection scope signal), price_positioning (trust and CTA framing), catalog_type (content density guidance), primary_market (geographic context), and brand_maturity (trust framing signal)."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-collection-seo",
+        "receives": ["collection-content.json"],
+        "note": "Out of Phase 5 scope (workflow 18). Will consume collection_title, category_promise, intro_text, and category_summary for keyword alignment and meta tag planning."
+      },
+      {
+        "workflow": "build-collection-navigation",
+        "receives": ["collection-content.json"],
+        "note": "Out of Phase 5 scope (workflow 19). Will consume internal_navigation_hints and cta_direction for navigation structure planning."
+      },
+      {
+        "workflow": "build-media-plan",
+        "receives": ["collection-content.json"],
+        "note": "Out of Phase 5 scope (workflow 25). Will consume collection content structure to plan media asset needs for collection pages."
+      }
+    ],
+
+    "schema_alignment": {
+      "collection-content.schema.json": {
+        "required_fields_covered": [
+          "collection_title",
+          "collection_subtitle",
+          "category_promise",
+          "intro_text",
+          "category_summary",
+          "selection_guidance",
+          "trust_elements",
+          "faq_items",
+          "cta_direction"
+        ],
+        "optional_fields_covered": [
+          "category_highlights",
+          "comparison_notes",
+          "internal_navigation_hints",
+          "notes"
+        ],
+        "selection_guidance_note": "selection_guidance requires minItems: 1. Each item requires guidance_title (non-empty string) and guidance_text (non-empty string). For EMPTY collections, one placeholder item is the minimum.",
+        "trust_elements_note": "trust_elements requires minItems: 1. Each element is a string. At least one trust element must be present per collection — even for sparse collections (e.g. a generic store policy trust element).",
+        "faq_items_note": "faq_items requires minItems: 1. Each item requires question (non-empty string) and answer (non-empty string). Even EMPTY collections must have at least one placeholder FAQ item.",
+        "cta_direction_note": "cta_direction is a required object with required sub-fields: primary_cta (enum) and cta_tone (enum). Both must be present.",
+        "validation_note": "Each collection-content object must be validated against schemas/collection-content.schema.json using ajv. All required fields must be present. All enum fields must use valid values. selection_guidance minItems = 1. trust_elements minItems = 1. faq_items minItems = 1."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: shopify_collections (array of raw Shopify collection objects, each including associated products array or product_count), market_intelligence, brand_positioning, store_profile.",
+        "input": "shopify_collections + market_intelligence + brand_positioning + store_profile",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present. shopify_collections must be an array (may be empty — log a warning if zero collections are found, but do not halt). market_intelligence must have audience_segments, purchase_motivators, trust_factors, search_intents, and content_opportunities. brand_positioning must have brand_role, tone_of_voice, trust_style, and conversion_style. store_profile must have store_type, price_positioning, catalog_type, and brand_maturity. Log warnings for any optional fields that are absent but proceed.",
+        "input": "all inputs",
+        "output": "validated inputs or halt error"
+      },
+      {
+        "step": 3,
+        "name": "Extract Store-Level Content Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Extract and prepare store-level and brand-level signals shared across all collections. Produce a collection_signals object: (1) BRAND ROLE: brand_role → collection editorial stance. (2) COPY TONE: tone_of_voice.style → copy tone constraint. (3) CTA TONE: conversion_style.cta_style → direct mapping to cta_tone for all collections. (4) TRUST MODE: trust_style.proof_mode → trust_elements framing. (5) VALUE PROPOSITION: value_proposition → category_promise framing anchor. (6) DIFFERENTIATORS: differentiators → selection_guidance framing material. (7) FORBIDDEN IMPRESSIONS: forbidden_impressions (optional) → LLM hard constraint. (8) AUDIENCE SEGMENTS: audience_segments → collection intro framing. (9) PURCHASE MOTIVATORS: purchase_motivators → category_promise signals. (10) TRUST FACTORS: trust_factors → trust_elements seeds. (11) CONTENT OPPORTUNITIES: content_opportunities → collection FAQ direction.",
+        "input": "validated market_intelligence + brand_positioning + store_profile",
+        "output": "collection_signals object"
+      },
+      {
+        "step": 4,
+        "name": "Assess Collection Inventory and Sparse Status",
+        "type": "Code node (JavaScript)",
+        "description": "For each Shopify collection, assess its content richness and set a content_mode flag: (1) EMPTY-COLLECTION: product_count = 0. (2) SPARSE-COLLECTION: product_count = 1 or 2. (3) STANDARD: product_count >= 3. Also assess: product_type_diversity (how many distinct product types are in the collection — informs comparison_notes relevance), price_range_width (narrow: max/min price ratio < 2, wide: > 2 — informs primary_cta selection), and existing_description_present (whether Shopify collection description is non-empty). Log counts of each content_mode across the collection set.",
+        "input": "shopify_collections",
+        "output": "per-collection assessment objects with content_mode, product_type_diversity, price_range_width, existing_description_present flags"
+      },
+      {
+        "step": 5,
+        "name": "Derive Per-Collection CTA Direction",
+        "type": "Code node (JavaScript)",
+        "description": "For each collection, deterministically derive cta_direction: cta_tone = direct mapping from conversion_style.cta_style (balanced is the default if absent). primary_cta derivation: compare-options if price_range_width = wide OR product_type_diversity >= 3. explore-products if standard collection without strong differentiating signals. shop-now if brand_role = specialist or premium-innovator AND collection has clear product focus. learn-more if store_type = category-specialist AND collection product types suggest high consideration research. mixed if no clear signal. Default: explore-products.",
+        "input": "per-collection assessment + collection_signals",
+        "output": "per-collection cta_direction objects"
+      },
+      {
+        "step": 6,
+        "name": "Build LLM Collection Content Prompt (per collection)",
+        "type": "Code node (JavaScript)",
+        "description": "For each collection, assemble a structured LLM prompt. The prompt must: (1) Present Shopify collection facts as operational truth: title, handle, existing_description (if present), product_count, product_type_diversity, price_range_width, list of product types present. (2) Apply collection_signals: brand_role, copy tone, value proposition, differentiators, audience segments, purchase motivators, trust factors, content opportunities, forbidden impressions. (3) Apply content_mode guard: EMPTY-COLLECTION: 'EMPTY COLLECTION: No products found. Generate minimal scaffolding only. Use PLACEHOLDER-REQUIRES-ENRICHMENT for all synthesized fields except collection_title. Limit selection_guidance to 1 placeholder item, trust_elements to 1 generic item, faq_items to 1 placeholder item.' SPARSE-COLLECTION: 'SPARSE COLLECTION: Only 1-2 products found. Generate conservative content. Limit selection_guidance to 1 item. Limit faq_items to 2. Mark category_summary with SPARSE-COLLECTION-REQUIRES-ENRICHMENT. Do not generate comparison_notes.' (4) Instruct on collection vs product content distinction: 'Collection content answers category questions (how to choose, why shop here), not product questions (what does this product do).' (5) Instruct on CTA direction: provide the derived primary_cta and cta_tone for this collection — do not let the LLM override these. (6) Request valid JSON output conforming to collection-content.schema.json field structure. (7) Prohibit: SEO keyword targeting, invented product claims, invented review counts, invented store policies.",
+        "input": "per-collection Shopify data + collection_signals + content_mode + cta_direction",
+        "output": "assembled LLM prompt string per collection",
+        "prompt_safety_note": "Prompt must explicitly state: 'collection_title must be the exact Shopify collection title — do not rename it. Do not make SEO keyword targeting decisions — this is planning content, not optimized copy. Do not invent product specifications, certifications, or review counts. Use PLACEHOLDER-REQUIRES-REVIEW for any trust element or FAQ answer that requires specific store policy information not provided in this prompt.'"
+      },
+      {
+        "step": 7,
+        "name": "LLM Synthesis: Collection Content Plan (per collection)",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API for each collection. Request JSON output mode. Temperature: 0.4 (collection content benefits from more editorial variety than FAQ synthesis but less than creative brand copy). Max tokens: 3000 per collection (collection content has more fields than product FAQ).",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt per collection",
+        "output": "raw LLM response string per collection (expected to be JSON)"
+      },
+      {
+        "step": 8,
+        "name": "Parse and Apply Safety Constraints (per collection)",
+        "type": "Code node (JavaScript)",
+        "description": "For each collection, parse the raw LLM response as JSON. Enforce safety and completeness constraints: (1) COLLECTION TITLE LOCK: Overwrite collection_title with the exact Shopify title if the LLM changed it. (2) CTA DIRECTION LOCK: Overwrite cta_direction with the deterministically derived values — do not use LLM CTA choices. (3) MINIMUM FIELD ENFORCEMENT: Verify selection_guidance minItems = 1, trust_elements minItems = 1, faq_items minItems = 1. Add placeholder items if any minimum is unmet. (4) SPARSE MODE ENFORCEMENT: If content_mode = SPARSE or EMPTY, verify field lengths and item counts are within conservative limits. Truncate and flag if LLM generated too much content for the available product basis. (5) COLLECTION TITLE IN CONTENT: If synthesized fields duplicate or directly repeat the collection_title verbatim in intro_text or category_summary, flag for review (but do not auto-correct). (6) PLACEHOLDER VALIDATION: Verify all trust_elements and faq_items answers that depend on unavailable specifics use PLACEHOLDER-REQUIRES-REVIEW rather than invented content.",
+        "input": "raw LLM response per collection + Shopify collection data + collection_signals + content_mode + cta_direction",
+        "output": "parsed and constrained collection_content object per collection (pre-validation)"
+      },
+      {
+        "step": 9,
+        "name": "Validate Against Schema (per collection)",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate each collection_content object against schemas/collection-content.schema.json using ajv. Key validations: all required fields present (collection_title, collection_subtitle, category_promise, intro_text, category_summary, selection_guidance, trust_elements, faq_items, cta_direction), selection_guidance minItems = 1 with guidance_title and guidance_text non-empty, trust_elements minItems = 1, faq_items minItems = 1 with question and answer non-empty, cta_direction.primary_cta in enum, cta_direction.cta_tone in enum. Log failures per collection without halting the workflow.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/collection-content.schema.json",
+        "failure_behavior": "Log validation failure for the specific collection. Do not halt the entire workflow. Report all failed collections in the review-required manifest.",
+        "input": "constrained collection_content object per collection",
+        "output": "validated collection_content objects or per-collection validation errors"
+      },
+      {
+        "step": 10,
+        "name": "Persist collection-content.json (per collection)",
+        "type": "GitHub node or Write File node",
+        "description": "Write each validated collection-content.json to projects/{project_id}/collection-content/{collection_handle}.json. Commit with a message such as 'chore: generate collection-content for {store_id} — Phase 5 draft (planning artifact, not SEO-validated)'. Collections that failed validation are logged to projects/{project_id}/collection-content/_review-required.json. Empty and sparse collections are logged to projects/{project_id}/collection-content/_sparse-collections.json for explicit human attention.",
+        "artifact_path": "projects/{project_id}/collection-content/{collection_handle}.json",
+        "review_manifest_path": "projects/{project_id}/collection-content/_review-required.json",
+        "sparse_manifest_path": "projects/{project_id}/collection-content/_sparse-collections.json",
+        "git_note": "Each collection-content.json must be committed to Git. These artifacts are consumed by build-collection-seo (workflow 18), build-collection-navigation (workflow 19), and build-media-plan (workflow 25) in later phases.",
+        "input": "validated collection_content object per collection",
+        "output": "confirmation of write per collection + list of persisted artifact paths"
+      },
+      {
+        "step": 11,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the list of persisted collection-content artifact paths, the review-required manifest path, and the sparse-collections manifest path to the master orchestrator. Include a summary: total collections processed, count of empty/sparse/standard, count of validation failures.",
+        "input": "artifact_paths list + review_required manifest path + sparse_collections manifest path + processing summary",
+        "output": "workflow output payload with collection inventory summary"
+      }
+    ],
+
+    "assumptions": [
+      "Shopify collection title is operational truth and must not be renamed or rewritten by this workflow. Any collection naming decisions are human decisions outside this workflow's scope.",
+      "Shopify existing collection descriptions (body_html) are treated as factual content. If present, they are passed to the LLM as 'existing content — do not contradict' context.",
+      "Collection content is fundamentally different from product content. It addresses the category, not individual products. The LLM prompt must make this distinction explicit.",
+      "collection-seo.json is NOT available in Phase 5 (workflow 18 is out of scope). No keyword targeting or SEO optimization is performed in this workflow. All synthesized copy is planning content.",
+      "Empty and sparse collections must produce conservative placeholder artifacts rather than synthesized content. This is a hard rule enforced programmatically.",
+      "cta_direction (both primary_cta and cta_tone) is derived deterministically and overrides any LLM-generated CTA choices. The brand's conversion style is the authoritative source for CTA tone.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "The workflow handles collections where no associated product data is available (e.g. product fetch was not part of the Shopify import) gracefully — product_count = 0 triggers EMPTY-COLLECTION mode.",
+      "internal_navigation_hints are structural planning seeds, not implemented navigation links. They are consumed by downstream workflows (build-collection-navigation, build-internal-linking) that are out of Phase 5 scope.",
+      "Trust elements that require specific store policy information (e.g. exact return window, specific shipping partners) must use PLACEHOLDER-REQUIRES-REVIEW unless that information is explicitly available in the store_profile or intake data."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should collection content be generated for automated Shopify collections (rule-based) differently from manual collections?",
+        "impact": "Automated collections (e.g. 'All products tagged X') may have less editorial intentionality behind them than manually curated collections. The collection content framing might differ.",
+        "recommended_default": "In Phase 5, treat all collections the same — use product_count and product_type_diversity as the primary content depth signals regardless of collection type. Flag automated collections (if identifiable from Shopify metadata) in the notes for human review of whether full editorial content is appropriate."
+      },
+      {
+        "question": "How should collections that overlap significantly in product membership be handled?",
+        "impact": "If two collections share 80%+ of their products, their collection content risks being nearly identical, creating editorial redundancy.",
+        "recommended_default": "Phase 5 does not detect collection overlap — each collection is processed independently. Document this as a future optimization: a collection overlap detection pre-step that flags high-overlap collections for coordinated content planning. Out of Phase 5 scope."
+      },
+      {
+        "question": "Should the workflow produce a separate summary artifact describing the full collection architecture (how many collections, their categories, their product counts)?",
+        "impact": "A collection architecture summary would help inform the downstream build-collection-navigation and build-collection-seo workflows.",
+        "recommended_default": "Yes — a lightweight collection inventory artifact at projects/{project_id}/collection-content/_collection-inventory.json would be valuable. It would list all collections, their product counts, content_mode flags, and cta_direction values. Low-effort addition within the same workflow run. Recommend adding this in implementation."
+      },
+      {
+        "question": "How should the workflow handle collections where the Shopify description is very high-quality and needs minimal enrichment vs collections where it is absent or very short?",
+        "impact": "The current workflow treats all collections with standard synthesis. There may be cases where a human-written Shopify description should anchor the content plan rather than be supplemented.",
+        "recommended_default": "If existing_description_present = true AND description length > 200 characters, pass it as a primary anchor in the LLM prompt ('This existing description is high quality — use it as the primary content anchor and only supplement with additional context, do not rewrite it'). If existing_description is short or empty, proceed with standard synthesis."
+      }
+    ],
+
+    "evidence_boundaries": {
+      "direct_operational_truth_from_shopify": [
+        "collection_title (direct from Shopify — never synthesized or rewritten)",
+        "Collection handle (direct from Shopify — artifact identifier)",
+        "Existing collection description / body_html (direct from Shopify — passed as factual context if present)",
+        "Product membership count (product_count — direct from Shopify — drives content_mode)",
+        "Product type distribution within collection (direct from Shopify — informs selection_guidance)",
+        "Price range of collection products (derived from Shopify variant prices — informs CTA direction)"
+      ],
+      "derived_deterministically_from_planning_artifacts": [
+        "cta_direction.cta_tone (direct mapping from brand-positioning.conversion_style.cta_style)",
+        "cta_direction.primary_cta (derived from product diversity + price range + brand_role — deterministic logic)",
+        "content_mode (empty/sparse/standard — derived from product_count — deterministic)"
+      ],
+      "llm_synthesized_planning_content": [
+        "collection_subtitle (LLM synthesis — editorial framing)",
+        "category_promise (LLM synthesis — grounded in product signals and brand positioning)",
+        "intro_text (LLM synthesis — editorial, not SEO-optimized)",
+        "category_summary (LLM synthesis — educational context)",
+        "selection_guidance items (LLM synthesis — grounded in actual collection product composition)",
+        "category_highlights (optional LLM synthesis)",
+        "comparison_notes (optional LLM synthesis — only for diverse collections)",
+        "trust_elements (LLM synthesis — oriented by trust_style, not invented proof points)",
+        "faq_items (LLM synthesis — category-level questions, not product-level)",
+        "internal_navigation_hints (optional LLM synthesis — structural planning seeds)"
+      ],
+      "not_available_in_this_phase": [
+        "collection-seo.json (workflow 18 — out of Phase 5 scope) — no keyword strategy or SEO optimization",
+        "collection-navigation.json (workflow 19 — out of Phase 5 scope)",
+        "Validated SEO performance data for collection pages",
+        "Internal linking plan (workflow 23 — far out of Phase 5 scope)",
+        "Confirmed store shipping and returns policies (unless explicitly in store_profile)",
+        "Actual customer browsing behavior data for collections",
+        "Structured data plan for collections (workflow 24 — far out of Phase 5 scope)"
+      ],
+      "labeling_requirement": "The notes field per collection-content artifact must include: 'COLLECTION CONTENT — PLANNING ARTIFACT: This artifact was generated in Phase 5. All synthesized text (subtitle, category_promise, intro_text, category_summary, selection_guidance, trust_elements, faq_items) is editorial planning content — not SEO-validated copy, not final production text. collection_title is the exact Shopify collection title and must not be changed without explicit human review. collection-seo.json (workflow 18) is not yet available — no keyword targeting has been applied. PLACEHOLDER-REQUIRES-REVIEW fields require specific store policy or product information before publishing. Human review is required before any field is used in a live store.'"
+    }
+  }
+}
