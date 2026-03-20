@@ -1,0 +1,765 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. The FAQ page output is a planning artifact — not a finalized FAQ set backed by user research, search console data, or customer support ticket analysis. Questions and answers generated here are editorial framings of likely buyer questions grounded in available planning artifacts. They are provisional AEO seeds and trust-building planning content — not proven search demand facts. Human review is required before any faq-page.json artifact influences a live store.",
+    "faq_page_vs_product_faq_vs_collection_faq_boundary": "IMPORTANT — FAQ PAGE IS CATEGORICALLY DIFFERENT FROM PRODUCT AND COLLECTION FAQs: Product FAQ (from build-product-faq) answers 'Should I buy this specific product? How does it work?' Collection FAQ (from build-collection-content faq_items) answers 'What is in this category? How do I compare products here?' The FAQ page (this workflow) answers store-level questions: 'How does this store work? What are the policies? Can I trust this store? Where do I get help?' These are different questions serving different buyer needs. The FAQ page is a trust-building and support-reduction artifact, not a product-discovery artifact. This boundary must be preserved in the question synthesis.",
+    "operational_fact_safety_note": "IMPORTANT — DO NOT FABRICATE OPERATIONAL FACTS: FAQ page questions about shipping, returns, contact, payment, and warranties require specific operational facts to answer honestly. Many of these facts may not be available from planning inputs. When operational answers cannot be confirmed, they must use PLACEHOLDER-REQUIRES-REVIEW rather than invented specifics. A placeholder answer is better than a fabricated shipping rate or invented return window — fabricated policy answers could mislead buyers and create legal risk.",
+    "aeo_provisional_note": "IMPORTANT — AEO STRATEGY IS NOT AVAILABLE IN PHASE 7: aeo-strategy.json (step 12) is out of Phase 7 scope. This FAQ page is designed as an AEO seed — it structures questions in a way that positions the store well for future answer engine optimization work. However, the question selection, framing, and answer format in this artifact are not aligned to a finalized AEO question taxonomy or answer format strategy. When aeo-strategy.json becomes available in a later phase, the FAQ page artifact should be reviewed and updated. All FAQ items are marked PROVISIONAL-PENDING-AEO-STRATEGY in the output notes.",
+    "page_goal_determination_note": "The page_goal field (support-reduction, trust-building, purchase-support, or hybrid) is the most important strategic decision for this workflow. It determines the question set emphasis, answer depth, and CTA direction. The page_goal must be derived from: intake preferences (if the user indicated a specific FAQ purpose), brand-positioning trust_style (strong trust brands → trust-building emphasis), market intelligence (high-purchase-barrier markets → purchase-support emphasis), and whether the store has operational support infrastructure (no dedicated support channel → support-reduction emphasis).",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/faq-page.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-faq-page",
+    "name": "build-faq-page",
+    "category": "planning",
+    "phase": "Phase 7 — Page SEO, FAQ Page, and SEO Strategy Planning",
+    "purpose": "Synthesize a schema-validated FAQ page planning artifact for the store. Unlike product-faq (per-product) and collection-content faq_items (per-collection), this is a single store-level FAQ page artifact. The store FAQ page answers buyer questions about how the store operates, not about specific products or categories. Questions typically cover: store policies (shipping, returns, payment), trust signals (guarantees, certifications, store legitimacy), support access (how to contact, when to expect a reply), and general product or category questions that apply store-wide rather than to a specific product. The faq-page.json output defines: page_title, page_goal (support-reduction, trust-building, purchase-support, or hybrid), intro_text, faq_groups (question sets organized by topic), trust_role, cta_direction, and optional media_notes. Questions are framed as likely buyer questions — grounded in available planning signals (product FAQ seeds, collection FAQ seeds, market intelligence AEO considerations, page-content faq scaffold, operational facts from intake/Shopify where available). Operational answers (shipping rates, return windows, contact details, payment methods) must use PLACEHOLDER-REQUIRES-REVIEW when specific facts are unavailable. This FAQ page is designed as an AEO-ready planning artifact — questions are structured to position the store for featured snippet and people-also-ask capture — but it is not aligned to a finalized AEO strategy. aeo-strategy.json is out of Phase 7 scope.",
+
+    "faq_page_strategic_role": "The store FAQ page serves three overlapping functions: (1) SUPPORT REDUCTION — pre-empts common support queries so buyers can self-serve answers before contacting the store. This reduces support load and improves pre-purchase confidence. (2) TRUST BUILDING — demonstrates the store is transparent, organized, and responsive. A well-structured FAQ is itself a trust signal — it shows the store anticipated buyer concerns. (3) AEO SEEDING — well-formed question-answer pairs on a dedicated FAQ page are strong candidates for featured snippet, people-also-ask, and AI answer engine responses. Even without a finalized AEO strategy, organizing FAQ content clearly and specifically prepares the store for AEO work. The page_goal field encodes which of these functions is primary for this store.",
+
+    "question_framing_guidelines": {
+      "framing_principle": "Questions should be framed as real buyer questions — natural language, first-person or implied first-person perspective, grounded in the purchase journey. Not corporate documentation language.",
+      "good_framing_examples": [
+        "How long does shipping take?",
+        "What is your return policy?",
+        "How do I know if this is the right size for me?",
+        "Can I return an item if I change my mind?",
+        "How do I contact customer support?",
+        "Is my payment information secure?"
+      ],
+      "bad_framing_examples": [
+        "What are the logistics parameters of the shipping service?",
+        "Describe the merchandise return procedure.",
+        "Enumerate the available customer communication channels."
+      ],
+      "question_honesty_requirement": "Questions should only appear in the FAQ page if they can be answered honestly from available information. Questions whose answers are all PLACEHOLDER-REQUIRES-REVIEW may still appear if they represent real buyer needs — but the answer placeholder must be clearly marked for human review, not fabricated.",
+      "question_scope_requirement": "Store-level FAQ questions should apply broadly to the store, not to a specific product or collection. 'Do you offer a warranty on [Specific Product X]?' is a product FAQ item — not a store FAQ question. 'Do you offer product warranties?' is a store-level FAQ question."
+    },
+
+    "faq_groups_planning": {
+      "recommended_group_structure": [
+        {
+          "group_name": "Orders and Payment",
+          "primary_question_types": ["payment", "general"],
+          "typical_questions": [
+            "How do I place an order?",
+            "What payment methods do you accept?",
+            "Is my payment information secure?",
+            "Can I modify or cancel my order after placing it?",
+            "Do you offer discounts or promotions?"
+          ],
+          "operational_fact_dependency": "Payment methods and order modification policy require operational confirmation. Use PLACEHOLDER-REQUIRES-REVIEW for specifics.",
+          "always_include": true,
+          "note": "Orders and payment questions are universal for all commerce stores. Include at minimum 2-3 questions regardless of page_goal."
+        },
+        {
+          "group_name": "Shipping and Delivery",
+          "primary_question_types": ["shipping"],
+          "typical_questions": [
+            "How long does shipping take?",
+            "Do you offer free shipping?",
+            "What are your shipping rates?",
+            "Do you ship internationally?",
+            "How do I track my order?"
+          ],
+          "operational_fact_dependency": "Shipping timeframes, rates, carriers, free shipping thresholds, and international availability require operational confirmation. Use PLACEHOLDER-REQUIRES-REVIEW for all specifics unless available from intake or Shopify import.",
+          "always_include": true,
+          "note": "Shipping is one of the most common pre-purchase concerns. Always include a shipping group, even if all answers are placeholders that require review."
+        },
+        {
+          "group_name": "Returns and Refunds",
+          "primary_question_types": ["returns"],
+          "typical_questions": [
+            "What is your return policy?",
+            "How do I return an item?",
+            "How long do I have to make a return?",
+            "Do you offer refunds or store credit?",
+            "Who pays for return shipping?"
+          ],
+          "operational_fact_dependency": "Return window, refund vs store credit, return shipping responsibility, and condition requirements require operational confirmation. Use PLACEHOLDER-REQUIRES-REVIEW for all specifics.",
+          "always_include": true,
+          "note": "Returns policy is a critical pre-purchase trust signal and a common support driver. Always include a returns group."
+        },
+        {
+          "group_name": "Products and Selection",
+          "primary_question_types": ["product", "category"],
+          "typical_questions": [
+            "How do I choose the right product for my needs?",
+            "Do you carry [category-specific selection question]?",
+            "Are your products [quality/safety/certification claim relevant to vertical]?",
+            "What makes your products different from other options?"
+          ],
+          "operational_fact_dependency": "General product category questions can be answered from market intelligence and brand positioning. Specific certification or specification claims require operational confirmation.",
+          "always_include": false,
+          "selection_condition": "Include if the store's product catalog is complex enough to generate genuine category-level selection questions, OR if market_intelligence shows high informational/how-to-choose search intent.",
+          "note": "This group bridges the FAQ page and product/collection FAQ content. Keep questions at store-level — avoid product-specific questions that belong in product-faq."
+        },
+        {
+          "group_name": "Trust and Guarantees",
+          "primary_question_types": ["trust"],
+          "typical_questions": [
+            "Is [Store Name] a legitimate store?",
+            "Do you offer any guarantees?",
+            "How long has the store been in business?",
+            "Are customer reviews verified?",
+            "Is my personal information kept private?"
+          ],
+          "operational_fact_dependency": "Guarantee specifics, business history, review verification method require operational confirmation. Use PLACEHOLDER-REQUIRES-REVIEW for specifics.",
+          "always_include": false,
+          "selection_condition": "Include if brand-positioning.trust_style.reassurance_level = 'strong' OR if market_intelligence shows trust as a primary purchase barrier OR if page_goal = 'trust-building'.",
+          "note": "Trust questions directly address buyer skepticism. Important for new or growing brands where store legitimacy is not yet established by reputation."
+        },
+        {
+          "group_name": "Contact and Support",
+          "primary_question_types": ["support", "contact"],
+          "typical_questions": [
+            "How do I contact customer support?",
+            "What are your support hours?",
+            "How quickly do you respond to inquiries?",
+            "I have a problem with my order — what should I do?"
+          ],
+          "operational_fact_dependency": "Contact email, support hours, response time expectations require operational confirmation. Use PLACEHOLDER-REQUIRES-REVIEW for specifics.",
+          "always_include": true,
+          "note": "Contact and support questions must always be present. Buyers who cannot find how to reach a store lose trust quickly. Even if all answers are placeholders, the group must be present as a review target."
+        },
+        {
+          "group_name": "Care and Compatibility",
+          "primary_question_types": ["care", "compatibility"],
+          "typical_questions": [
+            "How do I care for [product type]?",
+            "Is [product type] compatible with [use context]?",
+            "What [specifications] should I know before buying?"
+          ],
+          "operational_fact_dependency": "Care instructions and compatibility requirements come from product data. These are product-level signals — only include if they represent a store-wide concern for the entire catalog.",
+          "always_include": false,
+          "selection_condition": "Include if product-content faq_items include significant care or compatibility questions that apply broadly to the catalog — not just to one product.",
+          "note": "Care and compatibility questions are most common in fashion, home, electronics, and wellness verticals. Omit if not category-relevant."
+        }
+      ]
+    },
+
+    "inputs": {
+      "from_page_content_faq_scaffold": {
+        "source": "build-page-content → page-content.json for faq-page type",
+        "artifact_path": "projects/{project_id}/page-content/faq-page.json",
+        "data_treatment": "PLANNING SCAFFOLD — the page-content artifact for the faq-page type provides a planning scaffold built during Phase 6. It includes: page_title, page_goal direction, intro_text sketch, faq_items seeds, trust_elements, and cta_direction. This scaffold is the starting structural context for the full FAQ page synthesis.",
+        "availability": "CONDITIONAL — the faq-page page-content artifact is only present if the FAQ page was scoped during build-page-content (based on store type and intake preferences). If absent, this workflow builds the FAQ page from scratch using other inputs.",
+        "fields_used": [
+          {
+            "field": "page_title",
+            "treatment": "PAGE TITLE ANCHOR — the page_title from the page-content scaffold provides the starting title. The final faq-page.json page_title should be based on this but may be refined for clarity and trust framing.",
+            "note": "Synthesized planning content — may require human refinement."
+          },
+          {
+            "field": "page_goal",
+            "treatment": "GOAL VALIDATION SIGNAL — the page_goal in the page-content scaffold reflects the initial goal direction. Cross-validate with brand positioning and intake preferences. If they conflict, intake preferences take precedence; if intake is absent, brand positioning takes precedence.",
+            "note": "page_goal direction from page-content is a provisional planning signal — not a final decision."
+          },
+          {
+            "field": "intro_text",
+            "treatment": "INTRO TEXT SEED — the intro_text from the page-content scaffold is a planning seed for the faq-page intro_text. The full FAQ artifact should enrich it with the finalized page_goal framing and trust_role.",
+            "note": "Synthesized content — use as directional seed, not verbatim copy."
+          },
+          {
+            "field": "faq_items",
+            "treatment": "FAQ SEED ITEMS — any faq_items in the page-content scaffold are preliminary question-answer seeds. This workflow uses them as starting points and enriches them with the full question set from other inputs.",
+            "note": "FAQ seeds from page-content are preliminary planning content. This workflow deepens and structures them into faq_groups with question_type classification."
+          },
+          {
+            "field": "trust_elements",
+            "treatment": "TRUST SIGNAL — trust_elements from the page-content scaffold indicate what trust themes are already planned for the page. These orient the trust_role assignment and Trust and Guarantees group content.",
+            "note": "Synthesized content — trust elements must not be inflated into guarantee claims not supported by available data."
+          },
+          {
+            "field": "cta_direction",
+            "treatment": "CTA DIRECTION SEED — the cta_direction from page-content provides the initial CTA framing. Cross-validate with page_goal and brand positioning conversion_style.",
+            "note": "The final cta_direction in faq-page.json may differ from the page-content seed based on the full FAQ synthesis context."
+          },
+          {
+            "field": "notes",
+            "treatment": "PLACEHOLDER DENSITY DETECTION — if the page-content notes field contains PLACEHOLDER-REQUIRES-REVIEW flags, propagate these as signals for which FAQ answer topics will require human review.",
+            "note": "Placeholder propagation ensures operational fact safety is maintained from page-content through FAQ synthesis."
+          }
+        ]
+      },
+
+      "from_page_seo_faq": {
+        "source": "build-page-seo → page-seo.json for faq-page type",
+        "artifact_path": "projects/{project_id}/page-seo/faq-page.json",
+        "data_treatment": "SEO CONTEXT LAYER — the faq-page page-seo artifact provides SEO planning context for the FAQ page: the planned answer_targets, internal_linking_targets, and content_depth classification. These inform which questions to prioritize for AEO potential.",
+        "availability": "AVAILABLE IN PHASE 7 — build-page-seo runs before build-faq-page in the Phase 7 workflow sequence.",
+        "fields_used": [
+          {
+            "field": "answer_targets",
+            "treatment": "AEO PRIORITY SIGNALS — the answer_targets from the faq-page page-seo artifact indicate which question types are planned as AEO targets (what-is-it, shipping, returns, trust, contact, support). These should be reflected as questions in the FAQ page faq_groups with particularly clear, direct answers.",
+            "note": "answer_targets are provisional AEO seeds — not finalized AEO strategy. PROVISIONAL-PENDING-AEO-STRATEGY."
+          },
+          {
+            "field": "internal_linking_targets",
+            "treatment": "INTERNAL LINK DIRECTION — internal linking targets from the faq-page page-seo inform which pages FAQ answers should link to. Shipping answers → link to shipping page. Returns answers → link to returns page. Product-related answers → link to relevant collection or product page.",
+            "note": "Used to set internal_link_target_type in individual question objects within faq_groups."
+          },
+          {
+            "field": "content_depth",
+            "treatment": "DEPTH CALIBRATION — the content_depth assignment from page-seo (light, balanced, deep) informs the overall depth of the FAQ page synthesis. A deep FAQ page should have more groups, more questions, and more detailed answers.",
+            "note": "Calibrates the ambition level of this workflow's synthesis — not a hard constraint on question count."
+          }
+        ]
+      },
+
+      "from_product_content_faq_seeds": {
+        "source": "build-product-content → product-content.json (faq_items fields, all products)",
+        "artifact_path": "projects/{project_id}/product-content/{product_handle}.json",
+        "data_treatment": "QUESTION AGGREGATION LAYER — product-level faq_items from all products are aggregated to identify store-level FAQ patterns. Questions that appear across multiple products are candidates for store-level FAQ coverage.",
+        "aggregation_logic": "Scan faq_items from all product-content artifacts. Identify question themes that appear across more than one product (e.g. shipping questions, returns questions, care questions). These recurring themes are strong candidates for store-level FAQ groups. Product-specific questions that appear only for one product are NOT elevated to the store FAQ — they remain in product-faq artifacts.",
+        "fields_used": [
+          {
+            "field": "faq_items[].question",
+            "treatment": "THEME AGGREGATION — scan question vocabulary across products for recurring themes. Common themes: shipping timeline, return conditions, care instructions, compatibility, payment options.",
+            "note": "Do not copy product-specific question text verbatim. Abstract to store-level question framing."
+          },
+          {
+            "field": "faq_items[].answer",
+            "treatment": "ANSWER SIGNAL — where answers are operational facts (confirmed shipping details, confirmed return policy), they may be elevated to the store FAQ answer as operational truth. Where answers are PLACEHOLDER-REQUIRES-REVIEW, the store FAQ answer must also be PLACEHOLDER-REQUIRES-REVIEW.",
+            "note": "Only confirmed operational facts can be elevated. Placeholder answers propagate as placeholders."
+          },
+          {
+            "field": "shipping_notes",
+            "treatment": "OPERATIONAL TRUTH SUPPLEMENT — if product-content shipping_notes are confirmed (non-placeholder), they provide an operational fact base for shipping FAQ answers at the store level.",
+            "note": "Confirmed shipping_notes from product-content are the best available source for store-level shipping FAQ answers."
+          },
+          {
+            "field": "returns_notes",
+            "treatment": "OPERATIONAL TRUTH SUPPLEMENT — same logic as shipping_notes.",
+            "note": "Confirmed returns_notes inform store-level returns FAQ answers."
+          }
+        ]
+      },
+
+      "from_collection_content_faq_seeds": {
+        "source": "build-collection-content → collection-content.json (faq_items fields, all collections)",
+        "artifact_path": "projects/{project_id}/collection-content/{collection_handle}.json",
+        "data_treatment": "CATEGORY-LEVEL QUESTION AGGREGATION — collection-level faq_items may include category-scoped questions that apply store-wide if the store has a focused catalog. For broad-catalogue stores, collection FAQ questions are collection-specific and should not be elevated to the store FAQ.",
+        "aggregation_logic": "Include collection faq_items in the store FAQ aggregation only when: (1) the store has a focused catalog (catalog_type = focused-range or single-product) AND the questions apply to all products, OR (2) the question is explicitly a store-level question that was placed in the collection FAQ for planning convenience (e.g. 'Do you ship internationally?' appearing in a collection FAQ).",
+        "note": "Collection faq_items are a supplementary source — they add context but should not dominate the store FAQ question set. Product-content faq_items and operational facts are primary."
+      },
+
+      "from_market_intelligence": {
+        "source": "build-market-intelligence → market-intelligence.json",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "data_treatment": "AEO SEED AND TRUST FACTOR LAYER — market intelligence provides signals about what questions buyers commonly research in this market and what trust factors drive purchase decisions",
+        "fields_used": [
+          {
+            "field": "aeo_considerations",
+            "treatment": "FAQ QUESTION SEED — if aeo_considerations lists specific question topics buyers research in this market (e.g. 'buyers want to know about [safety certifications]', 'buyers research [specific trust factor]'), these should be reflected in the FAQ page faq_groups as question candidates. These are the most AEO-valuable question topics.",
+            "note": "PROVISIONAL-PENDING-AEO-STRATEGY — aeo_considerations are planning signals, not finalized AEO question taxonomy."
+          },
+          {
+            "field": "trust_factors",
+            "treatment": "TRUST GROUP CONTENT SIGNAL — trust factors reveal what trust claims matter most to buyers in this market. High-relevance trust factors (warranty, certifications, reviews, money-back guarantee) should appear as questions in the Trust and Guarantees group.",
+            "note": "Trust factor questions must only be answered honestly with confirmed facts. Unconfirmed trust claims must use PLACEHOLDER-REQUIRES-REVIEW."
+          },
+          {
+            "field": "core_problems",
+            "treatment": "PURCHASE-SUPPORT QUESTION SIGNAL — the core problems buyers face in this market suggest what 'how-to-choose' and selection questions the store FAQ should address at a category level.",
+            "note": "Relevant for the Products and Selection group when page_goal includes purchase-support."
+          },
+          {
+            "field": "search_intents",
+            "treatment": "QUESTION FRAMING SIGNAL — informational search intent example queries reveal how buyers phrase questions about the market. These vocabulary signals inform how FAQ questions should be naturally worded.",
+            "note": "Example queries are planning proxies — not confirmed search volume data. Use as natural language framing signals."
+          }
+        ]
+      },
+
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "data_treatment": "TONE AND TRUST STYLE LAYER — brand positioning determines the tone of FAQ answers, the trust_role assignment, and the CTA direction",
+        "fields_used": [
+          {
+            "field": "trust_style",
+            "treatment": "TRUST ROLE DETERMINATION — trust_style.reassurance_level (light, balanced, strong) directly maps to the trust_role field in faq-page.json. A strong reassurance level → trust_role = strong (the FAQ is a primary trust channel). Light reassurance → trust_role = light (the FAQ is informational, not a trust campaign).",
+            "note": "trust_role mapping: strong reassurance → strong trust_role. balanced reassurance → balanced trust_role. light reassurance → light trust_role. This mapping is deterministic."
+          },
+          {
+            "field": "tone_of_voice",
+            "treatment": "ANSWER TONE GUARDRAIL — FAQ answers must be written in the brand tone. A premium-confident brand must not produce casual or overly casual FAQ answers. A warm-empathetic brand must not produce dry corporate policy language.",
+            "note": "Tone of voice applies to both the intro_text and all FAQ answer framing."
+          },
+          {
+            "field": "conversion_style",
+            "treatment": "CTA DIRECTION SIGNAL — the brand's conversion_style (soft, balanced, assertive) informs cta_tone in the cta_direction output. Assertive conversion style → cta_tone = assertive. Soft → cta_tone = subtle.",
+            "note": "Cross-referenced with page_goal: a support-reduction page should have a softer CTA even if the brand normally uses assertive conversion framing."
+          },
+          {
+            "field": "objection_handling_style",
+            "treatment": "FAQ ANSWER FRAMING SIGNAL — the brand's objection handling style informs how FAQ answers address buyer concerns. A direct objection-handling style → answers directly resolve the concern. A consultative style → answers guide buyers to understand their options.",
+            "note": "Optional field — may be absent. When present, use as a tone calibration signal for FAQ answers."
+          },
+          {
+            "field": "value_proposition",
+            "treatment": "INTRO TEXT ANCHOR — the value proposition should be subtly reflected in the FAQ page intro_text, orienting buyers on what this store offers before they read the FAQ groups.",
+            "note": "Directional framing — not lifted verbatim into the intro_text."
+          },
+          {
+            "field": "forbidden_impressions",
+            "treatment": "HARD CONTENT EXCLUSION — any impressions listed in forbidden_impressions must not appear in FAQ page title, intro_text, or any FAQ answer.",
+            "note": "Hard constraint — applied during constraint enforcement."
+          }
+        ]
+      },
+
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "data_treatment": "OPERATIONAL CONTEXT AND STORE IDENTITY LAYER — store profile provides store name, type, market, and operating mode context",
+        "fields_used": [
+          {
+            "field": "store_name",
+            "treatment": "PAGE TITLE AND INTRO TEXT ANCHOR — the store_name appears in the FAQ page title and intro_text to make the FAQ clearly branded and navigational.",
+            "note": "Operational truth — must not be altered."
+          },
+          {
+            "field": "store_type",
+            "treatment": "FAQ SCOPE SIGNAL — store type informs which FAQ groups are most relevant. DTC brand → trust and returns groups are critical. Marketplace model → payment and order management questions are more varied. Subscription model → subscription management questions may be needed.",
+            "note": "store_type is the primary determinant of which optional FAQ groups to include."
+          },
+          {
+            "field": "business_model",
+            "treatment": "OPERATIONAL FAQ SCOPE — DTC models have straightforward operational FAQ needs. Wholesale or B2B hybrid models may have different order and payment FAQ requirements. Subscription models need subscription-specific FAQ questions.",
+            "note": "Use to determine if any non-standard FAQ groups are needed beyond the recommended group structure."
+          },
+          {
+            "field": "primary_market",
+            "treatment": "SHIPPING FAQ SCOPE SIGNAL — primary market informs whether international shipping questions are relevant and what geographic scope the shipping FAQ group should address.",
+            "note": "Supporting signal for shipping FAQ group scoping."
+          },
+          {
+            "field": "vertical",
+            "treatment": "CARE AND COMPATIBILITY FAQ RELEVANCE — the store vertical determines whether care and compatibility questions are relevant. Fashion → care instructions important. Electronics → compatibility important. Wellness → safety and ingredient questions important.",
+            "note": "Primary determinant of whether to include a Care and Compatibility FAQ group."
+          }
+        ]
+      },
+
+      "from_seo_strategy": {
+        "source": "build-seo-strategy → seo-strategy.json",
+        "artifact_path": "projects/{project_id}/seo-strategy.json",
+        "data_treatment": "STRATEGIC CALIBRATION LAYER — seo-strategy.json provides knowledge_seo_role and page_priority signals that inform FAQ page depth and ambition",
+        "availability": "AVAILABLE IN PHASE 7 — seo-strategy.json is built before build-faq-page in Phase 7 workflow sequence.",
+        "fields_used": [
+          {
+            "field": "knowledge_seo_role",
+            "treatment": "FAQ DEPTH CALIBRATION — knowledge_seo_role = 'major' → the FAQ page is a primary knowledge and AEO asset; synthesize a rich, deep FAQ with multiple groups and carefully framed answers. knowledge_seo_role = 'supporting' → standard FAQ depth. knowledge_seo_role = 'none' → minimal FAQ page is sufficient for operational support only.",
+            "note": "knowledge_seo_role is the primary strategic calibration signal for FAQ page depth."
+          },
+          {
+            "field": "page_priority",
+            "treatment": "FAQ PRIORITY CONTEXT — if 'faq-pages' appears high in page_priority, the FAQ page should receive more ambitious synthesis. If it appears low or is absent, the FAQ page is a standard operational artifact.",
+            "note": "Supporting calibration signal."
+          }
+        ],
+        "fallback_behavior": "When absent: treat as knowledge_seo_role = 'supporting' (standard FAQ depth). Proceed with standard synthesis."
+      },
+
+      "from_intake": {
+        "source": "intake-store-input → normalized intake payload",
+        "artifact_path": "projects/{project_id}/intake.json",
+        "data_treatment": "USER PREFERENCE LAYER — intake preferences about FAQ scope and purpose take precedence over derived decisions",
+        "fields_used": [
+          {
+            "field": "faq_page_goal_preference",
+            "treatment": "DIRECT GOAL DETERMINATION — if the user stated a FAQ page purpose in intake (support-reduction, trust-building, purchase-support, or hybrid), use it directly as page_goal. User-stated preferences override derived decisions.",
+            "note": "Optional intake field — may be absent."
+          },
+          {
+            "field": "operational_details",
+            "treatment": "OPERATIONAL FACT SOURCE — any shipping rates, return windows, contact email, or payment methods stated in intake provide confirmed operational facts for FAQ answers. Treat as operational truth (within the bounds of what was entered, not validated against Shopify live data).",
+            "note": "Intake-provided operational facts are the best available source before Shopify data is verified. Note them as intake-provided in the answer."
+          }
+        ]
+      }
+    },
+
+    "outputs": {
+      "primary_output": "faq-page.json (one per store)",
+      "artifact_path": "projects/{project_id}/faq-page.json",
+      "schema": "schemas/faq-page.schema.json",
+      "output_fields": {
+        "page_title": {
+          "source": "LLM synthesis from page-content scaffold title + store_name + page_goal",
+          "type": "LLM-synthesized string",
+          "format_guidance": "Common patterns: 'Frequently Asked Questions | [Store Name]', '[Store Name] FAQ', 'Have Questions? We Have Answers.' — should be clear, welcoming, and branded.",
+          "note": "page_title is a planning proposal — may require human refinement."
+        },
+        "page_goal": {
+          "source": "Derived from intake preference (if present) → brand-positioning.trust_style → seo-strategy.knowledge_seo_role → market intelligence trust_factors",
+          "type": "constrained enum — deterministic derivation with LLM synthesis for borderline cases",
+          "schema_enum": ["support-reduction", "trust-building", "purchase-support", "hybrid"],
+          "derivation_logic": {
+            "support-reduction": "Store has high operational support complexity (many policy variations, complex logistics) OR intake explicitly states support-reduction goal. FAQ is primarily a self-service support tool.",
+            "trust-building": "brand_positioning.trust_style.reassurance_level = 'strong' OR market_intelligence.trust_factors indicates trust is a primary purchase barrier OR new brand with low established reputation. FAQ is primarily a trust signal.",
+            "purchase-support": "Market shows high informational/how-to-choose intent OR content_opportunities in market intelligence are rich. FAQ is primarily a purchase decision support tool.",
+            "hybrid": "Multiple goals are closely balanced. The most common assignment for general commerce stores — FAQ pages naturally serve multiple purposes."
+          },
+          "note": "page_goal is the most strategically important field — it anchors the question set emphasis and CTA direction."
+        },
+        "intro_text": {
+          "source": "LLM synthesis from page-content scaffold intro_text + page_goal framing + value_proposition from brand_positioning + store_name",
+          "type": "LLM-synthesized string",
+          "constraint": "Must be welcoming and on-brand. Must reflect page_goal. Must not fabricate operational claims not in the available inputs. Should be 2-4 sentences.",
+          "note": "Synthesized planning content — requires human review before publication."
+        },
+        "faq_groups": {
+          "source": "LLM synthesis — organized from aggregated question signals across all inputs, structured per the recommended_group_structure",
+          "type": "LLM-synthesized array (minItems: 1) of group objects, each with group_name and questions array",
+          "required_groups": ["Orders and Payment", "Shipping and Delivery", "Returns and Refunds", "Contact and Support"],
+          "conditional_groups": ["Products and Selection", "Trust and Guarantees", "Care and Compatibility"],
+          "question_fields_per_item": {
+            "question": {
+              "source": "LLM synthesis — naturally worded buyer question in first-person framing",
+              "constraint": "Must be a plausible, honest store-level question. Must not be product-specific unless it applies to the entire catalog.",
+              "note": "Synthesized planning content."
+            },
+            "answer": {
+              "source": "LLM synthesis — honest answer from available confirmed facts, or PLACEHOLDER-REQUIRES-REVIEW for unconfirmed operational facts",
+              "constraint": "CRITICAL: Operational facts (shipping rates, return window, contact email, support hours, payment methods) must use PLACEHOLDER-REQUIRES-REVIEW if not confirmed in intake or Shopify import data. Do not invent plausible-sounding operational specifics.",
+              "placeholder_rule": "When the answer cannot be written honestly from available data: 'PLACEHOLDER-REQUIRES-REVIEW — [brief description of what specific information is needed, e.g. \"Shipping rates and delivery timeframes must be confirmed with operations before publishing.\"]'",
+              "note": "Answers with placeholders are better than fabricated answers. Placeholder answers clearly signal what needs to be filled in by humans before publication."
+            },
+            "question_type": {
+              "source": "Derived deterministically from question topic and group context",
+              "type": "constrained enum",
+              "schema_enum": ["product", "category", "shipping", "returns", "trust", "compatibility", "care", "payment", "support", "general"],
+              "mapping": {
+                "Orders and Payment group": "payment or general",
+                "Shipping and Delivery group": "shipping",
+                "Returns and Refunds group": "returns",
+                "Products and Selection group": "product or category",
+                "Trust and Guarantees group": "trust",
+                "Care and Compatibility group": "care or compatibility",
+                "Contact and Support group": "support"
+              }
+            },
+            "internal_link_target_type": {
+              "source": "Derived from answer content and internal linking targets from page-seo",
+              "type": "constrained enum",
+              "schema_enum": ["none", "product-page", "collection-page", "guide-page", "contact-page", "homepage"],
+              "link_logic": {
+                "shipping answers": "contact-page (for shipping support) or none",
+                "returns answers": "contact-page (for returns initiation) or none",
+                "product/selection answers": "collection-page (guide to shop) or product-page (specific product reference)",
+                "trust answers": "homepage (trust authority) or none",
+                "contact/support answers": "contact-page",
+                "general/payment answers": "none (unless a specific page handles this topic)"
+              },
+              "note": "internal_link_target_type is optional per schema — set 'none' when no internal link is appropriate for the answer."
+            }
+          },
+          "minimum_questions_per_group": 2,
+          "maximum_placeholder_answers_per_group": "No hard maximum — but groups where all answers are placeholders must be clearly flagged in notes as ALL-ANSWERS-REQUIRE-REVIEW."
+        },
+        "trust_role": {
+          "source": "Derived deterministically from brand_positioning.trust_style.reassurance_level",
+          "type": "constrained enum",
+          "schema_enum": ["light", "balanced", "strong"],
+          "mapping": {
+            "strong reassurance_level": "strong",
+            "balanced reassurance_level": "balanced",
+            "light reassurance_level": "light",
+            "absent or unknown": "balanced (safe default)"
+          },
+          "note": "trust_role is the most directly derived field. It is deterministic — not synthesized by LLM."
+        },
+        "media_notes": {
+          "source": "Optional — derived from page_goal and knowledge_seo_role",
+          "type": "optional array of strings",
+          "guidance": {
+            "trust-building goal": "Consider a small brand photo or team image to humanize the FAQ page. Video walkthrough of return process or shipping process if available.",
+            "purchase-support goal": "Product category images that orient buyers on the selection process. Comparison chart or illustration if guide content supports it.",
+            "support-reduction goal": "Clear iconography to visually organize FAQ groups. Process diagram for returns or shipping if clarity is a concern."
+          },
+          "note": "Media notes are planning suggestions — not confirmed media assets. These are inputs for build-media-plan (step 25), which is out of Phase 7 scope."
+        },
+        "cta_direction": {
+          "primary_cta": {
+            "source": "Derived from page_goal + brand_positioning.conversion_style + cta_direction from page-content scaffold",
+            "type": "constrained enum",
+            "schema_enum": ["none", "contact-support", "shop-now", "explore-products", "learn-more", "mixed"],
+            "derivation_logic": {
+              "support-reduction": "contact-support — guide buyers to the support channel if the FAQ doesn't resolve their issue",
+              "trust-building": "shop-now or explore-products — FAQ builds trust and should convert into commerce",
+              "purchase-support": "explore-products — FAQ guides buyers toward the right products",
+              "hybrid": "mixed — appropriate mix of contact-support and explore-products"
+            }
+          },
+          "cta_tone": {
+            "source": "Derived from brand_positioning.conversion_style",
+            "type": "constrained enum",
+            "schema_enum": ["subtle", "balanced", "assertive"],
+            "mapping": {
+              "soft conversion style": "subtle",
+              "balanced conversion style": "balanced",
+              "assertive conversion style": "assertive"
+            }
+          }
+        },
+        "notes": {
+          "source": "Workflow-generated synthesis metadata",
+          "type": "machine-generated string",
+          "required_content": "Must include: synthesis timestamp, page_goal assignment with derivation reasoning, list of inputs used (page-content scaffold availability, product-content FAQ aggregation coverage, collection-content FAQ aggregation coverage, operational facts confirmed vs placeholder), PROVISIONAL-PENDING-AEO-STRATEGY flag (all FAQ items are provisional AEO seeds not aligned to finalized AEO strategy), count of placeholder answers requiring human review, evidence boundary label ('FAQ items are editorial framings of likely buyer questions — not proven search demand data or confirmed customer question analysis')."
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-page-content",
+        "provides": ["page-content.json for faq-page type (if scoped)"],
+        "required": false,
+        "note": "The faq-page page-content artifact is a planning scaffold. If absent (FAQ page not scoped during build-page-content), this workflow builds the FAQ page from scratch using other inputs. Absence is handled gracefully."
+      },
+      {
+        "workflow": "build-page-seo",
+        "provides": ["page-seo.json for faq-page type"],
+        "required": false,
+        "note": "PHASE 7 CONTEXT: build-page-seo runs before build-faq-page in Phase 7. The faq-page page-seo artifact provides answer_targets and internal_linking_targets as AEO context. When absent, workflow proceeds without SEO context alignment."
+      },
+      {
+        "workflow": "build-product-content",
+        "provides": ["product-content.json per product (faq_items, shipping_notes, returns_notes fields)"],
+        "required": false,
+        "note": "Product-content FAQ seeds are aggregated across all products for store-level question pattern analysis. When absent, workflow proceeds with fewer question seeds."
+      },
+      {
+        "workflow": "build-collection-content",
+        "provides": ["collection-content.json per collection (faq_items fields)"],
+        "required": false,
+        "note": "Collection-content FAQ seeds are an optional supplementary source. Most store FAQ questions come from product-content and operational context, not collection content."
+      },
+      {
+        "workflow": "build-market-intelligence",
+        "provides": ["market-intelligence.json"],
+        "required": true,
+        "note": "market-intelligence.json provides trust factors, AEO considerations, and search intent signals that are required for honest, market-grounded FAQ question selection."
+      },
+      {
+        "workflow": "build-brand-positioning",
+        "provides": ["brand-positioning.json"],
+        "required": true,
+        "note": "brand-positioning.json determines trust_role, answer tone, and CTA direction — all required for a coherent FAQ page artifact."
+      },
+      {
+        "workflow": "build-store-profile",
+        "provides": ["store-profile.json"],
+        "required": true,
+        "note": "store-profile.json provides store_name (page title anchor), store_type, and vertical context required for FAQ group scoping."
+      },
+      {
+        "workflow": "build-seo-strategy",
+        "provides": ["seo-strategy.json"],
+        "required": false,
+        "note": "PHASE 7 CONTEXT: seo-strategy.json provides knowledge_seo_role and page_priority as depth calibration signals. When absent, workflow uses standard FAQ depth defaults."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-structured-data-plan",
+        "receives": ["faq-page.json"],
+        "note": "Workflow step 24 — out of Phase 7 scope. faq-page.json is a primary input for FAQ structured data planning (faqPage schema type for rich results)."
+      },
+      {
+        "workflow": "build-aeo-strategy",
+        "receives": ["faq-page.json"],
+        "note": "Workflow step 12 — NOT IMPLEMENTED IN PHASE 7. When implemented, build-aeo-strategy should review faq-page.json question framing against the finalized AEO question taxonomy and update accordingly."
+      },
+      {
+        "workflow": "run-validation",
+        "receives": ["faq-page.json"],
+        "note": "Out of Phase 7 scope (workflow step 28). Validates faq-page.json against schema and checks placeholder density and answer completeness."
+      }
+    ],
+
+    "schema_alignment": {
+      "faq-page.schema.json": {
+        "required_fields_covered": [
+          "page_title",
+          "page_goal",
+          "intro_text",
+          "faq_groups",
+          "trust_role",
+          "cta_direction"
+        ],
+        "optional_fields_covered": [
+          "media_notes",
+          "notes"
+        ],
+        "schema_enum_notes": {
+          "page_goal": "enum: support-reduction | trust-building | purchase-support | hybrid",
+          "faq_groups[].questions[].question_type": "enum: product | category | shipping | returns | trust | compatibility | care | payment | support | general",
+          "faq_groups[].questions[].internal_link_target_type": "enum: none | product-page | collection-page | guide-page | contact-page | homepage",
+          "trust_role": "enum: light | balanced | strong",
+          "cta_direction.primary_cta": "enum: none | contact-support | shop-now | explore-products | learn-more | mixed",
+          "cta_direction.cta_tone": "enum: subtle | balanced | assertive"
+        },
+        "validation_note": "faq-page.json is a single-instance artifact (one per store). All required fields must be present. faq_groups must have at least one group with at least one question. Each question must have question, answer, and question_type. cta_direction must have primary_cta and cta_tone."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: market_intelligence (object), brand_positioning (object), store_profile (object). Optional: page_content_faq_scaffold (the page-content artifact for faq-page type — may be absent if FAQ page was not scoped in build-page-content), page_seo_faq (the page-seo artifact for faq-page type from Phase 7 build-page-seo), product_content_artifacts (array — for FAQ seed aggregation), collection_content_artifacts (array — for FAQ seed aggregation), seo_strategy (object — from Phase 7 build-seo-strategy), intake_preferences (object).",
+        "input": "market_intelligence + brand_positioning + store_profile + optional inputs",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present. market_intelligence must have trust_factors and search_intents. brand_positioning must have trust_style, tone_of_voice, and conversion_style. store_profile must have store_name, store_type, and vertical. Log availability of all optional inputs. Set availability flags: has_faq_scaffold, has_page_seo_faq, has_product_content, has_collection_content, has_seo_strategy, has_intake_preferences. Fail with clear error only if required inputs are missing.",
+        "input": "all inputs",
+        "output": "validated inputs + availability flags or halt error"
+      },
+      {
+        "step": 3,
+        "name": "Determine Page Goal and Trust Role",
+        "type": "Code node (JavaScript)",
+        "description": "Derive page_goal and trust_role deterministically before LLM synthesis: (1) PAGE GOAL DERIVATION: Check intake_preferences.faq_page_goal_preference first — if present, use it directly. If absent, apply the derivation logic: check trust_style.reassurance_level (strong → trust-building candidate), check seo_strategy.knowledge_seo_role (major → purchase-support candidate), check market_intelligence.trust_factors richness (high → trust-building reinforced), check store_type (high operational complexity → support-reduction candidate). When multiple signals conflict, default to 'hybrid'. (2) TRUST ROLE DERIVATION: Map trust_style.reassurance_level to trust_role: strong → strong, balanced → balanced, light → light, absent → balanced (safe default). (3) CTA DIRECTION PRE-DERIVATION: Map page_goal + conversion_style to candidate cta_direction: generate candidate primary_cta and cta_tone for LLM prompt grounding.",
+        "input": "validated brand_positioning + market_intelligence + seo_strategy (optional) + intake_preferences (optional)",
+        "output": "derived_page_goal + derived_trust_role + candidate_cta_direction"
+      },
+      {
+        "step": 4,
+        "name": "Scope FAQ Groups",
+        "type": "Code node (JavaScript)",
+        "description": "Determine which FAQ groups to include in this store's FAQ page: (1) REQUIRED GROUPS: Always include Orders and Payment, Shipping and Delivery, Returns and Refunds, Contact and Support. (2) PRODUCTS AND SELECTION: Include if market_intelligence.search_intents contains significant informational or how-to-choose intents OR if content_opportunities are present OR seo_strategy.knowledge_seo_role = balanced or major. (3) TRUST AND GUARANTEES: Include if brand_positioning.trust_style.reassurance_level = strong OR market_intelligence.trust_factors indicates trust is a primary barrier OR derived_page_goal = trust-building. (4) CARE AND COMPATIBILITY: Include if store_profile.vertical is in the set where care/compatibility questions are common (fashion, wellness, electronics, home) AND product_content artifacts contain care or compatibility faq_items. (5) Log the scoped groups list — this is passed to the LLM as the required structure for faq_groups output.",
+        "input": "validated inputs + derived_page_goal + availability flags",
+        "output": "scoped_faq_groups list with group_name, question_types, and include_reason"
+      },
+      {
+        "step": 5,
+        "name": "Aggregate Question Signals from Product and Collection Content",
+        "type": "Code node (JavaScript)",
+        "description": "If has_product_content = true: load all product-content artifacts. Extract faq_items question themes — identify recurring themes across multiple products. Extract confirmed operational facts from shipping_notes and returns_notes fields (non-placeholder values only). If has_collection_content = true: scan collection-content faq_items for store-level applicable questions. Produce an aggregated_question_signals object: (1) recurring_question_themes: list of question themes appearing across 2+ products, classified by question_type. (2) confirmed_shipping_facts: any confirmed shipping_notes values (treat as operational truth signals). (3) confirmed_returns_facts: any confirmed returns_notes values. (4) care_compatibility_themes: care and compatibility faq_items themes if scoped. If optional content inputs are absent: set aggregated_question_signals = null and proceed with market intelligence and brand positioning signals only.",
+        "input": "product_content_artifacts (optional) + collection_content_artifacts (optional)",
+        "output": "aggregated_question_signals object or null"
+      },
+      {
+        "step": 6,
+        "name": "Build LLM FAQ Page Prompt",
+        "type": "Code node (JavaScript)",
+        "description": "Assemble the structured LLM prompt for FAQ page synthesis. The prompt must: (1) State the derived_page_goal, derived_trust_role, and candidate_cta_direction as pre-determined decisions — instruct the LLM to use these values directly. (2) Present the scoped_faq_groups list — instruct the LLM to produce exactly these groups and no others. (3) Present the aggregated_question_signals as question seed material — instruct the LLM to use recurring themes as a basis for group questions, abstracted to store-level framing. (4) Present confirmed operational facts — instruct the LLM to use these as the answer basis for relevant FAQ questions. (5) Present trust_factors, aeo_considerations, and search intent vocabulary from market intelligence as question framing context. (6) Apply the question framing guidelines: natural buyer language, first-person framing, store-level scope only. (7) Apply the placeholder rule: CRITICAL INSTRUCTION: 'For any FAQ answer that requires specific operational facts (shipping rates, return window, contact email, support hours, payment methods) that are not in the confirmed_operational_facts list, the answer field must be: PLACEHOLDER-REQUIRES-REVIEW — [brief description of what information is needed]. Do not invent plausible operational specifics.' (8) Apply tone guardrails from brand_positioning.tone_of_voice. (9) Apply forbidden_impressions as a hard exclusion list for all generated text. (10) Request output as valid JSON conforming to schemas/faq-page.schema.json. Include all schema enum values. (11) Minimum 2 questions per group. (12) Instruct that internal_link_target_type should be set to 'none' when no appropriate internal link exists — do not invent link targets.",
+        "input": "derived_page_goal + derived_trust_role + candidate_cta_direction + scoped_faq_groups + aggregated_question_signals + brand_positioning + market_intelligence + page_content_faq_scaffold (if available) + page_seo_faq.answer_targets (if available)",
+        "output": "assembled LLM prompt string",
+        "prompt_safety_note": "Prompt must state: 'This FAQ page is a planning artifact — FAQ items are editorial framings of likely buyer questions, not proven search demand or confirmed customer question analysis. Operational answers that cannot be confirmed from available data MUST use PLACEHOLDER-REQUIRES-REVIEW. Do not fabricate shipping rates, return windows, contact details, support hours, payment methods, or guarantee terms.'"
+      },
+      {
+        "step": 7,
+        "name": "LLM Synthesis: FAQ Page Content",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API. Request JSON output mode. Temperature: 0.3 (FAQ content synthesis needs some creativity for question framing but should be grounded in the provided signals). Max tokens: 4000 (FAQ pages can be longer than single-page artifacts).",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt",
+        "output": "raw LLM response string (expected to be JSON conforming to faq-page schema)"
+      },
+      {
+        "step": 8,
+        "name": "Parse and Enforce Operational Fact Safety",
+        "type": "Code node (JavaScript)",
+        "description": "Parse the raw LLM response as JSON. Apply operational fact safety enforcement: (1) OPERATIONAL FACT SCAN: Scan all faq_groups[].questions[].answer fields for potential operational specifics that may have been invented. Check for patterns such as: specific shipping timeframes ('ships in X days', 'X-Y business days'), specific return windows ('30 days', 'X day return policy'), contact email addresses, phone numbers, specific pricing, specific payment processor names where these were not in confirmed_operational_facts. If a specific operational claim is found that was NOT in confirmed_operational_facts: replace with PLACEHOLDER-REQUIRES-REVIEW — [contextual placeholder description]. Log the replacement. (2) PAGE GOAL ENFORCEMENT: Overwrite page_goal with derived_page_goal if the LLM changed it. (3) TRUST ROLE ENFORCEMENT: Overwrite trust_role with derived_trust_role if the LLM changed it. (4) CTA ENFORCEMENT: Verify cta_direction matches candidate_cta_direction. Allow LLM variation within the same primary_cta category — halt and overwrite only if the LLM chose a completely different primary_cta than derived (e.g. LLM chose 'shop-now' when page_goal = 'support-reduction'). (5) GROUP SCOPE ENFORCEMENT: Verify that exactly the scoped_faq_groups are present — no extra groups added, no required groups missing. (6) MINIMUM QUESTIONS: Verify each group has at least 2 questions. Add minimal placeholder questions if any group has fewer. (7) FORBIDDEN IMPRESSIONS: Scan all text fields for forbidden_impressions. Replace violations with REQUIRES-REVIEW-COPY-VIOLATION. (8) PROVISIONAL FLAG INJECTION: Inject PROVISIONAL-PENDING-AEO-STRATEGY into the notes field.",
+        "input": "raw LLM response + derived page_goal + derived trust_role + candidate cta_direction + scoped_faq_groups + confirmed_operational_facts",
+        "output": "parsed and constrained faq_page object (pre-validation)"
+      },
+      {
+        "step": 9,
+        "name": "Count and Report Placeholders",
+        "type": "Code node (JavaScript)",
+        "description": "Scan the constrained faq_page object and count all PLACEHOLDER-REQUIRES-REVIEW values across all answer fields. Produce a placeholder_report: (1) total_placeholder_answers: integer count. (2) placeholder_by_group: map of group_name to count of placeholder answers in that group. (3) groups_all_placeholder: list of group names where ALL answers are placeholders. (4) operational_facts_confirmed: list of which operational fact categories had confirmed data (shipping, returns, contact, payment). Inject placeholder_report summary into the notes field of faq_page. This report supports human review prioritization — which groups need the most operational fact input before the FAQ page can be published.",
+        "input": "constrained faq_page object",
+        "output": "faq_page object with placeholder report injected into notes"
+      },
+      {
+        "step": 10,
+        "name": "Validate Against Schema",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate the faq_page object against schemas/faq-page.schema.json using ajv. Key validations: page_title non-empty string, page_goal in enum, intro_text non-empty string, faq_groups is array minItems: 1, each group has group_name and questions (array minItems: 1), each question has question (non-empty), answer (non-empty), and question_type (in enum), internal_link_target_type (in enum if present), trust_role in enum, cta_direction is object with primary_cta in enum and cta_tone in enum. Halt workflow on validation failure — faq-page.json is a single-instance store artifact; partial outputs are not acceptable.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/faq-page.schema.json",
+        "failure_behavior": "Halt workflow on validation failure. Log exact field violation. Do not write a partially valid faq-page.json.",
+        "input": "constrained faq_page object with placeholder report",
+        "output": "validated faq_page object or halt error"
+      },
+      {
+        "step": 11,
+        "name": "Persist faq-page.json",
+        "type": "GitHub node or Write File node",
+        "description": "Write the validated faq-page.json to projects/{project_id}/faq-page.json. Commit with a message such as 'chore: generate faq-page for {store_id} — Phase 7 draft (provisional, {N} placeholder answers require review)'. Include the placeholder count in the commit message so the reviewer immediately knows the review scope.",
+        "artifact_path": "projects/{project_id}/faq-page.json",
+        "git_note": "faq-page.json is a single-instance store artifact. It must be committed to Git. The placeholder count in the commit message ensures transparency about the review requirements.",
+        "input": "validated faq_page object",
+        "output": "confirmation of write + persisted artifact path"
+      },
+      {
+        "step": 12,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the faq-page.json path, the placeholder_report, and provisional status metadata to the master orchestrator. The orchestrator must make faq-page.json available to: build-structured-data-plan (step 24 — out of Phase 7 scope) for FAQ structured data planning, and build-aeo-strategy (step 12 — NOT IMPLEMENTED IN PHASE 7) when AEO strategy is eventually built. Also flag the placeholder count so the orchestrator or human operator knows the human review requirement before this FAQ page artifact is used in production.",
+        "input": "faq-page.json path + placeholder_report + provisional status metadata",
+        "output": "workflow output payload with faq-page path and review requirements"
+      }
+    ],
+
+    "assumptions": [
+      "faq-page.json is a single-instance store artifact — one per store. It is not produced per product or per collection.",
+      "The required FAQ groups (Orders and Payment, Shipping and Delivery, Returns and Refunds, Contact and Support) are always present regardless of which optional inputs are available.",
+      "Operational facts (shipping rates, return windows, contact details, payment methods, support hours) are commonly unavailable from planning inputs. Placeholder answers for these facts are expected and safe. The placeholder_report in the output documents which answers need human input before publication.",
+      "aeo-strategy.json is NOT available in Phase 7. All FAQ items are provisional AEO seeds. They are structured to be AEO-ready but are not aligned to a finalized AEO question taxonomy.",
+      "page_goal and trust_role are derived deterministically before LLM synthesis and enforced in constraint checking. The LLM may not change these fields.",
+      "Group scope is determined in step 4 and enforced in step 8. The LLM may not add or remove groups from the scoped list.",
+      "Operational fact safety enforcement in step 8 is the most critical safety layer in this workflow. Any operational specifics not in confirmed_operational_facts must be replaced with placeholders.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "The faq-page artifact produced here is a planning scaffold. It is not final page copy. Human review of all placeholder answers and all synthesized answers is required before publication.",
+      "Question text should be natural buyer language — first-person framing, plain language. Not corporate policy language. This is enforced in the prompt and checked during constraint enforcement."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should the FAQ page planning include a question about AI assistant or chatbot support if the store plans to add one in the future?",
+        "impact": "As AI-powered support becomes more common, buyer questions like 'Is there a chat option?' are increasingly relevant. Including them now makes the FAQ future-proofed.",
+        "recommended_default": "Only include AI/chatbot support questions if intake_preferences explicitly indicate a support chat feature is planned or present. Do not speculatively add questions about features not yet decided."
+      },
+      {
+        "question": "Should the FAQ page include questions specifically for pre-purchase vs post-purchase buyer journeys, or should they be mixed?",
+        "impact": "Pre-purchase FAQs (product selection, shipping costs, return policy) and post-purchase FAQs (order tracking, return process, exchange process) serve different moments in the buyer journey. A FAQ page optimized for one may miss the other.",
+        "recommended_default": "For Phase 7, mix both in a single FAQ page organized by topic (not by journey stage). A journey-stage FAQ structure is a future enhancement if the store has a rich enough post-purchase support need to warrant it."
+      },
+      {
+        "question": "How should the FAQ page handle subscription-specific questions for stores with subscription business models?",
+        "impact": "Subscription stores have unique FAQ needs: subscription management, pause/cancel policy, billing cycle questions. The current group structure does not have a dedicated subscription group.",
+        "recommended_default": "If store_profile.business_model includes subscription logic, add a Subscription Management group to the scoped_faq_groups with question_types = general or support. Document the subscription group as a conditional group in the faq_groups_planning section. This can be added as a schema-aligned group since group_name is a free string."
+      },
+      {
+        "question": "Should faq-page.json be updated when seo-strategy is revised (e.g. when knowledge_seo_role changes from 'supporting' to 'major')?",
+        "impact": "A strategy shift from 'supporting' to 'major' knowledge_seo_role would justify expanding the FAQ page significantly — adding more groups, deeper answers, and richer AEO targeting. Without a re-run trigger, the FAQ page would remain at its initial depth level.",
+        "recommended_default": "Document in seo-strategy-revisions.md that the FAQ page should be reviewed and potentially re-run if knowledge_seo_role changes significantly. Do not implement automatic re-runs in Phase 7."
+      }
+    ]
+  }
+}
