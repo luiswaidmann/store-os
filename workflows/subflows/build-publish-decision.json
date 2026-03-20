@@ -1,0 +1,603 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. The publish-decision.json output is a planning artifact only — not an automated publish trigger, not a Shopify deploy command, not an override of human judgment, and not a compliance certification. The final publish decision for any store must be made by a human with appropriate authority (founder, operator, or designated reviewer). This workflow produces a structured planning recommendation that requires human approval before any publishing action is taken.",
+    "human_approval_requirement_note": "IMPORTANT — HUMAN APPROVAL IS ALWAYS REQUIRED BEFORE PUBLISHING: This workflow produces a publish recommendation, not a publish authorization. No publish mode output from this workflow (including publish-ready) authorizes automated publishing. A designated human reviewer must review this artifact, confirm that all manual review gates have been completed, and explicitly approve publication. The workflow cannot confirm that human review has occurred — that confirmation must come from the project governance process.",
+    "conservative_by_design_note": "IMPORTANT — THIS WORKFLOW IS CONSERVATIVE BY DESIGN: When blockers exist, this workflow outputs blocked regardless of quality score. When required facts are missing (pricing, legal content), this workflow outputs blocked or internal-review-only. When the evidence base is uncertain (all planning artifacts are LLM-synthesized), this workflow recommends against full public launch without human verification of key claims. Conservative gating is the correct behavior — the cost of a missed blocker in a published store is much higher than the cost of requiring additional human review.",
+    "evidence_boundary_note": "IMPORTANT — ALL PRIOR ARTIFACTS ARE LLM-SYNTHESIZED PLANNING ARTIFACTS: The inputs to this workflow (validation-report, quality-score, deployment-manifest) are all derived from LLM-synthesized planning artifacts. They reflect planning completeness — not confirmed business facts, not verified Shopify store data, not tested theme implementations. The publish decision is therefore a planning-level recommendation based on planning artifact quality. It is not a review of what has actually been implemented.",
+    "publish_mode_hierarchy_note": "IMPORTANT — PUBLISH MODES ARE ORDERED FROM MOST TO LEAST RESTRICTIVE: blocked (no launch in any form) > internal-review-only (visible only to team with no public URL indexing) > soft-launch (limited public visibility, no marketing amplification) > publish-ready (full launch authorized pending human approval). The workflow assigns the most restrictive publish mode that the current artifact state warrants. Moving from a more restrictive to a less restrictive mode requires resolving the conditions that triggered the restriction.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/publish-decision.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "docs/architecture.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-publish-decision",
+    "name": "build-publish-decision",
+    "category": "governance",
+    "phase": "Phase 10 — Validation, Quality Scoring, Deployment Manifest, and Publish Decision",
+    "purpose": "Produce the final planning governance artifact (publish-decision.json) that answers the question: in what mode, if any, is this store ready to publish? The publish-decision.json output defines: whether any publish is allowed (publish_allowed boolean), the recommended publish mode (blocked / internal-review-only / soft-launch / publish-ready), the decision rationale, all blocking reasons that prevent publishing, required actions that must be completed before the next decision cycle, optional improvement actions that improve quality but are not blockers, identified open risks with severity and mitigation guidance, whether human approval is required (always true), the approval role assignment, and an explicit evidence boundary statement. This workflow consumes validation-report.json from run-validation, quality-score.json from build-quality-score, and deployment-manifest.json from build-deployment-manifest as its three primary inputs. It also consumes governance preferences from the store intake artifact. It applies a deterministic set of blocking criteria and warning criteria to derive the publish mode and constructs the final planning artifact. The LLM synthesizes rationale language and risk descriptions from the deterministic gating outputs. No LLM output may override a deterministically computed blocking decision.",
+
+    "publish_decision_vs_prior_artifacts": "This is the final Phase 10 workflow and the final planning artifact in the store-os workflow chain. It consumes all three prior Phase 10 governance artifacts and distills their signals into a single structured decision record. It does not re-run validation. It does not re-compute quality scores. It does not re-inventory artifacts. It applies gating rules to the outputs of those workflows and produces a structured decision that a human reviewer uses to authorize or defer publishing.",
+
+    "upstream_dependency_order": "This workflow depends on all three prior Phase 10 workflows: run-validation (Phase 10, step 1), build-quality-score (Phase 10, step 2), and build-deployment-manifest (Phase 10, step 3). All three must complete before this workflow runs. It also consumes store-profile and intake context (from build-store-profile, Phase 1) for governance preferences.",
+
+    "publish_mode_definitions": {
+      "description": "Four possible publish mode outputs, ordered from most to least restrictive. The workflow assigns the most restrictive mode that the current artifact state warrants.",
+      "modes": {
+        "blocked": {
+          "criteria": "Any of the following: (1) validation-report.summary.publish_blocked = true (any blocking check failed), (2) any legal/policy page is absent or contains placeholder content, (3) pricing REQUIRES-OPERATIONAL-DATA on any product, (4) quality-score.launch_readiness = not-ready, (5) critical open risks with no mitigation path, (6) autoplay video with muted = false (critical safety violation), (7) deployment-manifest.publish_decision.publish_allowed = false",
+          "meaning": "No publishing in any form until blocking conditions are resolved. Not soft launch, not internal review with public URL, not preview link sharing with external parties.",
+          "required_resolution": "All blocking conditions must be individually resolved and the Phase 10 governance workflows must be re-run to produce an updated decision."
+        },
+        "internal-review-only": {
+          "criteria": "No blocking conditions AND any of: (1) quality-score.overall_score < 60, (2) any dimension score = 0, (3) more than 30% of product descriptions are placeholder, (4) seo-strategy not yet reviewed by human SEO reviewer, (5) structured-data-plan not yet reviewed by technical reviewer, (6) any REQUIRES-OPERATIONAL-DATA items unresolved in non-critical fields",
+          "meaning": "The store may be reviewed internally by the team but should not be indexed by search engines or shared with external parties. Password protection or equivalent access control is required.",
+          "required_resolution": "Resolve warning conditions and re-run Phase 10 to move to soft-launch or publish-ready mode."
+        },
+        "soft-launch": {
+          "criteria": "No blocking conditions AND no internal-review-only conditions AND any of: (1) quality-score.overall_score 60–79, (2) media production deferred items present (video or media assets not yet ready), (3) structured data plan validated but not yet developer-reviewed, (4) seo-strategy revision_guidance present but addressed, (5) minor PLACEHOLDER-REQUIRES-REVIEW items in secondary content areas",
+          "meaning": "The store is ready for limited public availability with no marketing amplification. Core content, legal pages, pricing, and critical SEO configuration are complete. Known gaps exist but do not block a soft launch. No paid traffic, no PR, no social media campaign.",
+          "required_resolution": "Complete deferred media production, resolve minor placeholder items, and re-run Phase 10 to move to publish-ready."
+        },
+        "publish-ready": {
+          "criteria": "No blocking conditions AND no internal-review-only conditions AND no soft-launch conditions AND: (1) quality-score.overall_score >= 80, (2) all manual review gates completed (requires external confirmation — this workflow cannot verify gate completion), (3) all legal pages complete and legal-reviewed, (4) all product pricing confirmed, (5) no seo-strategy revision signals, (6) media plan with minimal deferred items",
+          "meaning": "The planning artifact set is sufficiently complete and internally consistent to support a full public launch with marketing amplification, pending human approval and confirmation that all manual review gates have been completed.",
+          "caveat": "publish-ready does NOT mean launch is automatically authorized. Human approval is always required. This workflow cannot confirm that implementation has been completed, that the theme is deployed, or that manual review gates have been executed."
+        }
+      }
+    },
+
+    "blocking_criteria_complete_list": {
+      "description": "Deterministic blocking criteria. Any single blocking criterion → publish_mode = blocked. These are evaluated before any other criteria.",
+      "criteria": [
+        {
+          "criterion_name": "validation-report-publish-blocked",
+          "check": "validation-report.summary.publish_blocked = true",
+          "reason": "One or more blocking validation checks failed. Publishing is blocked until all blocking checks are resolved.",
+          "source": "validation-report.summary.publish_blocked"
+        },
+        {
+          "criterion_name": "legal-page-absent-or-placeholder",
+          "check": "Any legal/policy page (privacy-policy, terms-of-service, shipping-policy, return-policy) is absent OR has placeholder content_body",
+          "reason": "Legal pages are required for any publish mode. Placeholder or absent legal content is a compliance risk.",
+          "source": "deployment-manifest.artifacts + validation-report checks"
+        },
+        {
+          "criterion_name": "pricing-operational-data-unresolved",
+          "check": "Any product-content.pricing field contains REQUIRES-OPERATIONAL-DATA",
+          "reason": "A store cannot publish with unresolved pricing. Pricing is a fundamental operational fact.",
+          "source": "validation-report category_4 placeholder density checks"
+        },
+        {
+          "criterion_name": "quality-score-not-ready",
+          "check": "quality-score.launch_readiness = not-ready",
+          "reason": "Quality score indicates fundamental planning gaps that must be resolved before any launch.",
+          "source": "quality-score.launch_readiness"
+        },
+        {
+          "criterion_name": "autoplay-video-without-mute-violation",
+          "check": "validation-report contains any failed check for video-plan-autoplay-muted-compliance",
+          "reason": "Autoplay video without muted = true is a fundamental audio and accessibility violation that must be corrected before any launch.",
+          "source": "validation-report.checks"
+        },
+        {
+          "criterion_name": "canonical-policy-contradiction",
+          "check": "validation-report contains any failed check for seo-strategy-canonical-policy-alignment with blocking = true",
+          "reason": "Contradictory canonical URL assignments can cause SEO harm if implemented. Must be resolved before launch.",
+          "source": "validation-report.checks"
+        },
+        {
+          "criterion_name": "design-system-absent",
+          "check": "design-system artifact status = skipped (absent) in deployment-manifest",
+          "reason": "Design system is required for all implementation domains. Its absence means all implementation guidance is missing.",
+          "source": "deployment-manifest.artifacts"
+        }
+      ]
+    },
+
+    "warning_criteria_complete_list": {
+      "description": "Warning criteria. Warnings do not block publishing but determine publish mode ceiling (internal-review-only or soft-launch). Warnings must be acknowledged in required_actions or optional_actions.",
+      "internal_review_only_warnings": [
+        {
+          "criterion_name": "quality-score-below-60",
+          "check": "quality-score.overall_score < 60",
+          "publish_mode_ceiling": "internal-review-only",
+          "reason": "Overall planning quality score is below the threshold for any public visibility. Significant gaps in planning completeness must be addressed."
+        },
+        {
+          "criterion_name": "zero-dimension-score",
+          "check": "any quality-score dimension score = 0",
+          "publish_mode_ceiling": "internal-review-only",
+          "reason": "A dimension score of 0 indicates a fundamental planning gap in that area. No public launch should proceed with a zero-score planning dimension."
+        },
+        {
+          "criterion_name": "high-product-placeholder-density",
+          "check": "more than 30% of product descriptions contain PLACEHOLDER-REQUIRES-REVIEW",
+          "publish_mode_ceiling": "internal-review-only",
+          "reason": "More than 30% placeholder product descriptions means a substantial portion of the catalog is not ready for public-facing presentation."
+        },
+        {
+          "criterion_name": "seo-strategy-not-human-reviewed",
+          "check": "deployment-manifest contains seo-strategy-review gate not completed",
+          "publish_mode_ceiling": "internal-review-only",
+          "reason": "SEO strategy must be reviewed by a human SEO reviewer before any public traffic is driven to the store. AI-synthesized keyword strategy must be validated."
+        },
+        {
+          "criterion_name": "unresolved-operational-data-non-critical",
+          "check": "Any non-pricing REQUIRES-OPERATIONAL-DATA items unresolved across product-content or page-content",
+          "publish_mode_ceiling": "internal-review-only",
+          "reason": "Unresolved operational data gaps indicate the operator has not completed all required factual inputs."
+        }
+      ],
+      "soft_launch_warnings": [
+        {
+          "criterion_name": "quality-score-60-to-79",
+          "check": "quality-score.overall_score 60–79",
+          "publish_mode_ceiling": "soft-launch",
+          "reason": "Quality score is above the internal-review threshold but below the full publish threshold. The store is ready for limited visibility but not broad marketing amplification."
+        },
+        {
+          "criterion_name": "media-production-deferred",
+          "check": "deployment-manifest deferred items include media-video-production domain items",
+          "publish_mode_ceiling": "soft-launch",
+          "reason": "Deferred media production means the store will launch without its intended visual assets. Soft launch allows asset production to continue post-launch."
+        },
+        {
+          "criterion_name": "seo-strategy-revision-signal",
+          "check": "seo-strategy.revision_guidance contains re-run signal",
+          "publish_mode_ceiling": "soft-launch",
+          "reason": "A revision signal in seo-strategy suggests that SEO artifacts may need to be updated. Soft launch allows SEO refinement post-launch."
+        },
+        {
+          "criterion_name": "minor-secondary-placeholder-items",
+          "check": "PLACEHOLDER-REQUIRES-REVIEW items present in secondary content areas (collection descriptions, supplementary pages)",
+          "publish_mode_ceiling": "soft-launch",
+          "reason": "Minor placeholder items in secondary areas do not block a soft launch but should be resolved for full launch."
+        },
+        {
+          "criterion_name": "structured-data-not-developer-reviewed",
+          "check": "deployment-manifest contains structured-data-technical-review gate not completed",
+          "publish_mode_ceiling": "soft-launch",
+          "reason": "Structured data technical review is recommended before full launch to ensure JSON-LD implementation is correct."
+        }
+      ]
+    },
+
+    "inputs": {
+      "from_validation_report": {
+        "source": "run-validation → validation-report.json",
+        "artifact_path": "projects/{project_id}/validation-report.json",
+        "data_treatment": "PRIMARY BLOCKING SIGNAL — validation-report is the most important input for the publish decision. publish_blocked from validation-report is the first blocking criterion evaluated. All blocking checks from validation-report become blocking_reasons in the output.",
+        "fields_used": [
+          {
+            "field": "summary.publish_blocked",
+            "treatment": "FIRST BLOCKING CRITERION — if publish_blocked = true → publish_mode = blocked regardless of all other inputs.",
+            "note": "This is the hardest gate in the workflow. publish_blocked = true means all blocking validation checks must be resolved first."
+          },
+          {
+            "field": "summary.blocking_count",
+            "treatment": "BLOCKING REASON COUNT — blocking_count informs the required_actions list length and the rationale text.",
+            "note": "Each blocking check becomes a separate required action in the output."
+          },
+          {
+            "field": "checks",
+            "treatment": "BLOCKING REASONS AND OPEN RISKS — failed blocking checks become blocking_reasons. Failed non-blocking checks and warning checks become open_risks. Passed checks are not reflected in blocking_reasons or risks.",
+            "note": "All check severities are preserved in the risk severity mapping."
+          }
+        ]
+      },
+
+      "from_quality_score": {
+        "source": "build-quality-score → quality-score.json",
+        "artifact_path": "projects/{project_id}/quality-score.json",
+        "data_treatment": "QUALITY GATE INPUT — quality-score provides the overall_score and launch_readiness classification that determine the publish mode ceiling when no blocking criteria are present.",
+        "fields_used": [
+          {
+            "field": "launch_readiness",
+            "treatment": "PUBLISH MODE GATE — launch_readiness = not-ready → publish_mode = blocked. launch_readiness = needs-work → internal-review-only ceiling. launch_readiness = review-ready → soft-launch ceiling. launch_readiness = launch-ready → eligible for publish-ready.",
+            "note": "launch_readiness is directly mapped to the publish mode hierarchy."
+          },
+          {
+            "field": "overall_score",
+            "treatment": "PUBLISH MODE CEILING — applies warning criteria thresholds. Score < 60 → internal-review-only ceiling. Score 60–79 → soft-launch ceiling. Score >= 80 AND no other blocking/warning criteria → eligible for publish-ready.",
+            "note": "overall_score threshold rules are applied after launch_readiness checks."
+          },
+          {
+            "field": "top_risks",
+            "treatment": "RISK CONTRIBUTION — quality-score.top_risks are merged into the publish-decision.open_risks array with source = quality-score.",
+            "note": "Quality score risks are planning-level signals. They are preserved in the decision for the human reviewer."
+          },
+          {
+            "field": "manual_review_recommended",
+            "treatment": "APPROVAL ROLE SIGNAL — manual_review_recommended = true contributes to approval_role derivation.",
+            "note": "manual_review_recommended = true always sets manual_approval_required = true in the output."
+          }
+        ]
+      },
+
+      "from_deployment_manifest": {
+        "source": "build-deployment-manifest → deployment-manifest.json",
+        "artifact_path": "projects/{project_id}/deployment-manifest.json",
+        "data_treatment": "IMPLEMENTATION READINESS CONTEXT — deployment-manifest provides the artifact status inventory, deferred items, manual review gate status, and preliminary publish decision that inform open risks and required actions.",
+        "fields_used": [
+          {
+            "field": "artifacts",
+            "treatment": "IMPLEMENTATION STATUS TRACKING — artifacts with status = failed or skipped contribute to open risks. Failed artifacts in critical domains (product-content, design-system, legal page-content) may trigger additional blocking criteria.",
+            "note": "Artifact status is a proxy for implementation planning completeness, not actual implementation status."
+          },
+          {
+            "field": "validation_summary",
+            "treatment": "SECONDARY VALIDATION SIGNAL — manifest validation_summary is compared to validation-report for consistency. If inconsistency found, flag as an open risk.",
+            "note": "Manifest validation_summary is derived from validation-report — inconsistencies indicate an assembly error."
+          },
+          {
+            "field": "publish_decision.approval_required",
+            "treatment": "APPROVAL GATE SIGNAL — if manifest publish_decision.approval_required = true, this is reflected in the output manual_approval_required and approval_role fields.",
+            "note": "Manual review gate triggers from the manifest are preserved in the publish decision."
+          }
+        ]
+      },
+
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "data_treatment": "GOVERNANCE CONTEXT — store-profile provides the store's vertical, brand maturity, and any governance preferences specified at intake. Vertical may affect which publish mode criteria are relevant (e.g., legal requirements vary by vertical).",
+        "fields_used": [
+          {
+            "field": "vertical",
+            "treatment": "RISK CALIBRATION — certain verticals (health, finance, legal services) have more stringent legal and compliance requirements. vertical is used to calibrate the open_risks severity for legal page completeness.",
+            "note": "Vertical-specific compliance requirements may make some warning-level risks into blocking risks. This is a planning signal — actual compliance requirements must be confirmed with legal advisors."
+          },
+          {
+            "field": "brand_maturity",
+            "treatment": "SOFT-LAUNCH THRESHOLD CALIBRATION — brand_maturity signals whether the store operator has experience with launches. New brands (low maturity) may benefit from a more conservative default publish mode recommendation.",
+            "note": "brand_maturity is a soft signal. It does not change blocking criteria."
+          }
+        ]
+      }
+    },
+
+    "approval_role_derivation": {
+      "description": "The approval_role field identifies which human roles should review and approve the publish decision.",
+      "rules": {
+        "founder": "Default for all decisions — the store owner or founder must always be in the approval chain.",
+        "content-reviewer": "Required when: quality-score content_completeness dimension < 70, more than 10% product placeholder density.",
+        "technical-reviewer": "Required when: design-system-developer-review gate triggered, structured-data-technical-review gate triggered, motion-media-strategy feasibility not confirmed.",
+        "legal-reviewer": "Required when: any legal page is present but not explicitly marked as legal-reviewed (always recommended given legal content is AI-synthesized), vertical is health/finance/legal.",
+        "mixed": "When more than one role type is required. This is the most common case.",
+        "none": "Never appropriate — human approval is always required."
+      },
+      "note": "approval_role = none must never be output. This workflow always requires human approval."
+    },
+
+    "outputs": {
+      "primary_output": "publish-decision.json",
+      "artifact_path": "projects/{project_id}/publish-decision.json",
+      "schema": "schemas/publish-decision.schema.json",
+      "output_fields": {
+        "decision_id": {
+          "source": "Generated at runtime",
+          "type": "string",
+          "format_pattern": "build-publish-decision-{project_id}-{timestamp}",
+          "note": "Runtime-generated identifier."
+        },
+        "publish_allowed": {
+          "source": "Deterministic: false if any blocking criterion is met. true only if no blocking criteria and no internal-review-only or soft-launch criteria prevent it.",
+          "type": "boolean",
+          "note": "publish_allowed = true means the planning artifact set is sufficient to support a launch, not that launch is automatically authorized. Human approval is always required."
+        },
+        "decision_reason": {
+          "source": "LLM-synthesized from deterministic gating outputs",
+          "type": "string",
+          "note": "Clear plain-language explanation of why the publish mode was assigned. Includes the most significant blocking or warning factors."
+        },
+        "manual_approval_required": {
+          "source": "Deterministic: always true — human approval is always required before any publish action",
+          "type": "boolean",
+          "note": "This field is always true. Any workflow implementation that sets this to false is incorrect."
+        },
+        "approval_role": {
+          "source": "Deterministic derivation from approval_role_derivation rules",
+          "type": "constrained enum",
+          "schema_enum": ["none", "founder", "operator", "content-reviewer", "technical-reviewer", "legal-reviewer", "mixed"],
+          "note": "approval_role = none is never appropriate. The minimum is founder."
+        },
+        "rollback_recommended": {
+          "source": "Deterministic: false — no deployment has been made, rollback not applicable at this planning stage",
+          "type": "boolean",
+          "note": "rollback_recommended is always false for a first publish decision. It becomes relevant in subsequent decision cycles after initial deployment."
+        },
+        "open_risks": {
+          "source": "Derived from: validation-report failed non-blocking checks, quality-score.top_risks, deployment-manifest deferred items, and vertical-specific compliance risk signals",
+          "type": "array of risk objects with risk_name, severity, description, mitigation",
+          "risk_severity_mapping": {
+            "critical": "From blocking validation checks, legal page issues, pricing gaps",
+            "high": "From failed non-blocking validation checks, quality dimension scores < 50, high deferred item counts",
+            "medium": "From warning validation checks, quality dimension scores 50–70, minor placeholder density",
+            "low": "From quality improvement opportunities, optional enhancement suggestions"
+          },
+          "note": "open_risks must include all critical and high risks identified by validation-report. Medium and low risks are included at the LLM synthesis stage based on quality-score and deployment-manifest signals."
+        },
+        "blocking_reasons": {
+          "source": "Deterministic: derived from blocking criteria evaluation. Each met blocking criterion produces a blocking reason string.",
+          "type": "array of strings",
+          "note": "blocking_reasons is empty only when publish_allowed = true and publish_mode is soft-launch or publish-ready. blocking_reasons must directly correspond to the blocking criteria that were met."
+        },
+        "required_actions": {
+          "source": "Derived from: blocking_reasons (all must be in required_actions), high-severity open risks, unmet manual review gates from deployment-manifest",
+          "type": "array of strings",
+          "note": "Required actions are specific, actionable steps that must be completed before the next decision cycle. They correspond to specific blocking or high-severity warning conditions."
+        },
+        "optional_actions": {
+          "source": "LLM-synthesized from medium and low severity open risks and quality improvement opportunities",
+          "type": "array of strings",
+          "note": "Optional actions improve quality but are not required to unblock publishing. They represent the path from the current publish mode to a more permissive publish mode."
+        },
+        "recommended_publish_mode": {
+          "source": "Deterministic derivation from blocking criteria + warning criteria hierarchy",
+          "type": "string — one of: blocked | internal-review-only | soft-launch | publish-ready",
+          "derivation_summary": "blocked if any blocking criterion met. Otherwise: apply most restrictive warning criterion ceiling. If no warning criteria apply and quality-score >= 80: publish-ready. This field is stored in the notes field as the output schema does not have a dedicated recommended_publish_mode field — it is embedded in decision_reason and notes.",
+          "note": "recommended_publish_mode is reported in the notes field of the publish decision artifact since the schema captures it through publish_allowed, decision_reason, and notes together."
+        }
+      },
+      "downstream_consumers": [
+        "Release logic (future) — publish-decision.json is the final planning artifact. Future automated release workflows may consume publish_allowed and manual_approval_required as gating inputs.",
+        "Manual review process — the human reviewer uses publish-decision.json as their primary review artifact before authorizing any launch."
+      ]
+    },
+
+    "nodes": {
+      "node_1_trigger": {
+        "id": "trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "name": "Receive Inputs",
+        "description": "Receives all upstream governance artifact objects from the orchestrating workflow.",
+        "input_contract": {
+          "project_id": "string — required",
+          "validation_report": "object — required — validation-report.json from run-validation",
+          "quality_score": "object — required — quality-score.json from build-quality-score",
+          "deployment_manifest": "object — required — deployment-manifest.json from build-deployment-manifest",
+          "store_profile": "object — expected — for vertical and brand_maturity context"
+        }
+      },
+
+      "node_2_validate_inputs": {
+        "id": "validate-upstream-inputs",
+        "type": "n8n-nodes-base.code",
+        "name": "Validate Upstream Inputs",
+        "description": "Validates that all three Phase 10 governance artifacts are present. All three are required for a reliable publish decision.",
+        "validation_checks": [
+          "project_id must be a non-empty string",
+          "validation_report must be present with overall_status, summary, and checks fields — absence is a workflow halt",
+          "quality_score must be present with overall_score and launch_readiness fields — absence causes quality gating to be unavailable (publish_mode defaults to internal-review-only conservatively)",
+          "deployment_manifest must be present with artifacts and validation_summary fields — absence means implementation status is unknown (captured as open risk)",
+          "Extract validation_report.summary.publish_blocked into workflow context",
+          "Extract quality_score.launch_readiness and overall_score into workflow context",
+          "Extract deployment_manifest.publish_decision.approval_required into workflow context",
+          "Extract store_profile.vertical for risk calibration (default to 'unknown' if absent)"
+        ],
+        "on_critical_failure": "validation_report absent → halt workflow. Cannot produce reliable publish decision without validation-report.",
+        "on_partial_absence": "quality_score or deployment_manifest absent → proceed conservatively. Missing quality_score → treat as not-ready. Missing deployment_manifest → treat all implementation status as unknown."
+      },
+
+      "node_3_evaluate_blocking_criteria": {
+        "id": "evaluate-blocking-criteria",
+        "type": "n8n-nodes-base.code",
+        "name": "Evaluate Blocking Criteria",
+        "description": "Deterministically evaluates all blocking criteria in the blocking_criteria_complete_list. Each met criterion is recorded as a blocking reason.",
+        "evaluation_steps": [
+          "1. validation-report-publish-blocked: Check validation_report.summary.publish_blocked. If true → add blocking reason.",
+          "2. legal-page-absent-or-placeholder: Check deployment-manifest artifacts for legal page status. Check validation-report legal page checks. If any legal page absent or placeholder → add blocking reason.",
+          "3. pricing-operational-data-unresolved: Check validation-report pricing-operational-data-gap check. If failed → add blocking reason.",
+          "4. quality-score-not-ready: Check quality_score.launch_readiness. If not-ready → add blocking reason.",
+          "5. autoplay-video-without-mute-violation: Check validation-report for video-plan-autoplay-muted-compliance check failure. If failed → add blocking reason.",
+          "6. canonical-policy-contradiction: Check validation-report for seo-strategy-canonical-policy-alignment check failure with blocking = true. If failed → add blocking reason.",
+          "7. design-system-absent: Check deployment-manifest artifacts for design-system with status = skipped. If skipped → add blocking reason.",
+          "Determine: is_blocked = blocking_reasons.length > 0",
+          "Output: blocking_reasons array, is_blocked boolean"
+        ]
+      },
+
+      "node_4_evaluate_warning_criteria": {
+        "id": "evaluate-warning-criteria",
+        "type": "n8n-nodes-base.code",
+        "name": "Evaluate Warning Criteria and Determine Publish Mode",
+        "description": "If not blocked, evaluates all warning criteria to determine the publish mode ceiling. Applies the most restrictive applicable ceiling.",
+        "evaluation_steps": [
+          "Skip this node if is_blocked = true (node 3). Publish mode is already blocked.",
+          "INTERNAL-REVIEW-ONLY WARNINGS — evaluate in order, apply ceiling if any match:",
+          "  - quality-score-below-60: overall_score < 60",
+          "  - zero-dimension-score: any dimension score in quality_score.dimension_scores = 0",
+          "  - high-product-placeholder-density: check validation-report product-description-placeholder-density check result (blocking_threshold condition met)",
+          "  - seo-strategy-not-human-reviewed: check deployment-manifest for seo-strategy-review gate status",
+          "  - unresolved-operational-data-non-critical: check validation-report for any non-pricing REQUIRES-OPERATIONAL-DATA failures",
+          "SOFT-LAUNCH WARNINGS — only evaluated if no internal-review-only warnings applied:",
+          "  - quality-score-60-to-79: overall_score 60–79",
+          "  - media-production-deferred: check deployment-manifest deferred_items for media-video-production domain items",
+          "  - seo-strategy-revision-signal: check if validation-report contains seo-strategy revision signal warning",
+          "  - minor-secondary-placeholder-items: check validation-report for minor content warnings",
+          "  - structured-data-not-developer-reviewed: check deployment-manifest for structured-data-technical-review gate status",
+          "PUBLISH-READY: only if no internal-review-only warnings AND no soft-launch warnings AND overall_score >= 80 AND launch_readiness = launch-ready",
+          "Determine: recommended_publish_mode = blocked | internal-review-only | soft-launch | publish-ready",
+          "Determine: publish_allowed = recommended_publish_mode != blocked",
+          "Output: recommended_publish_mode, publish_allowed, warning_conditions_met array"
+        ]
+      },
+
+      "node_5_compute_risks_and_actions": {
+        "id": "compute-risks-and-actions",
+        "type": "n8n-nodes-base.code",
+        "name": "Compute Open Risks and Required Actions",
+        "description": "Derives open_risks and required_actions from blocking reasons, warning conditions, validation-report risks, and quality-score top risks.",
+        "computation_steps": [
+          "OPEN RISKS — build array:",
+          "  - All blocking_reasons → risk_name = blocking reason name, severity = critical, description = blocking criterion description, mitigation = resolution requirement",
+          "  - All warning_conditions_met → appropriate severity (high for internal-review-only triggers, medium for soft-launch triggers)",
+          "  - All quality_score.top_risks → merge with source = quality-score label",
+          "  - vertical-specific compliance risks: if vertical = health/finance/legal → add risk for legal compliance review requirement at severity = high",
+          "  - deployment-manifest deferred items with production dependencies → add as medium risks",
+          "REQUIRED ACTIONS — build array:",
+          "  - All blocking_reasons: each becomes a required_action with specific resolution instruction",
+          "  - All high-severity warning conditions: become required_actions for blocking publish mode movement",
+          "  - All unmet manual review gates from deployment-manifest: become required_actions",
+          "  - Legal reviewer approval: always a required_action (regardless of publish mode)",
+          "APPROVAL ROLE DERIVATION:",
+          "  - Start with founder (always required)",
+          "  - Add content-reviewer if: content_completeness dimension < 70 OR product placeholder density > 10%",
+          "  - Add technical-reviewer if: design-system-developer-review gate triggered OR structured data review not completed",
+          "  - Add legal-reviewer if: any legal page review required OR vertical = health/finance/legal",
+          "  - Set approval_role: founder (if only founder needed), or mixed (if multiple roles needed)",
+          "Output: open_risks array, required_actions array, optional_actions_seeds array, approval_role"
+        ]
+      },
+
+      "node_6_build_llm_prompt": {
+        "id": "build-llm-prompt",
+        "type": "n8n-nodes-base.code",
+        "name": "Build LLM Prompt for Decision Rationale",
+        "description": "Assembles a structured prompt for the LLM to synthesize decision_reason, risk descriptions, optional actions, and notes.",
+        "prompt_components": [
+          "System message: publish decision rationale synthesizer for schema-driven commerce OS. Role: translate deterministic gating outcomes into clear, precise, actionable rationale text. This is a conservative governance artifact — language must reflect the conservative nature of the decision process. Do not minimize risks. Do not encourage rushing to publish. Do not suggest that planning artifacts are confirmed business truths. Do not override any deterministic decision.",
+          "Project context: project_id, vertical, store_name",
+          "Recommended publish mode: {recommended_publish_mode}",
+          "publish_allowed: {publish_allowed}",
+          "blocking_reasons array from node 3",
+          "warning_conditions_met array from node 4",
+          "open_risks array from node 5 (structure only — LLM adds description and mitigation prose)",
+          "required_actions array from node 5",
+          "optional_actions_seeds from node 5 (LLM expands into full optional_actions)",
+          "quality_score.overall_score and launch_readiness",
+          "validation_report.summary counts",
+          "Instruction: produce (1) decision_reason — one clear paragraph explaining the recommended publish mode, the most significant factors that drove it, and what human reviewers should focus on, (2) open_risk descriptions — for each risk in open_risks array, a clear description and mitigation string, (3) optional_actions — 3–6 specific improvement actions that would move the store from current publish mode toward a more permissive mode, (4) notes — a comprehensive notes field including: evidence boundary statement, recommended publish mode description, key areas for human reviewer focus, and implementation readiness summary.",
+          "CRITICAL INSTRUCTIONS: decision_reason must not soften blocking or internal-review-only determinations. Risk descriptions must be specific and actionable — not vague. Optional actions must be clearly marked as optional, not as requirements. The evidence boundary statement in notes must explicitly note that all inputs are LLM-synthesized planning artifacts and that human verification of key facts is required. Never suggest that publish-ready means launch is automatically authorized."
+        ]
+      },
+
+      "node_7_llm_synthesis": {
+        "id": "llm-synthesis",
+        "type": "n8n-nodes-base.openAi",
+        "name": "LLM Synthesis — Publish Decision Rationale",
+        "description": "Calls the LLM to synthesize decision rationale, risk descriptions, optional actions, and notes.",
+        "model": "gpt-4o",
+        "temperature": 0.1,
+        "response_format": "json_object",
+        "credential_placeholder": "PLACEHOLDER — confirm actual n8n OpenAI credential name at runtime. Do not hardcode.",
+        "evidence_boundary_note": "The LLM synthesizes rationale language only. publish_allowed, manual_approval_required, approval_role, blocking_reasons, open_risks (structure), and required_actions were all computed deterministically in nodes 3–5 and may not be overridden."
+      },
+
+      "node_8_assemble_publish_decision": {
+        "id": "assemble-publish-decision",
+        "type": "n8n-nodes-base.code",
+        "name": "Assemble Final Publish Decision",
+        "description": "Merges deterministic decision outputs from nodes 3–5 with LLM-synthesized narrative from node 7. Constructs the final publish-decision.json conforming to publish-decision.schema.json.",
+        "assembly_steps": [
+          "Set publish_allowed from node 4 (deterministic — not overridable)",
+          "Set decision_reason from node 7 LLM output",
+          "Set manual_approval_required = true (always — deterministic)",
+          "Set approval_role from node 5 (deterministic)",
+          "Set rollback_recommended = false (deterministic — no deployment made)",
+          "Set open_risks from nodes 5+7 merged: structure from node 5, description/mitigation prose from node 7",
+          "Set blocking_reasons from node 3 (deterministic)",
+          "Set notes from node 7 LLM output — must include: evidence boundary statement, recommended_publish_mode embedded text, human reviewer focus areas",
+          "Verify: LLM output must not have changed publish_allowed, manual_approval_required, approval_role, blocking_reasons, or any risk severity values. If discrepancy found → use deterministic values, log discrepancy in notes.",
+          "Construct complete publish-decision.json with all required schema fields"
+        ]
+      },
+
+      "node_9_validate_schema": {
+        "id": "validate-output-schema",
+        "type": "n8n-nodes-base.code",
+        "name": "Validate Output Against Schema",
+        "description": "Validates the assembled publish-decision.json against schemas/publish-decision.schema.json using AJV.",
+        "schema_reference": "schemas/publish-decision.schema.json",
+        "on_validation_failure": "Output schema_validation_failed = true with errors array. Do not persist.",
+        "on_validation_success": "Proceed to persist."
+      },
+
+      "node_10_persist": {
+        "id": "persist",
+        "type": "n8n-nodes-base.github",
+        "name": "Persist to Git",
+        "description": "Writes the validated publish-decision.json to the project folder.",
+        "target_path": "projects/{project_id}/publish-decision.json",
+        "commit_message_pattern": "feat({project_id}): add publish-decision artifact [build-publish-decision]",
+        "credential_placeholder": "PLACEHOLDER — confirm actual n8n GitHub credential name at runtime. Do not hardcode.",
+        "draft_safety_note": "In draft mode, write to projects/{project_id}/drafts/publish-decision.json."
+      },
+
+      "node_11_output": {
+        "id": "output",
+        "type": "n8n-nodes-base.set",
+        "name": "Output",
+        "description": "Returns the publish decision summary and workflow status to the calling orchestrator.",
+        "output_fields": {
+          "workflow_id": "build-publish-decision",
+          "project_id": "{project_id}",
+          "status": "completed | failed",
+          "artifact_path": "projects/{project_id}/publish-decision.json",
+          "publish_allowed": "{publish_allowed from publish-decision}",
+          "recommended_publish_mode": "{recommended_publish_mode embedded in notes}",
+          "manual_approval_required": "true",
+          "approval_role": "{approval_role from publish-decision}",
+          "blocking_count": "{count of blocking_reasons}",
+          "open_risk_count": "{count of open_risks}",
+          "required_action_count": "{count of required_actions}",
+          "phase_10_complete": true,
+          "downstream_consumers": ["release logic (future)", "manual review process"],
+          "errors": []
+        }
+      }
+    },
+
+    "assumptions": [
+      "All three Phase 10 governance artifacts (validation-report, quality-score, deployment-manifest) are consumed as read-only inputs — this workflow does not re-run validation, re-score quality, or re-inventory artifacts",
+      "Human approval is always required before any publish action — this is a fundamental assumption that cannot be overridden by any workflow output",
+      "manual_approval_required = true is always the correct value for this workflow's output — any implementation that sets it to false is a defect",
+      "The recommended publish mode is the most restrictive mode warranted by the current artifact state — it is not optimistic and not based on what the operator wants",
+      "All prior planning artifacts are LLM-synthesized — this means the publish decision is based on planning completeness, not confirmed business facts or verified implementations",
+      "rollback_recommended = false at initial decision time — there is nothing to roll back before first deployment",
+      "Vertical-specific legal and compliance considerations are flagged as risks but not evaluated authoritatively — actual compliance requirements must be confirmed with qualified legal advisors",
+      "The publish decision is the last artifact in the Phase 10 workflow chain and the last planning artifact in the entire store-os workflow chain (before backup)"
+    ],
+
+    "evidence_boundaries": [
+      "This workflow makes no claims about actual store implementation quality, theme deployment status, live Shopify store configuration, or production asset availability",
+      "The publish decision is based entirely on the quality of planning artifacts — not on whether any implementation has been performed",
+      "All prior artifacts that feed into this workflow are LLM-synthesized planning documents — they reflect what was intended and planned, not what has been confirmed or implemented",
+      "The workflow cannot verify that manual review gates have been completed — that confirmation must come from the project governance process outside this workflow",
+      "Risk descriptions and optional actions are LLM-synthesized narrative — they are not expert legal, technical, or business recommendations",
+      "publish-ready as a recommended publish mode does not mean the store is ready to publish — it means the planning artifact set is sufficient to support a launch, pending human approval and implementation verification",
+      "This workflow has no access to Shopify APIs, live store data, search engine ranking signals, analytics, or any production system"
+    ],
+
+    "open_questions": [
+      "Should publish mode thresholds (quality score 60, 80) be adjusted for specific verticals? Health, finance, and legal verticals may require higher thresholds.",
+      "Should the workflow check for any signals from the store intake about the operator's intended launch timeline? A hard launch deadline may affect how warnings are prioritized.",
+      "Should the workflow explicitly check for structured data implementation completeness (not just planning completeness) as a soft-launch criterion? Currently, structured data review is a soft-launch warning but actual implementation status is unknown.",
+      "How should the workflow handle a second or third decision cycle (after initial launch)? The current design is for first-launch decisions. Post-launch re-decisions may need different blocking and warning criteria.",
+      "Should the optional_actions be categorized by who is responsible (operator, content team, technical team, legal team) to make the handoff clearer for the human reviewer?",
+      "Should this workflow also output a recommended review checklist for the human approver? This would make the human review process more structured and less dependent on the reviewer knowing what to look for."
+    ],
+
+    "draft_dev_safety_notes": [
+      "This workflow definition is not yet executable n8n JSON. A developer must translate it before running.",
+      "All credential references are PLACEHOLDER values.",
+      "This is the final Phase 10 workflow. Upon successful completion, Phase 10 is complete and the store-os planning workflow chain is complete (backup-project may follow).",
+      "In draft/dev mode, write output to projects/{project_id}/drafts/publish-decision.json.",
+      "manual_approval_required = true must be hardcoded as a constant in the implementation, not derived dynamically. Human approval is always required. This value must never be false.",
+      "The conservative override logic (blocked if any single blocking criterion is met, regardless of quality score) must be implemented before the warning criteria evaluation. The order of evaluation in nodes 3 and 4 is not interchangeable.",
+      "The LLM synthesis step must be the last computation before assembly. Deterministic outputs from nodes 3–5 must be computed and locked before the LLM is called. The LLM adds language — it does not add logic.",
+      "This workflow produces a planning artifact only — not a deployment authorization, not a Shopify publish command, not a CI/CD trigger, and not an override of human judgment."
+    ]
+  }
+}
