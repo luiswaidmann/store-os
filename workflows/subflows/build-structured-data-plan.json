@@ -1,0 +1,565 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. The structured data plan output is a planning artifact — not emitted JSON-LD markup, not a validated Google Rich Results test output, and not a confirmed structured data implementation. All schema.org type prioritizations and page-type mappings produced here are planning-level decisions derived from available strategy artifacts and provisional SEO inputs. Human review and technical implementation by a developer are required before any structured data plan decisions are applied to production pages.",
+    "planning_artifact_note": "IMPORTANT — OUTPUT IS A PLAN, NOT IMPLEMENTATION: The structured-data-plan.json artifact defines which schema.org types should be implemented on which page types and at what priority level. It does not generate JSON-LD code, Shopify metafield configurations, or theme script blocks. The output is consumed by developers and theme configurators as a technical planning guide — not as directly deployable markup.",
+    "missing_data_note": "IMPORTANT — MISSING FACTUAL DATA IS COMMON: Many schema.org types require factual operational data that may not yet be available during planning: review data (ReviewRating, aggregateRating) requires real product reviews. Organization structured data requires confirmed business address, contact details, and social profiles. Offer details (price, availability, shipping) require live Shopify product data. Policy structured data requires confirmed return policy details. When required factual data is not available in upstream artifacts, this workflow must represent those schema types as REQUIRES-OPERATIONAL-DATA in the plan — not as confident implementation targets.",
+    "json_ld_boundary_note": "IMPORTANT — NO JSON-LD OUTPUT: This workflow produces a structured data PLAN — a prioritized list of schema.org types per page type with coverage and validation guidance. It does not generate JSON-LD scripts, Shopify theme app extensions, or metafield schemas. JSON-LD generation is a separate technical implementation phase outside the scope of this planning workflow.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/structured-data-plan.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-structured-data-plan",
+    "name": "build-structured-data-plan",
+    "category": "planning",
+    "phase": "Phase 8 — AEO Strategy, Internal Linking, and Structured Data Planning",
+    "purpose": "Synthesize a schema-validated store-level structured data plan from the available SEO strategy, AEO strategy, per-product structured data artifacts, FAQ page artifact, page-SEO artifacts, collection-SEO artifacts, and brand positioning. The structured-data-plan.json output defines: primary goal (search-clarity, rich-results-support, answer-readiness, or hybrid), enabled schema types (the allowed set for this store), page-type mapping (which schema.org types apply to which page types), entity priority (brand, product, and category entity markup urgency), validation priority (required validation, manual review requirements, strictness level), and markup policy for FAQ, review, and offer schema types. This plan is the store-level structured data planning framework that enables: (1) consistent schema.org type selection across all page types, (2) prioritization of structured data implementation effort, (3) explicit documentation of data gaps that must be resolved before certain schema types can be implemented, and (4) alignment between SEO rich result goals and AEO answer readiness goals. All outputs are planning-level decisions — not generated JSON-LD, not rich results audit findings, not confirmed implementation readiness assessments.",
+
+    "structured_data_plan_vs_product_structured_data": "This workflow produces a STORE-LEVEL structured data plan — a single artifact that defines which schema.org types apply to which page types across the entire store. It is distinct from build-product-structured-data (step 16, Phase 5), which produces per-product structured data artifacts for individual products. The store-level plan aggregates and prioritizes across all page types. Per-product artifacts define specific field values for individual products. The store-level plan is the strategic layer; per-product artifacts are the operational layer.",
+
+    "inputs": {
+      "from_seo_strategy": {
+        "source": "build-seo-strategy → seo-strategy.json",
+        "artifact_path": "projects/{project_id}/seo-strategy.json",
+        "data_treatment": "SEO RICH RESULT DIRECTION LAYER — seo-strategy.json provides the structured_data_priority list (if present) that seeds the enabled_schema_types and page-type mapping. The SEO strategy defines which schema types are strategically important from a search engine visibility perspective.",
+        "fields_used": [
+          {
+            "field": "structured_data_priority",
+            "treatment": "DIRECT SCHEMA TYPE SEED — if seo-strategy includes structured_data_priority, this list is the starting point for enabled_schema_types. AEO strategy and per-product artifact analysis may extend or narrow this list.",
+            "note": "Optional field in seo-strategy.schema.json — may be absent. If absent, enabled_schema_types must be derived from primary_seo_goal and page_priority alone."
+          },
+          {
+            "field": "primary_seo_goal",
+            "treatment": "PRIMARY GOAL DERIVATION SIGNAL — transactional-growth → rich-results-support (product rich results, offer schema). category-discovery → search-clarity (breadcrumb, item-list). knowledge-plus-commerce → answer-readiness (FAQ schema, article). hybrid → hybrid.",
+            "note": "primary_seo_goal is the strongest single signal for structured-data-plan.primary_goal derivation."
+          },
+          {
+            "field": "page_priority",
+            "treatment": "PAGE TYPE MAPPING PRIORITY — pages higher in page_priority receive richer schema type assignments in the page_type_mapping. Product-pages at priority 1 → Product + Offer + Review + Breadcrumb schema. Collection-pages at priority 1 → ItemList + Breadcrumb schema. Guide-pages at priority 1 → Article + FAQ + HowTo schema.",
+            "note": "page_priority directly determines which page types get the most comprehensive schema type coverage in the plan."
+          },
+          {
+            "field": "product_seo_role",
+            "treatment": "PRODUCT SCHEMA URGENCY — primary-driver → product_entity_priority = critical. balanced-driver → high. light-support → medium. This maps directly to entity_priority.product_entity_priority.",
+            "note": "Product entity priority determines how urgently Product schema.org type should be implemented — not just whether it is enabled."
+          },
+          {
+            "field": "collection_seo_role",
+            "treatment": "CATEGORY SCHEMA URGENCY — primary-driver → category_entity_priority = critical. balanced-driver → high. light-support → medium.",
+            "note": "Category entity priority determines ItemList and Breadcrumb schema urgency for collection pages."
+          },
+          {
+            "field": "knowledge_seo_role",
+            "treatment": "FAQ AND ARTICLE SCHEMA SIGNAL — none → faq and article schema types are omitted or deferred. supporting → faq schema is included with low priority. balanced → faq and article schema are medium priority. major → faq and article schema are high priority.",
+            "note": "knowledge_seo_role is the primary input for FAQ and article schema type inclusion and priority."
+          }
+        ]
+      },
+
+      "from_aeo_strategy": {
+        "source": "build-aeo-strategy → aeo-strategy.json",
+        "artifact_path": "projects/{project_id}/aeo-strategy.json",
+        "data_treatment": "AEO ANSWER READINESS LAYER — aeo-strategy.json provides the answer-engine-specific schema type signals that complement the SEO-driven structured data direction.",
+        "fields_used": [
+          {
+            "field": "faq_strategy.faq_schema_priority",
+            "treatment": "FAQ SCHEMA URGENCY — high → faq schema type is a critical implementation target. medium → faq schema is planned but not urgent. low → faq schema is deferred.",
+            "note": "faq_schema_priority from AEO strategy is the most direct input for faq_markup_policy derivation."
+          },
+          {
+            "field": "entity_clarity_strategy",
+            "treatment": "ENTITY MARKUP PRIORITY — entity_clarity_strategy.brand_entity_clarity maps to entity_priority.brand_entity_priority. product_entity_clarity → product_entity_priority. category_entity_clarity → category_entity_priority. AEO entity clarity levels should be treated as a second signal alongside SEO role-based entity priority — take the higher of the two where they differ.",
+            "note": "Entity clarity from AEO strategy may raise entity priority above what seo-strategy role assignments alone would suggest. Take the higher value where the two sources differ."
+          },
+          {
+            "field": "structured_answer_priority",
+            "treatment": "ANSWER FORMAT TO SCHEMA TYPE MAPPING — faq-blocks → FAQ schema type. comparison-blocks → (no direct schema type, document as content-level recommendation). how-it-works-blocks → HowTo schema type. entity-definitions → Organization + Product schema. spec-summaries → Product schema with detailed property coverage.",
+            "note": "structured_answer_priority from AEO strategy maps to schema type inclusions in enabled_schema_types and page_type_mapping."
+          },
+          {
+            "field": "primary_aeo_goal",
+            "treatment": "AEO PRIMARY GOAL ALIGNMENT — answer-readiness AEO goal → answer-readiness structured data primary_goal or hybrid. trust-and-reassurance → review_markup_policy signal (strong if review data is available). product-understanding → Product schema with comprehensive properties is critical.",
+            "note": "AEO primary_aeo_goal provides a complementary signal to seo-strategy primary_seo_goal for structured data primary_goal derivation."
+          }
+        ]
+      },
+
+      "from_product_structured_data_artifacts": {
+        "source": "build-product-structured-data → product-structured-data.json (per product, provisional)",
+        "artifact_path": "projects/{project_id}/product-structured-data/{product_handle}.json",
+        "data_treatment": "PRODUCT SCHEMA COVERAGE PATTERN ANALYSIS — per-product structured data artifacts from Phase 5 are analyzed as a pattern set to understand what schema.org coverage already exists at the product level and what gaps are most common. This analysis informs enabled_schema_types completeness and offer/review markup policies.",
+        "availability": "AVAILABLE FROM PHASE 5 — product-structured-data artifacts were generated provisionally in Phase 5.",
+        "pattern_analysis": {
+          "schema_type_coverage_rate": "What percentage of product-structured-data artifacts include Product schema type? Offer schema? Review schema? BreadcrumbList? This coverage rate informs whether adding schema types to the plan represents incremental work or a complete new implementation.",
+          "review_data_availability_rate": "What percentage of product-structured-data artifacts have review data available (aggregateRating present)? Low rate → review_markup_policy = none or balanced. High rate → review_markup_policy = strong is a realistic implementation target.",
+          "offer_data_completeness_rate": "What percentage of product-structured-data artifacts have complete offer data (price, availability, currency, seller)? Low completeness rate → offer_markup_policy = light. High completeness → offer_markup_policy = strong.",
+          "missing_required_field_rate": "What percentage of product-structured-data artifacts have missing required fields (e.g. missing product name, brand, or description)? High rate → note as REQUIRES-OPERATIONAL-DATA in the plan.",
+          "sparse_data_rate": "Percentage of artifacts with PLACEHOLDER-REQUIRES-REVIEW or SPARSE-DATA flags. High rate → note as REQUIRES-OPERATIONAL-ENRICHMENT before production implementation."
+        },
+        "note": "Product-structured-data pattern analysis is used to calibrate coverage realism and markup policy decisions. Individual per-product artifacts are not modified by this workflow."
+      },
+
+      "from_faq_page": {
+        "source": "build-faq-page → faq-page.json",
+        "artifact_path": "projects/{project_id}/faq-page.json",
+        "data_treatment": "FAQ SCHEMA COVERAGE LAYER — faq-page.json defines the FAQ page content and schema intent. If the faq-page has a strong question set and schema intent, FAQ schema type should be a high-priority implementation target.",
+        "fields_used": [
+          {
+            "field": "faq_intensity",
+            "treatment": "FAQ SCHEMA SCOPE — strong → faq schema type is enabled and high priority for faq-page. balanced → faq schema is enabled and medium priority. light → faq schema is deferred or minimal.",
+            "note": "FAQ schema markup applies to pages where FAQ content is structured enough to support Question/Answer schema.org markup."
+          },
+          {
+            "field": "questions",
+            "treatment": "FAQ SCHEMA APPLICABILITY — if questions array is non-empty and questions have clear answer text, FAQ schema implementation is technically feasible. Empty or placeholder questions → FAQ schema must be marked REQUIRES-OPERATIONAL-DATA.",
+            "note": "FAQ schema requires actual question and answer text. Planning-level placeholder questions do not constitute real FAQ schema content."
+          }
+        ]
+      },
+
+      "from_page_seo_artifacts": {
+        "source": "build-page-seo → page-seo.json (per page, provisional)",
+        "artifact_path": "projects/{project_id}/page-seo/{page_handle}.json",
+        "data_treatment": "PAGE TYPE AND ROLE ANALYSIS — page-seo artifacts define the page types present in this store (guide pages, about pages, policy pages, informational pages). The presence and role of guide pages determines whether Article and HowTo schema types are applicable.",
+        "availability": "AVAILABLE FROM PHASE 7.",
+        "pattern_analysis": {
+          "guide_page_present": "Is at least one guide page (page_role = guide or informational) present? If yes → Article schema type is applicable. If no guide pages: Article schema is deferred.",
+          "how_to_content_present": "Are any pages or guide content artifacts structured as step-by-step how-to content? If yes → HowTo schema type is applicable. If no: HowTo is deferred.",
+          "about_page_present": "Is an About page or Organization page present? If yes → Organization schema on the about page is applicable. If no: Organization schema may apply to homepage only."
+        },
+        "note": "Page-seo artifacts are provisional. Schema type applicability for guide and how-to content should be marked REQUIRES-CONFIRMATION if the page type presence is uncertain."
+      },
+
+      "from_collection_seo_artifacts": {
+        "source": "build-collection-seo → collection-seo.json (per collection, provisional)",
+        "artifact_path": "projects/{project_id}/collection-seo/{collection_handle}.json",
+        "data_treatment": "COLLECTION SCHEMA COVERAGE ANALYSIS — collection-seo artifacts define the collections present and their page roles. Breadcrumb and ItemList schema applicability depends on collection hierarchy depth and collection page role.",
+        "availability": "AVAILABLE FROM PHASE 6.",
+        "pattern_analysis": {
+          "collection_hierarchy_depth": "Do collection-seo artifacts suggest a multi-level collection hierarchy (parent collections + subcollections)? Multi-level → Breadcrumb schema is critical for navigational clarity in SERPs. Flat catalogue → Breadcrumb is still valuable but less critical.",
+          "item_list_applicability": "Are collection pages populated with products? Non-empty collections → ItemList schema is applicable. Empty or sparse collections → ItemList schema must be marked REQUIRES-OPERATIONAL-DATA until collections are populated."
+        },
+        "note": "Empty or sparse collections should be marked as REQUIRES-OPERATIONAL-DATA for ItemList schema — not included as confident schema implementation targets."
+      },
+
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "data_treatment": "ORGANIZATION ENTITY LAYER — brand positioning provides the brand identity signals that inform Organization schema feasibility. Organization schema requires specific factual data (name, URL, logo, contact details, social profiles) that may or may not be available in the planning phase.",
+        "fields_used": [
+          {
+            "field": "brand_name",
+            "treatment": "ORGANIZATION SCHEMA SEED — brand_name is the primary Organization schema.org name field. If present, Organization schema is technically feasible at a minimum level (name + URL).",
+            "note": "Full Organization schema requires address, contact details, and social profiles — these typically require operational verification and are not available in the planning phase."
+          },
+          {
+            "field": "brand_role",
+            "treatment": "ORGANIZATION SCHEMA PRIORITY — specialist, editorial-guide, or premium-innovator brand roles → brand entity clarity is high priority → Organization schema (brand knowledge panel support) is a meaningful structured data investment. value-leader → Organization schema is standard.",
+            "note": "Organization schema is recommended for all stores as a baseline brand entity signal. Brand role calibrates its priority level."
+          }
+        ]
+      }
+    },
+
+    "outputs": {
+      "primary_output": "structured-data-plan.json",
+      "artifact_path": "projects/{project_id}/structured-data-plan.json",
+      "schema": "schemas/structured-data-plan.schema.json",
+      "output_fields": {
+        "plan_name": {
+          "source": "LLM synthesis — a human-readable name for this store's structured data plan",
+          "type": "LLM-synthesized string",
+          "format_guidance": "Recommended pattern: '[Store Vertical] Structured Data Plan — [Primary Goal]'. Example: 'Sustainable Apparel Structured Data Plan — Rich Results and Answer Readiness'. Should reflect the actual store type and plan goal — not a generic template name.",
+          "note": "plan_name is a planning label for human orientation."
+        },
+        "primary_goal": {
+          "source": "Derived from seo-strategy.primary_seo_goal + aeo-strategy.primary_aeo_goal",
+          "type": "constrained enum",
+          "schema_enum": ["search-clarity", "rich-results-support", "answer-readiness", "hybrid"],
+          "derivation_logic": {
+            "search-clarity": "The primary structured data goal is to help search engines understand the store's content clearly — breadcrumb, organization, and basic product schema for crawl clarity. Appropriate when primary_seo_goal = category-discovery and the store has complex navigation or a large catalog that needs clear hierarchy signals.",
+            "rich-results-support": "The primary structured data goal is to qualify for Google Rich Results — product rich results (Product + Offer + Review), FAQ rich results (FAQPage). Appropriate when primary_seo_goal = transactional-growth and product rich results (star ratings, price, availability in SERPs) are a meaningful conversion-rate opportunity.",
+            "answer-readiness": "The primary structured data goal is to support answer engine surfaces — FAQ schema on knowledge and product pages, HowTo schema for process content, Organization schema for brand entity clarity. Appropriate when primary_aeo_goal = trust-and-reassurance or product-understanding and knowledge_seo_role is major.",
+            "hybrid": "Multiple structured data goals are meaningfully present. Use when rich-results-support and answer-readiness are both high priorities — typically in stores with both a transactional product catalog and rich FAQ or guide content."
+          }
+        },
+        "enabled_schema_types": {
+          "source": "Derived from seo-strategy.structured_data_priority + aeo-strategy.structured_answer_priority mapping + product-structured-data pattern analysis + page type presence analysis",
+          "type": "array (minItems: 1) of constrained enum values",
+          "schema_enum": ["product", "faq", "breadcrumb", "review", "offer", "article", "organization", "item-list", "how-to"],
+          "derivation_logic": {
+            "product": "Always include when product_seo_role = primary-driver or balanced-driver. Product schema is the baseline schema type for any commerce store with searchable products.",
+            "faq": "Include when knowledge_seo_role = supporting or higher AND faq_schema_priority from aeo-strategy is medium or high. Exclude (or mark deferred) when knowledge_seo_role = none or faq questions are empty/placeholder.",
+            "breadcrumb": "Include for all stores with collection hierarchy. BreadcrumbList schema clarifies navigational hierarchy in SERPs and supports crawl clarity regardless of primary_goal.",
+            "review": "Include when review data is available (review_data_availability_rate > 0% in product-structured-data pattern analysis) AND review rich results are strategically valuable. Exclude when review data is absent — do not plan for review schema without confirmed review data source.",
+            "offer": "Include when offer data completeness is sufficient (price, availability, currency available in product-structured-data artifacts) AND primary_goal = rich-results-support or hybrid. Mark as REQUIRES-OPERATIONAL-DATA if offer data completeness is low.",
+            "article": "Include when at least one guide page or blog article page type is present in page-seo artifacts AND knowledge_seo_role = balanced or major. Exclude when no guide or article page types exist.",
+            "organization": "Include for all stores at minimum level (name + URL). Extended Organization schema (address, contact, social profiles) is marked REQUIRES-OPERATIONAL-DATA until business details are verified.",
+            "item-list": "Include when collection_seo_role = primary-driver or balanced-driver AND collections are not empty/sparse (item_list_applicability confirmed in collection-seo analysis). Mark as REQUIRES-OPERATIONAL-DATA for empty collections.",
+            "how-to": "Include only when how-to structured content is confirmed present in page-seo or guide content artifacts. Exclude when no step-by-step how-to content exists — HowTo schema without genuine how-to content structure is misleading."
+          },
+          "note": "Schema types marked REQUIRES-OPERATIONAL-DATA or REQUIRES-CONFIRMATION should be included in the enabled_schema_types array with clear documentation in the notes field that they are conditional on data availability. They represent planning intent, not confirmed implementation readiness."
+        },
+        "page_type_mapping": {
+          "source": "Derived from enabled_schema_types + seo-strategy.page_priority + aeo-strategy.structured_answer_priority + page type presence analysis",
+          "type": "array (minItems: 1) of page-type-to-schema-types mapping objects",
+          "schema_fields_per_mapping": {
+            "page_type": "enum: homepage | product-page | collection-page | guide-page | faq-page | blog-article | page",
+            "schema_types": "array of schema types from enabled_schema_types that apply to this page type"
+          },
+          "standard_page_type_schema_assignments": {
+            "homepage": ["organization", "item-list (optional — for featured product or collection lists)"],
+            "product-page": ["product", "offer (conditional — requires complete offer data)", "review (conditional — requires review data)", "breadcrumb"],
+            "collection-page": ["item-list (conditional — requires non-empty collection)", "breadcrumb"],
+            "guide-page": ["article", "faq (if guide contains FAQ section)", "breadcrumb"],
+            "faq-page": ["faq", "breadcrumb"],
+            "blog-article": ["article", "breadcrumb"],
+            "page": ["organization (for about page)", "faq (if page contains FAQ content)", "breadcrumb"]
+          },
+          "conditional_assignment_note": "Schema types marked as 'conditional' in the page-type mapping represent implementation targets that are technically planned but require operational data or content confirmation before they can be activated. They must be listed in the page_type_mapping with a clear conditional annotation in the notes field — not omitted.",
+          "note": "page_type_mapping should only include page types that are actually present or planned in this store. Do not include guide-page mapping if no guide pages exist in the store's current page structure."
+        },
+        "entity_priority": {
+          "brand_entity_priority": {
+            "source": "Derived from: higher of (seo-strategy.primary_seo_goal brand signal) vs (aeo-strategy.entity_clarity_strategy.brand_entity_clarity)",
+            "type": "constrained enum",
+            "schema_enum": ["medium", "high", "critical"],
+            "derivation_logic": {
+              "critical": "New brand OR brand_entity_clarity = critical in aeo-strategy. Organization schema implementation is a high-priority structured data task — the brand's entity presence in search is weak and schema markup is a meaningful lever.",
+              "high": "Growing brand OR brand_entity_clarity = high in aeo-strategy. Organization schema is an important implementation target but not the most critical gap.",
+              "medium": "Established brand with existing search entity presence. Organization schema maintenance and accuracy is the goal, not urgently building brand entity recognition."
+            }
+          },
+          "product_entity_priority": {
+            "source": "Derived from: higher of (seo-strategy.product_seo_role mapping) vs (aeo-strategy.entity_clarity_strategy.product_entity_clarity)",
+            "type": "constrained enum",
+            "schema_enum": ["medium", "high", "critical"],
+            "derivation_logic": {
+              "critical": "product_seo_role = primary-driver AND product entity clarity gaps are widespread in product-structured-data artifacts. Product schema implementation is the most important structured data task.",
+              "high": "product_seo_role = balanced-driver OR product entity clarity is high. Product schema is a high-priority implementation target.",
+              "medium": "product_seo_role = light-support OR product entity clarity is medium. Product schema is planned but not an urgent implementation priority."
+            }
+          },
+          "category_entity_priority": {
+            "source": "Derived from: higher of (seo-strategy.collection_seo_role mapping) vs (aeo-strategy.entity_clarity_strategy.category_entity_clarity)",
+            "type": "constrained enum",
+            "schema_enum": ["medium", "high", "critical"],
+            "derivation_logic": {
+              "critical": "collection_seo_role = primary-driver AND category entity clarity gaps are significant. Breadcrumb and ItemList schema implementation is critical for this store's search presence.",
+              "high": "collection_seo_role = balanced-driver OR category entity clarity = high. Collection schema implementation is an important target.",
+              "medium": "collection_seo_role = light-support OR category entity clarity = medium. Collection schema is planned as a standard implementation item."
+            }
+          }
+        },
+        "validation_priority": {
+          "required_validation": {
+            "source": "Always true — schema validation is required before any structured data is deployed to production",
+            "type": "boolean",
+            "note": "required_validation = true for all stores. Structured data with schema errors can trigger manual actions from Google and degrade rich result eligibility. Validation must use Google's Rich Results Test or Schema.org validator before production deployment."
+          },
+          "manual_review_required_for_advanced_markup": {
+            "source": "Derived from: presence of review, offer, or organization schema types in enabled_schema_types",
+            "type": "boolean",
+            "derivation_logic": "Set to true when any of the following schema types are enabled: review (requires real review data verification), offer (requires price/availability accuracy verification), organization (requires business detail accuracy verification). Set to false when only basic schema types are enabled (product, breadcrumb, faq without sensitive data).",
+            "note": "Advanced markup (review, offer, organization with contact details) carries higher risk of Google policy violations if data is inaccurate or fabricated. Manual review by a human with access to verified business data is required before these types are deployed."
+          },
+          "strictness": {
+            "source": "Derived from primary_goal + presence of advanced schema types",
+            "type": "optional constrained enum",
+            "schema_enum": ["balanced", "high", "strict"],
+            "derivation_logic": {
+              "balanced": "Standard schema validation. Known optional property gaps are acceptable. Focus on required properties and valid enum values.",
+              "high": "Strict validation of all properties including conditionally required fields (e.g. offer.availability, offer.priceCurrency). Appropriate when primary_goal = rich-results-support and qualifying for rich results depends on property completeness.",
+              "strict": "No exceptions. All recommended and required properties must be present and valid. Appropriate for stores targeting featured rich results and operating in verticals where Google's structured data quality enforcement is active."
+            }
+          }
+        },
+        "faq_markup_policy": {
+          "source": "Derived from aeo-strategy.faq_strategy.faq_schema_priority + seo-strategy.knowledge_seo_role + faq-page.faq_intensity",
+          "type": "optional constrained enum",
+          "schema_enum": ["minimal", "balanced", "strong"],
+          "derivation_logic": {
+            "minimal": "faq_schema_priority = low or knowledge_seo_role = none. FAQ markup is a deferred or minimal implementation. Only implement if FAQPage schema requires no additional content effort.",
+            "balanced": "faq_schema_priority = medium or knowledge_seo_role = supporting. FAQ markup is planned for the primary faq-page and for product pages with FAQ sections.",
+            "strong": "faq_schema_priority = high or knowledge_seo_role = major. FAQ markup is a high-priority implementation target across faq-pages, guide pages, and product pages with FAQ content. Schema should cover all structured question-answer pairs."
+          }
+        },
+        "review_markup_policy": {
+          "source": "Derived from product-structured-data pattern analysis (review_data_availability_rate) + market_intelligence.trust_factors (from seo-strategy context)",
+          "type": "optional constrained enum",
+          "schema_enum": ["none", "balanced", "strong"],
+          "derivation_logic": {
+            "none": "review_data_availability_rate = 0% in product-structured-data artifacts (no reviews available). Do not plan for review schema when no review data exists — adding review schema without data requires placeholder values which violates Google's structured data guidelines.",
+            "balanced": "Some review data is available (review_data_availability_rate > 0% but partial). Implement review schema on products where review data is confirmed available. Mark remaining products as REQUIRES-OPERATIONAL-DATA for review schema.",
+            "strong": "Review data is widely available (review_data_availability_rate high) AND trust_factors are high in the market. Review schema is a strategic implementation priority for rich result star ratings."
+          },
+          "review_data_warning": "IMPORTANT: Review schema must NEVER be implemented without verified real review data. Fabricated aggregateRating values violate Google's structured data quality guidelines and can result in rich result disqualification. review_markup_policy = balanced or strong must be contingent on verified review data from a confirmed review source (native Shopify reviews, third-party review app, etc.)."
+        },
+        "offer_markup_policy": {
+          "source": "Derived from product-structured-data pattern analysis (offer_data_completeness_rate) + primary_goal",
+          "type": "optional constrained enum",
+          "schema_enum": ["light", "balanced", "strong"],
+          "derivation_logic": {
+            "light": "offer_data_completeness_rate is low OR primary_goal = search-clarity or answer-readiness. Minimal offer markup — price and availability where data is confirmed. Incomplete offers are better omitted than partially specified.",
+            "balanced": "Moderate offer data completeness. Implement offer schema on products where price and availability data is complete. Mark others as REQUIRES-OPERATIONAL-DATA.",
+            "strong": "High offer data completeness AND primary_goal = rich-results-support. Comprehensive offer schema (price, availability, priceCurrency, seller, shippingDetails where available) is a high-priority implementation target for product rich results."
+          },
+          "offer_data_warning": "Offer schema (price, availability) must reflect live Shopify product data at time of implementation. Planning-phase price data from Shopify import may be stale by implementation time. Offer schema must be dynamically populated from live Shopify data — not hardcoded from planning artifacts."
+        },
+        "notes": {
+          "source": "Workflow-generated synthesis metadata",
+          "type": "machine-generated string",
+          "required_content": "Must include: synthesis timestamp, plan version label (e.g. Phase-8-draft), list of inputs used (seo-strategy, aeo-strategy, product-structured-data pattern summary if available, faq-page, page-seo pattern summary if available, collection-seo pattern summary if available, brand-positioning), provisional flag (PROVISIONAL-STRUCTURED-DATA-PLAN: This artifact was synthesized from planning inputs. All schema type prioritizations are planning-level decisions. Technical implementation requires developer review, operational data verification, and schema validation before production deployment.), data gap notice (REQUIRES-OPERATIONAL-DATA: The following schema types included in this plan are conditional on operational data that was not available during planning: [list]. These types must not be implemented until the required data is verified and available.), planning-only note (PLANNING-ARTIFACT-ONLY: This plan does not generate JSON-LD, Shopify metafield schemas, or theme app extension code. JSON-LD generation is a separate technical implementation phase.), and review/offer safety notice (REVIEW-OFFER-SAFETY: review and offer schema types must only be implemented with verified real data. Fabricated or placeholder review ratings and offer prices violate Google's structured data guidelines.)."
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-seo-strategy",
+        "provides": ["seo-strategy.json"],
+        "required": true,
+        "note": "seo-strategy.json (step 11, Phase 7) provides the primary_seo_goal, page_priority, product/collection/knowledge SEO roles, and structured_data_priority seed. This workflow cannot produce a coherent plan without the SEO foundation."
+      },
+      {
+        "workflow": "build-aeo-strategy",
+        "provides": ["aeo-strategy.json"],
+        "required": true,
+        "note": "aeo-strategy.json (step 12, Phase 8) provides faq_schema_priority, entity_clarity_strategy, and structured_answer_priority — all of which are critical inputs for FAQ markup policy, entity priority, and enabled schema type decisions. This dependency makes build-structured-data-plan order-dependent on build-aeo-strategy within Phase 8."
+      },
+      {
+        "workflow": "build-product-structured-data",
+        "provides": ["product-structured-data.json artifacts (per product)"],
+        "required": false,
+        "note": "PHASE 5 CONTEXT: per-product structured data artifacts provide review data availability rate, offer data completeness rate, and entity clarity gap signals. When absent, review and offer markup policies must be set conservatively (review = none, offer = light) with explicit REQUIRES-OPERATIONAL-DATA documentation."
+      },
+      {
+        "workflow": "build-faq-page",
+        "provides": ["faq-page.json"],
+        "required": false,
+        "note": "PHASE 7 CONTEXT: faq-page.json confirms FAQ schema applicability. When absent, FAQ schema inclusion must be inferred from aeo-strategy.faq_schema_priority alone and flagged as REQUIRES-CONFIRMATION."
+      },
+      {
+        "workflow": "build-page-seo",
+        "provides": ["page-seo.json artifacts (per page)"],
+        "required": false,
+        "note": "PHASE 7 CONTEXT: page-seo artifacts confirm guide page, how-to content, and about page presence. When absent, article and how-to schema type inclusion must be inferred from seo-strategy knowledge_seo_role alone and marked REQUIRES-CONFIRMATION."
+      },
+      {
+        "workflow": "build-collection-seo",
+        "provides": ["collection-seo.json artifacts (per collection)"],
+        "required": false,
+        "note": "PHASE 6 CONTEXT: collection-seo artifacts confirm collection hierarchy depth and populate-rate for ItemList schema applicability. When absent, item-list schema inclusion is assumed based on catalog type from store-profile but marked REQUIRES-CONFIRMATION."
+      },
+      {
+        "workflow": "build-brand-positioning",
+        "provides": ["brand-positioning.json"],
+        "required": false,
+        "note": "PHASE 1 CONTEXT: brand-positioning.json provides brand_name and brand_role for Organization schema priority calibration. When absent, Organization schema is included as a standard baseline with medium entity priority."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "run-validation",
+        "receives": ["structured-data-plan.json"],
+        "note": "Out of Phase 8 scope (workflow step 28). Validates structured-data-plan.json against schema and cross-validates entity_priority alignment with aeo-strategy.entity_clarity_strategy and seo-strategy SEO role assignments."
+      },
+      {
+        "workflow": "build-deployment-manifest",
+        "receives": ["structured-data-plan.json"],
+        "note": "Out of Phase 8 scope. The deployment manifest should include structured data implementation tasks derived from this plan — particularly the enabled_schema_types list and page_type_mapping as implementation checklist items."
+      }
+    ],
+
+    "schema_alignment": {
+      "structured-data-plan.schema.json": {
+        "required_fields_covered": [
+          "plan_name",
+          "primary_goal",
+          "enabled_schema_types",
+          "page_type_mapping",
+          "entity_priority",
+          "validation_priority"
+        ],
+        "optional_fields_covered": [
+          "faq_markup_policy",
+          "review_markup_policy",
+          "offer_markup_policy",
+          "notes"
+        ],
+        "schema_enum_notes": {
+          "primary_goal": "enum: search-clarity | rich-results-support | answer-readiness | hybrid",
+          "enabled_schema_types items": "enum: product | faq | breadcrumb | review | offer | article | organization | item-list | how-to",
+          "page_type_mapping[].page_type": "enum: homepage | product-page | collection-page | guide-page | faq-page | blog-article | page",
+          "page_type_mapping[].schema_types items": "enum: product | faq | breadcrumb | review | offer | article | organization | item-list | how-to",
+          "entity_priority.brand_entity_priority": "enum: medium | high | critical",
+          "entity_priority.product_entity_priority": "enum: medium | high | critical",
+          "entity_priority.category_entity_priority": "enum: medium | high | critical",
+          "validation_priority.strictness": "optional enum: balanced | high | strict",
+          "faq_markup_policy": "optional enum: minimal | balanced | strong",
+          "review_markup_policy": "optional enum: none | balanced | strong",
+          "offer_markup_policy": "optional enum: light | balanced | strong"
+        },
+        "validation_note": "structured-data-plan.json is a single-instance artifact (one per store). enabled_schema_types minItems = 1. page_type_mapping minItems = 1. All enum values must be validated before writing. The schema does not permit additionalProperties at root level or within page_type_mapping items.",
+        "safety_note": "The review_markup_policy field, if set to balanced or strong, must be accompanied by notes documenting the confirmed review data source. The validation workflow must check that review_markup_policy != none implies a review data source is documented. Similarly, offer_markup_policy = strong must be accompanied by documentation of how offer data will be populated from live Shopify data."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: seo_strategy (object, required), aeo_strategy (object, required). Optional: product_structured_data_artifacts (array), faq_page (object), page_seo_artifacts (array), collection_seo_artifacts (array), brand_positioning (object). Logs which optional inputs are present.",
+        "input": "seo_strategy + aeo_strategy + optional product_structured_data_artifacts + optional faq_page + optional page_seo_artifacts + optional collection_seo_artifacts + optional brand_positioning",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present and minimally complete. seo_strategy must have: primary_seo_goal, page_priority, product_seo_role, collection_seo_role, knowledge_seo_role. aeo_strategy must have: primary_aeo_goal, faq_strategy.faq_schema_priority, entity_clarity_strategy, structured_answer_priority. Set availability flags: has_product_structured_data, has_faq_page, has_page_seo_patterns, has_collection_seo_patterns, has_brand_positioning. Fail with clear error if required inputs are missing.",
+        "input": "all inputs",
+        "output": "validated inputs + availability flags or halt error"
+      },
+      {
+        "step": 3,
+        "name": "Extract Structured Data Context",
+        "type": "Code node (JavaScript)",
+        "description": "Extract and organize the structured data context signals. Produce an sd_context object containing: (1) SEO SIGNALS: primary_seo_goal, page_priority, product_seo_role, collection_seo_role, knowledge_seo_role, structured_data_priority (if present) from seo_strategy. (2) AEO SIGNALS: primary_aeo_goal, faq_schema_priority, entity_clarity_strategy, structured_answer_priority from aeo_strategy. (3) BRAND SIGNALS: brand_name, brand_role from brand_positioning if available.",
+        "input": "validated seo_strategy + aeo_strategy + optional brand_positioning",
+        "output": "sd_context object"
+      },
+      {
+        "step": 4,
+        "name": "Analyze Product Structured Data Patterns (if available)",
+        "type": "Code node (JavaScript)",
+        "description": "If has_product_structured_data = true: load all product-structured-data artifacts. Compute: schema_type_coverage_rate (per schema type: what percentage of products have it), review_data_availability_rate, offer_data_completeness_rate, missing_required_field_rate, sparse_data_rate. Derive conservative markup policy recommendations: if review_data_availability_rate = 0 → recommend review_markup_policy = none. If offer_data_completeness_rate < 50% → recommend offer_markup_policy = light. If has_product_structured_data = false: set product_sd_analysis = null, set conservative defaults: review_markup_policy_recommendation = none (no review data confirmed), offer_markup_policy_recommendation = light (no offer data confirmed).",
+        "input": "product_structured_data_artifacts (if available)",
+        "output": "product_sd_analysis + markup policy recommendations or null + conservative defaults"
+      },
+      {
+        "step": 5,
+        "name": "Analyze Page Type Presence (if available)",
+        "type": "Code node (JavaScript)",
+        "description": "Analyze page-seo and collection-seo artifacts to identify which page types are confirmed present: guide_page_present, how_to_content_present, about_page_present, collection_hierarchy_depth (flat vs multi-level), item_list_applicability (non-empty collections exist). If pattern artifacts are not available: set all presence flags to REQUIRES-CONFIRMATION with fallback inference from seo_strategy.knowledge_seo_role and collection_seo_role. Also analyze faq-page: faq_confirmed_non_empty = (faq_page.questions is non-empty array with answer text).",
+        "input": "page_seo_artifacts (if available) + collection_seo_artifacts (if available) + faq_page (if available)",
+        "output": "page_type_presence flags object"
+      },
+      {
+        "step": 6,
+        "name": "Derive Structured Data Plan Direction (Pre-LLM)",
+        "type": "Code node (JavaScript)",
+        "description": "Compute deterministic pre-LLM structured data plan derivations: (1) CANDIDATE primary_goal: apply derivation logic from primary_seo_goal + primary_aeo_goal. (2) CANDIDATE enabled_schema_types: apply inclusion logic from the output_fields specification — product, breadcrumb, organization always included. faq included if faq_schema_priority >= medium AND faq_confirmed_non_empty. review included if review_data_availability_rate > 0. offer included if offer_data_completeness_rate > 50% AND primary_goal includes rich-results-support. article included if guide_page_present. item-list included if item_list_applicability = true. how-to included if how_to_content_present. (3) CANDIDATE page_type_mapping: apply standard page type schema assignment from output_fields specification, filtered to confirmed present page types only. (4) CANDIDATE entity_priority: take higher of SEO role mapping vs AEO entity clarity for each entity type. (5) CANDIDATE validation_priority: required_validation = true always. manual_review_required = review or offer or organization in enabled_schema_types. strictness based on primary_goal. (6) CANDIDATE markup policies: apply from product_sd_analysis recommendations or conservative defaults. Include reasoning for each candidate.",
+        "input": "sd_context + product_sd_analysis + page_type_presence flags",
+        "output": "pre_llm_sd_candidates object with candidate values and reasoning notes"
+      },
+      {
+        "step": 7,
+        "name": "Build LLM Structured Data Plan Prompt",
+        "type": "Code node (JavaScript)",
+        "description": "Assemble the structured LLM prompt for structured data plan synthesis. The prompt must: (1) Present SEO signals: primary_seo_goal, page_priority, product/collection/knowledge SEO roles, structured_data_priority seed. (2) Present AEO signals: faq_schema_priority, entity_clarity_strategy, structured_answer_priority mapping to schema types. (3) Present product schema coverage analysis findings: review data rate, offer completeness rate, sparse rates. (4) Present page type presence findings: which page types are confirmed present. (5) Present pre-LLM candidate reasoning as grounding context. (6) Request output as valid JSON conforming to schemas/structured-data-plan.schema.json. Include all enum values and required fields. (7) Instruct: 'Do not include schema types in enabled_schema_types or page_type_mapping without a clear justification tied to the store signals provided.' (8) Instruct: 'Do not plan for review schema unless review_data_availability_rate > 0%. Set review_markup_policy = none if review data is unconfirmed.' (9) Instruct: 'This is a planning artifact — do not generate JSON-LD code, schema.org markup, or implementation code.' (10) Include data gap instructions: 'Schema types that require operational data not confirmed in the planning phase must be documented in the notes field as REQUIRES-OPERATIONAL-DATA.'",
+        "input": "sd_context + pre_llm_sd_candidates + product_sd_analysis + page_type_presence",
+        "output": "assembled LLM prompt string",
+        "prompt_safety_note": "Prompt must explicitly state: 'This is a structured data PLAN — do not generate JSON-LD or schema markup code. Do not claim rich results eligibility. Do not plan for review schema without confirmed review data. All decisions are planning hypotheses requiring developer review and operational data verification.'"
+      },
+      {
+        "step": 8,
+        "name": "LLM Synthesis: Structured Data Plan",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API. Request JSON output mode. Temperature: 0.1. Max tokens: 3000.",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt",
+        "output": "raw LLM response string (expected to be JSON conforming to structured-data-plan schema)"
+      },
+      {
+        "step": 9,
+        "name": "Parse and Enforce Structured Data Plan Constraints",
+        "type": "Code node (JavaScript)",
+        "description": "Parse the raw LLM response as JSON. Enforce constraint integrity: (1) ENUM VALIDATION: All enum fields must match allowed schema values. Substitutions logged. (2) REQUIRED FIELD COMPLETENESS: All required fields present. enabled_schema_types minItems = 1. page_type_mapping minItems = 1. (3) REVIEW SAFETY ENFORCEMENT: If review is in enabled_schema_types but review_data_availability_rate = 0 (or not available): inject warning 'REVIEW-SAFETY-WARNING: review schema type included in plan but no review data was confirmed available in product-structured-data analysis. Review schema must not be implemented until review data source is confirmed.' If review_markup_policy is balanced or strong without confirmed review data: downgrade to none with logged warning. (4) OFFER SAFETY ENFORCEMENT: If offer is in enabled_schema_types but offer_data_completeness_rate < 30%: inject 'OFFER-DATA-WARNING: offer data completeness is low. Offer schema should only be implemented on products with confirmed complete offer data.' (5) CONDITIONAL TYPE ANNOTATION: For any schema type that depends on unconfirmed page type presence (article, how-to) or unconfirmed data (review, offer): inject REQUIRES-OPERATIONAL-DATA or REQUIRES-CONFIRMATION annotation into notes. (6) PROVISIONAL FLAG INJECTION: Inject required flags into notes.",
+        "input": "raw LLM response + pre_llm_sd_candidates + product_sd_analysis",
+        "output": "parsed and constrained structured_data_plan object (pre-validation)"
+      },
+      {
+        "step": 10,
+        "name": "Validate Against Schema",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate the structured_data_plan object against schemas/structured-data-plan.schema.json using ajv. Key validations: plan_name non-empty string, primary_goal in enum, enabled_schema_types is non-empty array with items in enum, page_type_mapping is non-empty array with each item having page_type in enum and schema_types as non-empty array with items in enabled_schema_types, entity_priority is object with all three entity priority fields in enum, validation_priority is object with required_validation (boolean) and manual_review_required_for_advanced_markup (boolean). Halt workflow on validation failure.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/structured-data-plan.schema.json",
+        "failure_behavior": "Halt workflow on any validation failure. Log exact field violation. Do not write a partially valid structured data plan.",
+        "additional_validation": "Verify that all schema_types in page_type_mapping items are also present in the enabled_schema_types array. If a schema type appears in page_type_mapping but not in enabled_schema_types, either add it to enabled_schema_types or remove it from the page_type_mapping. Log any corrections.",
+        "input": "constrained structured_data_plan object",
+        "output": "validated structured_data_plan object or halt error"
+      },
+      {
+        "step": 11,
+        "name": "Persist structured-data-plan.json",
+        "type": "GitHub node or Write File node",
+        "description": "Write structured-data-plan.json to projects/{project_id}/structured-data-plan.json. Commit with a message such as 'chore: generate structured-data-plan for {store_id} — Phase 8 draft (planning artifact, provisional, review/offer policies require operational data verification)'. The provisional nature, the data dependency conditions, and the planning-only scope must all be visible in the commit message.",
+        "artifact_path": "projects/{project_id}/structured-data-plan.json",
+        "git_note": "This artifact is a planning document — not a technical implementation or markup generation output. The commit message must reflect the provisional and planning-only nature.",
+        "input": "validated structured_data_plan object",
+        "output": "confirmation of write + persisted artifact path"
+      },
+      {
+        "step": 12,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass structured-data-plan.json (as object or path) to the master orchestrator. This is the final output of Phase 8. The orchestrator should note that Phase 8 is now complete: aeo-strategy.json, internal-linking.json, and structured-data-plan.json have all been produced.",
+        "input": "structured-data-plan.json path",
+        "output": "workflow output payload with structured-data-plan path + Phase 8 completion signal"
+      }
+    ],
+
+    "assumptions": [
+      "seo-strategy.json and aeo-strategy.json are both required inputs. This workflow cannot produce a coherent plan without them.",
+      "product-structured-data, faq-page, page-seo, collection-seo, and brand-positioning artifacts are optional. Their absence triggers conservative defaults and REQUIRES-OPERATIONAL-DATA annotations rather than halting the workflow.",
+      "Review schema (review_markup_policy = balanced or strong) must never be planned without confirmed review data availability. When review data is unconfirmed, review_markup_policy defaults to none regardless of what the LLM suggests.",
+      "Offer schema (offer_markup_policy) must be grounded in actual Shopify product data completeness. Planning-phase offer data may be stale by implementation time. Offer schema must be implemented with live Shopify data — not hardcoded from planning artifacts.",
+      "The output is a planning artifact — not generated JSON-LD, Shopify theme code, or rich results implementation. Technical implementation requires a separate development phase.",
+      "Schema types that require page types not confirmed present in the store (e.g. how-to without confirmed how-to content, article without confirmed guide pages) are marked REQUIRES-CONFIRMATION rather than excluded entirely. They represent planning intent contingent on page type creation.",
+      "Organization schema is always included at minimum level (name + URL). Extended Organization schema (address, phone, social profiles) is marked REQUIRES-OPERATIONAL-DATA until business details are verified.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "A single structured-data-plan.json is produced per store. It is a store-level singleton artifact — not a per-page or per-product artifact.",
+      "build-structured-data-plan runs after build-aeo-strategy and build-internal-linking in Phase 8. Both aeo-strategy.json and internal-linking.json must be available as input before this workflow runs.",
+      "BreadcrumbList and Organization schema are baseline schema types recommended for all commerce stores regardless of primary_goal. They should always appear in enabled_schema_types unless there is a specific technical reason to exclude them.",
+      "Consistency constraint: all schema_types appearing in page_type_mapping must also appear in enabled_schema_types. This constraint is enforced in step 9 parse/constrain and step 10 schema validation."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should the structured data plan include a prioritized implementation roadmap (e.g. Phase 1: breadcrumb + organization, Phase 2: product + offer, Phase 3: faq + review) in the notes field or as a separate artifact?",
+        "impact": "A prioritized roadmap would make the plan significantly more actionable for developers. Without it, the plan lists all schema types but gives no implementation sequencing guidance.",
+        "recommended_default": "Include a simplified implementation priority sequence in the notes field for Phase 8. The first items should always be: (1) BreadcrumbList — high value, low implementation risk. (2) Organization on homepage — high SEO value, low data risk. (3) Product schema on product pages — high value for any commerce store. (4) FAQ schema if data is confirmed. (5) Offer schema after offer data is verified. (6) Review schema after real review data source is confirmed. A structured prioritized_implementation_phases array field could be a schema extension candidate for a future plan version."
+      },
+      {
+        "question": "How should the structured data plan handle stores on Shopify Online Store 2.0 vs legacy Shopify themes, given that JSON-LD implementation approaches differ significantly between them?",
+        "impact": "OS 2.0 themes support app blocks and native structured data injection via theme app extensions. Legacy themes require manual theme code edits. The implementation approach affects feasibility and risk of each schema type.",
+        "recommended_default": "If store-profile includes Shopify OS version or theme type, document the implementation approach implications in the notes field. For Phase 8: note 'SHOPIFY-THEME-VERSION-UNKNOWN: Structured data implementation approach (app block vs manual theme injection vs metafield-driven) must be confirmed with the development team based on the actual Shopify theme version.' Do not make OS-specific recommendations without confirmed theme version data."
+      },
+      {
+        "question": "Should enabled_schema_types distinguish between 'confident' types (data confirmed available) and 'conditional' types (data availability unconfirmed) rather than using a single flat array?",
+        "impact": "A flat enabled_schema_types array treats Organization (always feasible) the same as Review (requires confirmed review data). This makes it harder for developers to know which types they can implement immediately vs which require prerequisite data work.",
+        "recommended_default": "For Phase 8, use the flat enabled_schema_types array as specified in the schema, but document confirmed-vs-conditional status in the notes field and page_type_mapping schema_types entries. Splitting enabled_schema_types into confirmed and conditional arrays is a schema evolution candidate for a future plan version — document this as a known gap in the Phase 8 notes field."
+      },
+      {
+        "question": "Should the structured data plan cross-validate its enabled_schema_types against the internal-linking strategy to ensure linking and schema markup are coherent (e.g. if guide-to-product links are planned, article schema on guide pages should be in the plan)?",
+        "impact": "Internal linking and structured data are complementary — guide pages that are heavily linked (per internal-linking strategy) should also have article schema. Cross-validating would ensure the plans are coherent.",
+        "recommended_default": "Document this cross-validation requirement as an open item for the run-validation workflow (step 28). For Phase 8: note 'CROSS-VALIDATION-RECOMMENDED: internal-linking.json and structured-data-plan.json should be cross-validated to ensure schema type coverage is coherent with linking strategy (e.g. guide pages with high inbound link priority should have article schema; collection pages with item-list schema should have collection-to-product link rules).' The validation workflow is the appropriate place to enforce this, not Phase 8 planning."
+      }
+    ]
+  }
+}
