@@ -1,0 +1,387 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. The output artifact (store-profile.json) must validate against schemas/store-profile.schema.json before being passed downstream.",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ],
+    "output_schema": "schemas/store-profile.schema.json"
+  },
+  "workflow": {
+    "id": "build-store-profile",
+    "name": "build-store-profile",
+    "category": "planning",
+    "phase": "Phase 1 — Project Foundation",
+    "purpose": "Combine the normalized intake payload from intake-store-input with shop basics from import-shopify-data to produce a validated store-profile.json. This is the first structured planning artifact in the chain. It serves as the primary shared context for all downstream strategic and planning workflows. The output must conform to schemas/store-profile.schema.json.",
+
+    "inputs": {
+      "from_intake": {
+        "source": "intake-store-input → normalized_intake_payload",
+        "fields_used": [
+          "project_id",
+          "primary_market",
+          "target_markets",
+          "primary_language",
+          "languages",
+          "primary_currency",
+          "currencies",
+          "vertical",
+          "store_type",
+          "business_model",
+          "price_positioning",
+          "publish_mode",
+          "special_notes"
+        ],
+        "note": "Brand and positioning fields (brand_role, tone_of_voice, etc.) from intake are NOT written into store-profile.json. They belong in brand-positioning.json (out of scope for this phase)."
+      },
+      "from_shopify_import": {
+        "source": "import-shopify-data → raw_shop_data + import_summary",
+        "fields_used": [
+          "raw_shop_data.shop_domain",
+          "raw_shop_data.shop_name",
+          "import_summary.active_product_count"
+        ],
+        "note": "store_name and domain are populated from Shopify, not from manual intake. This is intentional — the user does not type these values."
+      }
+    },
+
+    "outputs": {
+      "store_profile": {
+        "description": "Validated store-profile.json conforming to schemas/store-profile.schema.json. The primary shared planning context for all downstream workflows in the chain.",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "schema": "schemas/store-profile.schema.json",
+        "field_mapping": {
+          "store_id": {
+            "source": "intake.project_id",
+            "type": "direct",
+            "note": "store_id equals project_id. Both are the same canonical identifier."
+          },
+          "store_name": {
+            "source": "raw_shop_data.shop_name",
+            "type": "direct from Shopify",
+            "note": "Store name is always fetched from Shopify — not manually entered in the intake form."
+          },
+          "store_type": {
+            "source": "intake.store_type",
+            "type": "direct",
+            "default_if_absent": "multi-product-store",
+            "allowed_values": ["single-brand-store", "multi-product-store", "category-specialist", "editorial-commerce-store", "general-commerce-store"],
+            "schema_enum": "store-profile.schema.json#/properties/store_type/enum"
+          },
+          "platform": {
+            "source": "fixed value",
+            "value": "shopify",
+            "type": "constant",
+            "note": "Platform is always shopify for this workflow. The schema supports other platforms but they require a different import workflow."
+          },
+          "business_model": {
+            "source": "intake.business_model",
+            "type": "direct",
+            "default_if_absent": "ecommerce",
+            "allowed_values": ["ecommerce", "dropshipping", "hybrid", "other"],
+            "schema_enum": "store-profile.schema.json#/properties/business_model/enum"
+          },
+          "primary_market": {
+            "source": "intake.primary_market",
+            "type": "direct"
+          },
+          "target_markets": {
+            "source": "intake.target_markets",
+            "type": "direct",
+            "default_if_absent": "[intake.primary_market]",
+            "note": "Must be an array with at least 1 item. Falls back to [primary_market] if not provided."
+          },
+          "primary_language": {
+            "source": "intake.primary_language",
+            "type": "direct"
+          },
+          "languages": {
+            "source": "intake.languages",
+            "type": "direct",
+            "default_if_absent": "[intake.primary_language]",
+            "note": "Must be an array with at least 1 item. Falls back to [primary_language] if not provided."
+          },
+          "primary_currency": {
+            "source": "intake.primary_currency",
+            "type": "direct"
+          },
+          "currencies": {
+            "source": "intake.currencies",
+            "type": "direct",
+            "default_if_absent": "[intake.primary_currency]",
+            "note": "Must be an array with at least 1 item. Falls back to [primary_currency] if not provided."
+          },
+          "vertical": {
+            "source": "intake.vertical",
+            "type": "direct"
+          },
+          "price_positioning": {
+            "source": "intake.price_positioning",
+            "type": "direct",
+            "allowed_values": ["budget", "mass-market", "mass-premium", "premium", "luxury", "to-be-defined"],
+            "schema_enum": "store-profile.schema.json#/properties/price_positioning/enum"
+          },
+          "catalog_type": {
+            "source": "import_summary.active_product_count (derived)",
+            "type": "derived — heuristic from product count",
+            "derivation_logic": {
+              "single-product": "active_product_count === 1",
+              "small-curated-catalog": "active_product_count >= 2 && active_product_count <= 15",
+              "broad-catalog": "active_product_count >= 16 && active_product_count <= 200",
+              "seasonal-catalog": "cannot be automatically determined — defaults to broad-catalog if count suggests it, but should be manually overridden when seasonal logic is known",
+              "mixed-catalog": "active_product_count > 200"
+            },
+            "note": "catalog_type has no direct intake field. It is derived from the number of active products imported from Shopify. This is a heuristic — the user may override it later. See open_questions for the override mechanism.",
+            "allowed_values": ["single-product", "small-curated-catalog", "broad-catalog", "seasonal-catalog", "mixed-catalog"],
+            "schema_enum": "store-profile.schema.json#/properties/catalog_type/enum"
+          },
+          "brand_maturity": {
+            "source": "no direct intake field — default applied",
+            "type": "default",
+            "default_value": "new",
+            "note": "brand_maturity cannot be reliably determined from Shopify data or intake fields in this phase. It defaults to 'new'. A future intake field or manual override should be added when brand_maturity becomes strategically important.",
+            "allowed_values": ["new", "growing", "established", "legacy"],
+            "schema_enum": "store-profile.schema.json#/properties/brand_maturity/enum"
+          },
+          "operating_mode": {
+            "source": "intake.publish_mode (mapped)",
+            "type": "mapped enum",
+            "mapping": {
+              "no-publish": "draft-first",
+              "draft-only": "draft-first",
+              "draft-and-review": "staging-first"
+            },
+            "note": "intake.publish_mode uses different values than the schema's operating_mode enum. This mapping is explicit. 'production-managed' is not reachable from intake defaults — it must be manually set outside the intake flow.",
+            "allowed_values": ["draft-first", "staging-first", "production-managed"],
+            "schema_enum": "store-profile.schema.json#/properties/operating_mode/enum"
+          },
+          "domain": {
+            "source": "raw_shop_data.shop_domain",
+            "type": "direct from Shopify",
+            "note": "Domain is always fetched from Shopify. It is an optional field in the schema but is expected to be populated in all Shopify-sourced workflows."
+          },
+          "notes": {
+            "source": "intake.special_notes",
+            "type": "direct",
+            "optional": true,
+            "note": "Forwarded as-is into the store profile notes field. May be null if not provided."
+          }
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "intake-store-input",
+        "provides": ["normalized_intake_payload"]
+      },
+      {
+        "workflow": "import-shopify-data",
+        "provides": ["raw_shop_data", "import_summary"]
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-market-intelligence",
+        "receives": ["store-profile.json"],
+        "note": "Out of scope for Phase 1. Documented for future reference."
+      },
+      {
+        "workflow": "build-brand-positioning",
+        "receives": ["store-profile.json"],
+        "note": "Out of scope for Phase 1."
+      },
+      {
+        "workflow": "build-seo-strategy",
+        "receives": ["store-profile.json"],
+        "note": "Out of scope for Phase 1."
+      },
+      {
+        "workflow": "build-homepage-strategy",
+        "receives": ["store-profile.json"],
+        "note": "Out of scope for Phase 1."
+      },
+      {
+        "note": "All downstream strategic planning workflows consume store-profile.json as their shared project context. This artifact is the anchor for the entire planning chain."
+      }
+    ],
+
+    "schema_alignment": {
+      "store-profile.schema.json": {
+        "required_fields_covered": [
+          "store_id",
+          "store_name",
+          "store_type",
+          "platform",
+          "business_model",
+          "primary_market",
+          "target_markets",
+          "primary_language",
+          "languages",
+          "primary_currency",
+          "currencies",
+          "vertical",
+          "price_positioning",
+          "catalog_type",
+          "brand_maturity",
+          "operating_mode"
+        ],
+        "optional_fields_covered": [
+          "domain",
+          "notes"
+        ],
+        "fields_not_covered_in_this_phase": [
+          "secondary_domains — not applicable at intake time"
+        ],
+        "validation_note": "The output must be validated against schemas/store-profile.schema.json before being persisted and before downstream workflows consume it. If validation fails, the workflow should halt and report the specific schema violation."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects both normalized_intake_payload (from intake-store-input) and the Shopify import results (raw_shop_data, import_summary from import-shopify-data). Both upstream workflows must have completed before this workflow begins.",
+        "input": "normalized_intake_payload + raw_shop_data + import_summary",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify that both required upstream inputs are present: normalized_intake_payload must have project_id, primary_market, primary_language, primary_currency, vertical, price_positioning. raw_shop_data must have shop_domain and shop_name. import_summary must have active_product_count. If any required upstream value is missing, halt and return a clear error.",
+        "input": "normalized_intake_payload + raw_shop_data + import_summary",
+        "output": "validated inputs or error"
+      },
+      {
+        "step": 3,
+        "name": "Map Intake Fields",
+        "type": "Code node (JavaScript)",
+        "description": "Apply direct field mappings from normalized_intake_payload to store-profile fields. Apply defaults for any optional fields that were not provided. Apply enum mapping for operating_mode: no-publish → draft-first, draft-only → draft-first, draft-and-review → staging-first.",
+        "input": "validated normalized_intake_payload",
+        "output": "partial store-profile object (intake-sourced fields)"
+      },
+      {
+        "step": 4,
+        "name": "Map Shopify Fields",
+        "type": "Code node (JavaScript)",
+        "description": "Populate store_name from raw_shop_data.shop_name and domain from raw_shop_data.shop_domain. Set platform to 'shopify' (constant). These values come from Shopify, never from manual intake.",
+        "input": "raw_shop_data",
+        "output": "Shopify-sourced fields added to partial store-profile object"
+      },
+      {
+        "step": 5,
+        "name": "Derive catalog_type",
+        "type": "Code node (JavaScript)",
+        "description": "Derive catalog_type from import_summary.active_product_count using the documented heuristic: 1 product → single-product, 2–15 → small-curated-catalog, 16–200 → broad-catalog, 201+ → mixed-catalog. Log the derived value and the product count so it is visible in the execution log for review.",
+        "derivation_note": "seasonal-catalog cannot be derived automatically. Default to broad-catalog or mixed-catalog based on count. Document the limitation in the notes field of the store-profile.",
+        "input": "import_summary.active_product_count",
+        "output": "catalog_type value"
+      },
+      {
+        "step": 6,
+        "name": "Apply brand_maturity Default",
+        "type": "Set node",
+        "description": "Set brand_maturity to 'new' as the default value. This field has no direct intake field in Phase 1. The value is documented as a default in the store-profile and should be overridden manually if the brand is known to be growing, established, or legacy.",
+        "input": "partial store-profile object",
+        "output": "brand_maturity = 'new' added to partial store-profile object"
+      },
+      {
+        "step": 7,
+        "name": "Assemble store-profile Object",
+        "type": "Code node (JavaScript)",
+        "description": "Merge all partial objects (intake-sourced fields, Shopify-sourced fields, derived fields, defaults) into the complete store-profile object. Ensure no extra fields are added beyond what schemas/store-profile.schema.json defines. The schema uses additionalProperties: false — any extra field will cause validation failure.",
+        "input": "all partial field sets",
+        "output": "complete store-profile object (pre-validation)"
+      },
+      {
+        "step": 8,
+        "name": "Validate Against Schema",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate the assembled store-profile object against schemas/store-profile.schema.json. Use a JSON Schema validation library (e.g., ajv) within the Code node. If validation passes, proceed. If validation fails, halt with a clear error message identifying the field and violation. Do not persist or pass downstream an invalid store-profile.",
+        "validation_library": "ajv (Ajv JSON Schema Validator) — recommended for n8n Code nodes",
+        "schema_file": "schemas/store-profile.schema.json",
+        "failure_behavior": "Halt workflow. Report exact schema violation to execution log. Do not silently continue with an invalid artifact.",
+        "input": "complete store-profile object",
+        "output": "validated store-profile object or validation error"
+      },
+      {
+        "step": 9,
+        "name": "Persist store-profile.json",
+        "type": "GitHub node or Write File node",
+        "description": "Write the validated store-profile.json to the project artifacts path: projects/{project_id}/store-profile.json. This is the primary output artifact of this workflow and the anchor for all downstream planning workflows. If using the GitHub node: commit to the project branch with a descriptive commit message such as 'chore: generate store-profile for {project_id}'. If using a local file write: write to the project directory and ensure the file is committed to Git separately.",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "git_note": "The store-profile.json must be committed to Git. This is the source-of-truth artifact for the project. n8n execution logs alone are not sufficient memory.",
+        "input": "validated store-profile object",
+        "output": "confirmation of write + artifact path"
+      },
+      {
+        "step": 10,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the artifact path and a reference to the validated store-profile.json to the master orchestrator for routing to downstream planning workflows.",
+        "input": "artifact_path + validated store-profile object",
+        "output": "workflow output payload"
+      }
+    ],
+
+    "assumptions": [
+      "store_id equals project_id. They are the same canonical identifier. No separate store_id is generated.",
+      "store_name is always sourced from Shopify (raw_shop_data.shop_name) and never from manual intake. If the Shopify shop name and the desired project display name differ, that divergence should be noted in the special_notes field.",
+      "platform is fixed as 'shopify' in this workflow. A future workflow for non-Shopify platforms would require a different import flow.",
+      "catalog_type is a derived heuristic based on active product count. It is a planning signal, not a hard business rule. Users should verify and override this value if the heuristic does not reflect their actual catalog strategy.",
+      "brand_maturity defaults to 'new' because there is no reliable way to determine brand age or recognition from Shopify data or the intake form in Phase 1. This default is safe and conservative.",
+      "operating_mode is always 'draft-first' or 'staging-first' for workflows triggered through the intake form. 'production-managed' is not reachable from the intake defaults and requires manual override.",
+      "The store-profile.json schema uses additionalProperties: false. This means the assembled object must contain only schema-defined fields. No extra fields from the intake or Shopify import should bleed through.",
+      "Both upstream workflows (intake-store-input and import-shopify-data) must complete successfully before this workflow begins. There is no partial execution fallback — if either upstream output is missing, this workflow halts."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should brand_maturity be added as an optional intake field in a future phase?",
+        "impact": "Currently defaults to 'new' without user input. Adding it to the intake form would improve accuracy for established brands.",
+        "recommended_default": "Add as an optional Group 3 field in the intake form in a future iteration. For Phase 1, the 'new' default is safe.",
+        "affects_doc": "docs/n8n-intake-spec.md (Group 3 — Store and Business Context)"
+      },
+      {
+        "question": "Should catalog_type be available as an optional override field in the intake form?",
+        "impact": "The heuristic derivation may be wrong for seasonal or mixed catalogs. Allowing the user to override it directly would be more reliable.",
+        "recommended_default": "Add as an optional override field in the intake form in a future iteration. For Phase 1, the heuristic is acceptable with a visible log note.",
+        "affects_doc": "docs/n8n-intake-spec.md"
+      },
+      {
+        "question": "What happens if import_summary.active_product_count is 0 (store has no active products)?",
+        "impact": "catalog_type derivation would have no valid result. This could happen for a brand new store.",
+        "recommended_default": "If active_product_count === 0, set catalog_type to 'small-curated-catalog' as a provisional default and log a warning. The user can override after products are added."
+      },
+      {
+        "question": "Should the GitHub write (step 9) commit directly to main or to a project-specific branch?",
+        "impact": "Writing directly to main may conflict with other in-progress work. A project-specific branch is safer.",
+        "recommended_default": "Write to a project-specific branch (e.g., projects/{project_id}/run-{timestamp}). The master orchestrator or a human reviewer merges to main after reviewing the generated artifacts."
+      },
+      {
+        "question": "Should the schema validation in step 8 use an inline schema copy or reference the live schemas/store-profile.schema.json from the repository?",
+        "impact": "Referencing the live schema file requires the n8n environment to have access to the Git repository or a deployed copy of the schema. Inline copy risks schema drift.",
+        "recommended_default": "Reference the live schema from the repository. If the n8n environment cannot access Git directly, include a schema sync step or use the GitHub node to fetch the schema file before validation."
+      }
+    ],
+
+    "runtime_dependencies": [
+      "n8n Execute Workflow Trigger node — receives subworkflow call from master orchestrator",
+      "n8n Code node (JavaScript) — for field mapping, derivation, and schema validation",
+      "n8n Set node — for applying fixed defaults (brand_maturity, platform)",
+      "n8n GitHub node OR Write File node — for persisting store-profile.json",
+      "ajv (Ajv JSON Schema Validator) — for schema validation inside Code node. May need to be bundled or imported within the n8n Code node execution context.",
+      "schemas/store-profile.schema.json — must be accessible to the validation step, either via repository access or inline copy",
+      "Both intake-store-input and import-shopify-data must complete successfully before this workflow runs"
+    ]
+  }
+}

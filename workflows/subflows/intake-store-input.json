@@ -1,0 +1,322 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, and node structure so that a future n8n implementation can be built safely. Do not treat this as a production workflow. Do not bypass schema validation or publish gates.",
+    "schema_reference": "schemas/project.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-intake-spec.md",
+      "workflows/mappings/input-to-artifacts.md",
+      "workflows/mappings/workflow-input-output-map.md"
+    ]
+  },
+  "workflow": {
+    "id": "intake-store-input",
+    "name": "intake-store-input",
+    "category": "intake",
+    "phase": "Phase 1 — Project Foundation",
+    "purpose": "Collect and normalize strategic user input from the n8n intake form. Validate required fields, apply defaults for optional fields, and produce a clean normalized intake payload that downstream workflows can safely consume. This is the entry point of the entire workflow chain.",
+
+    "inputs": {
+      "source": "n8n Form Trigger or Webhook Trigger (runtime decision — see open_questions)",
+      "required_fields": [
+        {
+          "field": "project_id",
+          "type": "text",
+          "rules": "lowercase, numbers, hyphens only — no spaces",
+          "example": "suppliedtech",
+          "validates_against": "schemas/project.schema.json#/properties/project_id"
+        },
+        {
+          "field": "project_name",
+          "type": "text",
+          "example": "SuppliedTech"
+        },
+        {
+          "field": "shopify_store_selector",
+          "type": "dropdown / store connection selector",
+          "note": "User selects the active Shopify store connection. Does not manually enter domain. This selector is runtime-only and must NOT be stored as a domain string in project artifacts."
+        },
+        {
+          "field": "primary_market",
+          "type": "dropdown",
+          "allowed_values": ["DE", "DACH", "EU", "US", "UK", "Global"],
+          "default": "DE"
+        },
+        {
+          "field": "primary_language",
+          "type": "dropdown",
+          "allowed_values": ["de", "en", "fr", "it", "es"],
+          "default": "de"
+        },
+        {
+          "field": "primary_currency",
+          "type": "dropdown",
+          "allowed_values": ["EUR", "USD", "GBP", "CHF"],
+          "default": "EUR"
+        },
+        {
+          "field": "vertical",
+          "type": "dropdown",
+          "allowed_values": [
+            "consumer-tech-accessories",
+            "fashion-textiles",
+            "pet-products",
+            "home-living",
+            "fitness-accessories",
+            "beauty",
+            "general-commerce",
+            "other"
+          ],
+          "default": "general-commerce"
+        },
+        {
+          "field": "price_positioning",
+          "type": "dropdown",
+          "allowed_values": ["budget", "mass-market", "mass-premium", "premium", "luxury", "to-be-defined"],
+          "default": "mass-premium",
+          "validates_against": "schemas/store-profile.schema.json#/properties/price_positioning"
+        },
+        {
+          "field": "manual_review_required",
+          "type": "boolean",
+          "default": true,
+          "note": "Governance control. Must default to true. Controls publish gating downstream."
+        },
+        {
+          "field": "publish_mode",
+          "type": "dropdown",
+          "allowed_values": ["no-publish", "draft-only", "draft-and-review"],
+          "default": "draft-only",
+          "note": "Governance control. Controls what the workflow is allowed to do downstream."
+        }
+      ],
+      "optional_fields": [
+        {
+          "field": "target_markets",
+          "type": "multi-select",
+          "allowed_values": ["DE", "AT", "CH", "DACH", "EU", "US", "UK", "Global"],
+          "default_fallback": "Falls back to [primary_market] if not provided"
+        },
+        {
+          "field": "languages",
+          "type": "multi-select",
+          "allowed_values": ["de", "en", "fr", "it", "es"],
+          "default_fallback": "Falls back to [primary_language] if not provided"
+        },
+        {
+          "field": "currencies",
+          "type": "multi-select",
+          "allowed_values": ["EUR", "USD", "GBP", "CHF"],
+          "default_fallback": "Falls back to [primary_currency] if not provided"
+        },
+        { "field": "store_type", "type": "dropdown", "allowed_values": ["single-brand-store", "multi-product-store", "category-specialist", "editorial-commerce-store", "general-commerce-store"], "default": "multi-product-store" },
+        { "field": "business_model", "type": "dropdown", "allowed_values": ["ecommerce", "dropshipping", "hybrid"], "default": "ecommerce" },
+        { "field": "brand_role", "type": "dropdown", "allowed_values": ["specialist", "curator", "problem-solver", "premium-innovator", "editorial-guide", "value-leader"], "default": "specialist" },
+        { "field": "tone_of_voice", "type": "dropdown", "allowed_values": ["clear-direct", "premium-confident", "warm-helpful", "editorial-smart", "playful-bold", "technical-trustworthy"], "default": "clear-direct" },
+        { "field": "trust_style", "type": "dropdown", "allowed_values": ["evidence-led", "social-proof-led", "authority-led", "guarantee-led", "mixed"], "default": "mixed" },
+        { "field": "conversion_style", "type": "dropdown", "allowed_values": ["subtle", "balanced", "assertive"], "default": "balanced" },
+        { "field": "objection_handling_style", "type": "dropdown", "allowed_values": ["minimal", "balanced", "detailed"], "default": "balanced" },
+        { "field": "competitor_urls", "type": "repeatable text list", "note": "Optional list of competitor URLs for later clustering" },
+        { "field": "desired_style_hints", "type": "multi-select", "allowed_values": ["minimal-modern", "premium-clean", "editorial-rich", "technical-structured", "playful-bold", "conversion-focused"] },
+        { "field": "forbidden_styles", "type": "multi-select", "allowed_values": ["too-generic-dropshipping", "too-dark-aggressive", "too-playful", "too-editorial", "too-luxury", "too-corporate", "too-cluttered", "too-minimal-empty"] },
+        { "field": "must_not_feel_like", "type": "long text" },
+        { "field": "must_feel_like", "type": "long text" },
+        { "field": "seo_goal", "type": "dropdown", "allowed_values": ["transactional-growth", "category-discovery", "brand-plus-category-growth", "knowledge-plus-commerce", "hybrid"], "default": "hybrid" },
+        { "field": "aeo_goal", "type": "dropdown", "allowed_values": ["product-understanding", "category-understanding", "comparison-readiness", "trust-and-reassurance", "hybrid"], "default": "hybrid" },
+        { "field": "faq_intensity", "type": "dropdown", "allowed_values": ["light", "balanced", "strong"], "default": "balanced" },
+        { "field": "knowledge_content_priority", "type": "dropdown", "allowed_values": ["none", "supporting", "balanced", "major"], "default": "supporting" },
+        { "field": "motion_level_preference", "type": "dropdown", "allowed_values": ["none", "subtle", "balanced", "strong", "cinematic"], "default": "subtle" },
+        { "field": "scroll_animation_preference", "type": "dropdown", "allowed_values": ["none", "light", "balanced", "strong"], "default": "light" },
+        { "field": "hero_video_allowed", "type": "boolean", "default": false },
+        { "field": "video_usage_preference", "type": "dropdown", "allowed_values": ["none", "supporting-only", "balanced", "hero-driven"], "default": "supporting-only" },
+        { "field": "performance_priority", "type": "dropdown", "allowed_values": ["maximum", "balanced", "experience-led"], "default": "balanced" },
+        { "field": "special_notes", "type": "long text" }
+      ],
+      "fields_that_must_not_be_in_this_form": [
+        "shop_domain — must be fetched from Shopify, not manually entered",
+        "shop_name — must be fetched from Shopify",
+        "product_titles — Shopify import",
+        "product_handles — Shopify import",
+        "product_descriptions — Shopify import",
+        "collections — Shopify import",
+        "variants — Shopify import",
+        "images — Shopify import",
+        "vendors — Shopify import",
+        "tags — Shopify import",
+        "existing_seo_fields — Shopify import"
+      ]
+    },
+
+    "outputs": {
+      "normalized_intake_payload": {
+        "description": "Validated, normalized version of all intake fields with defaults applied. Passed to import-shopify-data and build-store-profile.",
+        "structure": {
+          "project_id": "string (lowercase, hyphenated)",
+          "project_name": "string",
+          "shopify_store_selector": "runtime connection reference (not stored in artifacts)",
+          "primary_market": "string enum",
+          "target_markets": "string[] (min 1, falls back to [primary_market])",
+          "primary_language": "string enum",
+          "languages": "string[] (min 1, falls back to [primary_language])",
+          "primary_currency": "string enum",
+          "currencies": "string[] (min 1, falls back to [primary_currency])",
+          "vertical": "string enum",
+          "store_type": "string enum | null",
+          "business_model": "string enum",
+          "price_positioning": "string enum",
+          "brand_role": "string enum | null",
+          "tone_of_voice": "string enum | null",
+          "trust_style": "string enum | null",
+          "conversion_style": "string enum | null",
+          "objection_handling_style": "string enum | null",
+          "competitor_urls": "string[] | []",
+          "desired_style_hints": "string[] | []",
+          "forbidden_styles": "string[] | []",
+          "must_not_feel_like": "string | null",
+          "must_feel_like": "string | null",
+          "seo_goal": "string enum",
+          "aeo_goal": "string enum",
+          "faq_intensity": "string enum",
+          "knowledge_content_priority": "string enum",
+          "motion_level_preference": "string enum",
+          "scroll_animation_preference": "string enum",
+          "hero_video_allowed": "boolean",
+          "video_usage_preference": "string enum",
+          "performance_priority": "string enum",
+          "manual_review_required": "boolean",
+          "publish_mode": "string enum",
+          "special_notes": "string | null"
+        }
+      },
+      "project_setup_payload": {
+        "description": "Minimal subset passed to project creation logic (if project does not yet exist).",
+        "structure": {
+          "project_id": "string",
+          "project_name": "string"
+        }
+      }
+    },
+
+    "upstream_dependencies": [],
+
+    "downstream_consumers": [
+      {
+        "workflow": "import-shopify-data",
+        "receives": ["shopify_store_selector", "project_id"]
+      },
+      {
+        "workflow": "build-store-profile",
+        "receives": ["normalized_intake_payload"]
+      }
+    ],
+
+    "schema_alignment": {
+      "project.schema.json": {
+        "project_id": "maps directly — enforces lowercase hyphenated pattern",
+        "vertical": "maps directly",
+        "business_model": "maps directly",
+        "target_markets": "maps directly",
+        "languages": "maps directly",
+        "price_positioning": "maps directly"
+      },
+      "store-profile.schema.json": {
+        "primary_market": "maps directly",
+        "primary_language": "maps directly",
+        "primary_currency": "maps directly",
+        "vertical": "maps directly",
+        "price_positioning": "maps directly — enum constrained",
+        "store_type": "maps directly — enum constrained",
+        "business_model": "maps directly — enum constrained"
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Form Trigger or Webhook Trigger",
+        "description": "Entry point for the intake flow. In n8n, this is either a Form Trigger node (native n8n forms) that renders the intake form, or a Webhook Trigger that receives a structured POST payload from an external form. Runtime decision required — see open_questions.",
+        "output": "raw form submission payload"
+      },
+      {
+        "step": 2,
+        "name": "Validate Required Fields",
+        "type": "Code node (JavaScript)",
+        "description": "Check that all required fields are present and non-empty. Validate project_id against pattern ^[a-z0-9-]+$. Validate enum fields against their allowed value lists. If validation fails, throw an error with a clear message identifying the missing or invalid field. Do not proceed if required fields are missing.",
+        "input": "raw form submission payload",
+        "output": "validated raw payload or error"
+      },
+      {
+        "step": 3,
+        "name": "Apply Defaults for Optional Fields",
+        "type": "Code node (JavaScript)",
+        "description": "For each optional field that was not provided or is null/undefined, apply the documented default value. Apply array fallbacks: target_markets defaults to [primary_market], languages defaults to [primary_language], currencies defaults to [primary_currency]. Do not overwrite values that were explicitly set by the user.",
+        "input": "validated raw payload",
+        "output": "payload with defaults applied"
+      },
+      {
+        "step": 4,
+        "name": "Normalize Field Values",
+        "type": "Code node (JavaScript)",
+        "description": "Normalize text: trim whitespace from all string fields. Normalize project_id to lowercase. Ensure all array fields are arrays (not comma-separated strings). Normalize boolean fields to true/false. Sanitize special_notes, must_feel_like, must_not_feel_like to strip any unexpected markup.",
+        "input": "payload with defaults applied",
+        "output": "normalized_intake_payload"
+      },
+      {
+        "step": 5,
+        "name": "Extract Project Setup Payload",
+        "type": "Set node",
+        "description": "Extract the minimal project_setup_payload (project_id and project_name) as a separate output for project initialization logic.",
+        "input": "normalized_intake_payload",
+        "output": "project_setup_payload"
+      },
+      {
+        "step": 6,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass normalized_intake_payload and project_setup_payload to the next workflows: import-shopify-data (receives shopify_store_selector + project_id) and build-store-profile (receives full normalized_intake_payload). In n8n, this is accomplished via the subworkflow output or a direct workflow chaining mechanism.",
+        "input": "normalized_intake_payload + project_setup_payload",
+        "output": "workflow output payload"
+      }
+    ],
+
+    "assumptions": [
+      "The shopify_store_selector field identifies a specific Shopify credential connection already configured in n8n. It is not a manually-typed domain string.",
+      "The intake form enforces the required field minimum at the UI level but this workflow also re-validates server-side in step 2.",
+      "All enum field values are enforced by the allowed_values lists in this document and must match the schema enums in store-profile.schema.json and project.schema.json.",
+      "The workflow does not create the project folder on disk. Project folder creation is a separate bootstrap step handled outside this workflow or in a dedicated step.",
+      "manual_review_required defaults to true and should never default to false unless the user explicitly sets it.",
+      "publish_mode defaults to draft-only and must never default to a value that would allow uncontrolled production publishing.",
+      "competitor_urls are stored as-is and are not validated as reachable URLs at intake time. They are input for the competitor clustering phase only."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should the trigger be an n8n native Form Trigger node or a Webhook Trigger that receives a structured POST from an external form?",
+        "impact": "Determines the trigger node type and how the form UI is built. n8n Form Trigger is simpler for MVP but limits UI control.",
+        "recommended_default": "n8n Form Trigger for MVP. Switch to Webhook + external form when the UI needs advanced validation or custom styling."
+      },
+      {
+        "question": "Where should the normalized_intake_payload be persisted between workflow steps?",
+        "impact": "n8n can pass data between connected workflows via Execute Workflow Trigger, or the payload can be written to a temporary JSON file in the project path. The file-based approach aligns better with Git-first principles.",
+        "recommended_default": "Write normalized_intake_payload to projects/{project_id}/intake-payload.json as an intermediate artifact. This provides an audit trail and makes the intake visible in Git."
+      },
+      {
+        "question": "Should project folder creation happen inside this workflow or be a separate bootstrap step?",
+        "impact": "This workflow produces the project_id but does not currently create the folder structure.",
+        "recommended_default": "Keep intake and project creation separate. A dedicated bootstrap step or subworkflow handles folder creation from project_setup_payload."
+      }
+    ],
+
+    "runtime_dependencies": [
+      "n8n Form Trigger node or Webhook Trigger node (runtime choice)",
+      "n8n Code node (JavaScript) — available in all n8n versions",
+      "n8n Set node — available in all n8n versions",
+      "No external API credentials required at this stage",
+      "No Shopify connection used in this workflow — connection is selected but used in import-shopify-data"
+    ]
+  }
+}
