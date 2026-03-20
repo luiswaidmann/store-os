@@ -1,0 +1,672 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. Design system outputs are planning artifacts that require human review before they drive theme configuration, section layout, or asset generation decisions. Several design-system fields (color palette, typography choice) require explicit human input or brand asset review — these are flagged as HUMAN-REVIEW-REQUIRED below.",
+    "evidence_boundary_note": "This workflow produces a structured design direction artifact — not a finalized visual specification. Design style, typography personality, and color strategy are synthesized from brand positioning and pattern manifest signals, which are themselves LLM-synthesized artifacts. No actual brand assets, mood boards, or visual audits are available in this phase. The design system defines planning-level constraints and directions only. Any field that requires access to actual brand colors, real typography files, or visual brand guidelines must be flagged as a human-review placeholder.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/design-system.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+  "workflow": {
+    "id": "build-design-system",
+    "name": "build-design-system",
+    "category": "planning",
+    "phase": "Phase 3 — Experience Planning",
+    "purpose": "Synthesize a schema-validated design system artifact from brand positioning and pattern manifest inputs. The output defines planning-level visual, structural, motion, and media constraints that will govern how the store is built. Brand positioning acts as the primary hard constraint layer — brand_role, tone_of_voice, and trust_style determine the design direction. Pattern manifest direction fields constrain layout density, visual hierarchy, and media behavior. Intake motion and video preferences directly constrain motion and media strategy fields. Performance guardrails are derived from intake.performance_priority and intake media preferences. The design system must remain generic and planning-oriented — it defines rules and directions, not specific hex values, font files, or final theme configurations.",
+
+    "inputs": {
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "fields_used_as_hard_constraints": [
+          {
+            "field": "brand_role",
+            "treatment": "HARD CONSTRAINT — primary driver of design_style selection. Maps to design_style enum as follows: premium-innovator → premium-clean or minimal-modern; editorial-guide → editorial-rich or minimal-modern; specialist → technical-structured or premium-clean; problem-solver → conversion-focused or technical-structured; curator → editorial-rich or minimal-modern; value-leader → conversion-focused or minimal-modern.",
+            "note": "If multiple design_style values are compatible with the brand_role, the LLM selects the best fit based on tone_of_voice and price_positioning context."
+          },
+          {
+            "field": "tone_of_voice.style",
+            "treatment": "HARD CONSTRAINT — maps to typography_strategy.font_personality. editorial-smart → editorial-expressive; technical-trustworthy → technical-precise; clear-direct → neutral-modern or friendly-clear; premium-confident → premium-refined; warm-helpful → friendly-clear; playful-bold → editorial-expressive or friendly-clear.",
+            "note": "If tone_of_voice.style was user-provided in intake, this mapping is a hard constraint. If synthesized, it is still a strong signal."
+          },
+          {
+            "field": "trust_style.proof_mode",
+            "treatment": "HARD CONSTRAINT — drives trust_visibility field selection. evidence-led → proof_prominence = high, review_visibility = medium; social-proof-led → proof_prominence = high, review_visibility = high; authority-led → proof_prominence = high, guarantee_visibility = medium; guarantee-led → guarantee_visibility = high, proof_prominence = medium; mixed → all medium.",
+            "note": "Must be consistent with trust_direction.proof_style in pattern-manifest."
+          },
+          {
+            "field": "conversion_style.cta_style",
+            "treatment": "HARD CONSTRAINT — maps to component_style.button_style. subtle → minimal; balanced → clean-solid or premium-solid; assertive → high-contrast-cta.",
+            "note": "Must be consistent with pdp_direction.cta_prominence in pattern-manifest."
+          },
+          {
+            "field": "visual_positioning_hint",
+            "treatment": "SYNTHESIS HINT — orients design_style and color_strategy selection. Optional. If present, used to validate or refine the brand_role-driven design_style choice.",
+            "note": "Carry this hint into the LLM prompt but do not treat it as overriding brand_role."
+          },
+          {
+            "field": "media_style_hint",
+            "treatment": "SYNTHESIS HINT — orients media_strategy.image_intensity and motion_strategy.motion_level. Optional.",
+            "note": "Informs the LLM but does not override pattern_manifest.media_direction or intake motion preferences."
+          },
+          {
+            "field": "forbidden_impressions",
+            "treatment": "NEGATIVE CONSTRAINT — informs which design directions to avoid. e.g. if forbidden_impressions includes 'cheap', color_strategy must not use palette_complexity = minimal with weak contrast. If 'corporate' is forbidden, component_style must avoid sharp corners + strong shadows.",
+            "note": "The LLM must check each design decision against forbidden_impressions and flag any that risk creating the forbidden impression."
+          },
+          {
+            "field": "objection_handling_style",
+            "treatment": "CONTEXT — 'detailed' objection handling suggests higher trust_visibility and proof_prominence. 'minimal' suggests lighter trust elements.",
+            "note": "Secondary signal — trust_style.proof_mode is the primary trust constraint."
+          }
+        ],
+        "fields_used_as_synthesis_hints": [
+          {
+            "field": "price_positioning",
+            "treatment": "HINT (from store-profile, passed through brand-positioning context) — premium price → premium-clean or editorial-rich design_style; budget → conversion-focused or minimal-modern. Also influences color_strategy.contrast_level and spacing_strategy.",
+            "source_note": "price_positioning is in store-profile.json — consume from store_profile input rather than brand-positioning if the field is not duplicated."
+          },
+          {
+            "field": "differentiators",
+            "treatment": "HINT — used to validate that design style choices support the store's stated differentiators (e.g. if 'transparency' is a differentiator, open spacing and high readability should be preferred).",
+            "note": "Not a design constraint — a cross-check signal."
+          }
+        ]
+      },
+      "from_pattern_manifest": {
+        "source": "build-pattern-manifest → pattern-manifest.json",
+        "artifact_path": "projects/{project_id}/pattern-manifest.json",
+        "fields_used_as_structural_constraints": [
+          {
+            "field": "layout_direction.page_density",
+            "treatment": "STRUCTURAL CONSTRAINT — maps directly to layout_density. minimal → airy; balanced → balanced; information-rich → dense.",
+            "mapping": {
+              "minimal": "airy",
+              "balanced": "balanced",
+              "information-rich": "dense"
+            },
+            "schema_enum": ["airy", "balanced", "dense"]
+          },
+          {
+            "field": "layout_direction.visual_hierarchy",
+            "treatment": "STRUCTURAL CONSTRAINT — maps directly to visual_hierarchy in design-system. Values are identical across schemas.",
+            "schema_enum": ["clean-linear", "editorial-layered", "conversion-first"]
+          },
+          {
+            "field": "media_direction.media_intensity",
+            "treatment": "STRUCTURAL CONSTRAINT — maps to media_strategy.image_intensity. minimal → light; balanced → balanced; rich → rich.",
+            "mapping": {
+              "minimal": "light",
+              "balanced": "balanced",
+              "rich": "rich"
+            },
+            "schema_enum": ["light", "balanced", "rich"]
+          },
+          {
+            "field": "media_direction.video_usage",
+            "treatment": "STRUCTURAL CONSTRAINT — maps directly to media_strategy.video_usage. Same enum values across both schemas.",
+            "schema_enum": ["none", "supporting-only", "balanced", "hero-driven"]
+          },
+          {
+            "field": "media_direction.motion_usage",
+            "treatment": "STRUCTURAL CONSTRAINT — maps directly to motion_strategy.motion_level. Same enum values across both schemas.",
+            "schema_enum": ["none", "subtle", "moderate", "cinematic"]
+          },
+          {
+            "field": "trust_direction.trust_visibility",
+            "treatment": "STRUCTURAL CONSTRAINT — maps to trust_visibility fields. light → proof_prominence = low; moderate → medium; strong → high.",
+            "note": "Must align with trust_style.proof_mode constraint from brand-positioning."
+          },
+          {
+            "field": "forbidden_patterns",
+            "treatment": "NEGATIVE CONSTRAINT — informs component_style and motion_strategy. Any forbidden pattern that implies a design direction (e.g. 'flashy auto-play video', 'aggressive countdown timers', 'cluttered layout') must be reflected in the design system rules.",
+            "note": "LLM must scan forbidden_patterns for design implications and translate them into guardrail rules."
+          }
+        ]
+      },
+      "from_intake": {
+        "source": "intake-store-input → normalized_intake_payload",
+        "fields_used_as_direct_constraints": [
+          {
+            "field": "motion_level_preference",
+            "treatment": "DIRECT CONSTRAINT — maps directly to motion_strategy.motion_level. This is a ceiling: the design system must not exceed this value. If pattern_manifest.media_direction.motion_usage is higher than this value, intake wins and the lower value is used.",
+            "schema_enum": ["none", "subtle", "moderate", "cinematic"]
+          },
+          {
+            "field": "scroll_animation_preference",
+            "treatment": "DIRECT CONSTRAINT — maps directly to motion_strategy.scroll_animation_usage.",
+            "schema_enum": ["none", "light", "balanced", "strong"]
+          },
+          {
+            "field": "hero_video_allowed",
+            "treatment": "DIRECT CONSTRAINT — boolean. If false, media_strategy.video_usage cannot be hero-driven, and performance_guardrails.fallback_required_for_hero_media must be true.",
+            "note": "This field is a hard user decision. The design system must reflect it regardless of what pattern-manifest suggests."
+          },
+          {
+            "field": "video_usage_preference",
+            "treatment": "DIRECT CONSTRAINT — maps to media_strategy.video_usage as a ceiling. Intake value cannot be exceeded even if brand-positioning suggests richer video usage.",
+            "schema_enum": ["none", "supporting-only", "balanced", "hero-driven"]
+          },
+          {
+            "field": "performance_priority",
+            "treatment": "DIRECT CONSTRAINT — maps to motion_strategy.performance_priority and performance_guardrails.heavy_media_control. maximum → heavy_media_control = strict, performance_priority = maximum; balanced → heavy_media_control = balanced, performance_priority = balanced; experience-led → heavy_media_control = flexible, performance_priority = experience-led.",
+            "mapping": {
+              "maximum": { "motion_strategy.performance_priority": "maximum", "performance_guardrails.heavy_media_control": "strict" },
+              "balanced": { "motion_strategy.performance_priority": "balanced", "performance_guardrails.heavy_media_control": "balanced" },
+              "experience-led": { "motion_strategy.performance_priority": "experience-led", "performance_guardrails.heavy_media_control": "flexible" }
+            },
+            "note": "performance_priority is the most direct control the user has over the trade-off between visual richness and load speed."
+          }
+        ],
+        "fields_used_as_synthesis_hints": [
+          {
+            "field": "desired_style_hints",
+            "treatment": "HINT — secondary signal for design_style and color_strategy refinement. Must not override brand_role or trust_style constraints.",
+            "note": "Used to tiebreak between compatible design_style options."
+          },
+          {
+            "field": "must_feel_like",
+            "treatment": "HINT — positive aesthetic signal. Used to orient LLM design decisions within the allowed constraint space.",
+            "note": "Sanitize before including in prompt."
+          },
+          {
+            "field": "must_not_feel_like",
+            "treatment": "HINT — negative aesthetic signal. Supplements forbidden_impressions from brand-positioning in constraining design decisions.",
+            "note": "Sanitize before including in prompt."
+          }
+        ]
+      },
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "fields_used": [
+          "store_id",
+          "vertical",
+          "price_positioning",
+          "store_type",
+          "catalog_type",
+          "brand_maturity"
+        ],
+        "treatment": "CONTEXT — price_positioning and brand_maturity provide secondary signals for design_style and spacing decisions. vertical and store_type help validate that design choices fit the commerce context (e.g. a B2B specialist store has different spacing and typography needs than a DTC premium brand).",
+        "note": "store-profile does not override brand-positioning or pattern-manifest constraints."
+      }
+    },
+
+    "design_system_fields_requiring_human_review": {
+      "note": "The following fields produce planning-level directions only. They cannot be finalized without human input, brand assets, or further design process steps.",
+      "fields": [
+        {
+          "field": "color_strategy",
+          "reason": "Specific palette choices (colors, hex values, contrast ratios) require access to actual brand assets or brand guidelines. This workflow produces strategic direction (contrast_level, palette_complexity, accent_usage) — not actual color values.",
+          "action_required": "Human designer must translate these direction values into actual brand color tokens."
+        },
+        {
+          "field": "typography_strategy.font_personality",
+          "reason": "Font selection requires access to font files, brand guidelines, or explicit designer decisions. This workflow produces a font_personality direction — not an actual font name.",
+          "action_required": "Human designer must select a specific font that matches the font_personality direction within Shopify theme constraints."
+        },
+        {
+          "field": "component_style",
+          "reason": "Corner radius, shadow, button, and card style directions set constraints but require designer interpretation within actual theme component options.",
+          "action_required": "Human designer or theme configurator must map these directions to specific component settings."
+        }
+      ]
+    },
+
+    "outputs": {
+      "design_system": {
+        "description": "Validated design-system.json conforming to schemas/design-system.schema.json. Defines planning-level visual, structural, motion, and media directions. A constraint and direction artifact — not a final theme configuration or design specification.",
+        "artifact_path": "projects/{project_id}/design-system.json",
+        "schema": "schemas/design-system.schema.json",
+        "field_mapping": {
+          "design_style": {
+            "source": "Constrained by brand_role (hard constraint) + tone_of_voice.style + price_positioning (secondary)",
+            "type": "constrained enum",
+            "constraint_logic": "premium-innovator → premium-clean; editorial-guide → editorial-rich or minimal-modern; specialist → technical-structured; problem-solver → conversion-focused or technical-structured; curator → editorial-rich; value-leader → conversion-focused or minimal-modern",
+            "schema_enum": ["minimal-modern", "premium-clean", "editorial-rich", "technical-structured", "playful-bold", "conversion-focused"],
+            "note": "'playful-bold' is only valid if brand_role = curator or price_positioning = budget and tone_of_voice.style = playful-bold."
+          },
+          "layout_density": {
+            "source": "DIRECT mapping from pattern_manifest.layout_direction.page_density",
+            "type": "direct-mapped enum",
+            "mapping": { "minimal": "airy", "balanced": "balanced", "information-rich": "dense" },
+            "schema_enum": ["airy", "balanced", "dense"]
+          },
+          "visual_hierarchy": {
+            "source": "DIRECT mapping from pattern_manifest.layout_direction.visual_hierarchy",
+            "type": "direct-mapped enum",
+            "schema_enum": ["clean-linear", "editorial-layered", "conversion-first"]
+          },
+          "color_strategy": {
+            "contrast_level": {
+              "source": "LLM synthesis from design_style + price_positioning + forbidden_impressions",
+              "type": "LLM-selected enum",
+              "constraint_logic": "premium-clean + high-price → soft or balanced; conversion-focused → strong; editorial-rich → soft or balanced; technical-structured → balanced or strong. If forbidden_impressions includes 'harsh' or 'aggressive', prefer soft.",
+              "schema_enum": ["soft", "balanced", "strong"],
+              "human_review_note": "HUMAN REVIEW REQUIRED — actual color selection must be done by a designer."
+            },
+            "palette_complexity": {
+              "source": "LLM synthesis from design_style + brand_role",
+              "type": "LLM-selected enum",
+              "constraint_logic": "minimal-modern/premium-clean → minimal or balanced; editorial-rich → balanced or expanded; conversion-focused → balanced (too many colors dilutes CTA focus); technical-structured → minimal or balanced",
+              "schema_enum": ["minimal", "balanced", "expanded"],
+              "human_review_note": "HUMAN REVIEW REQUIRED — actual palette selection must be done by a designer."
+            },
+            "accent_usage": {
+              "source": "LLM synthesis from conversion_style.cta_style + design_style",
+              "type": "LLM-selected enum",
+              "constraint_logic": "assertive CTA → strong accent for CTAs; subtle CTA → subtle accent; balanced → balanced",
+              "schema_enum": ["subtle", "balanced", "strong"]
+            }
+          },
+          "typography_strategy": {
+            "font_personality": {
+              "source": "DIRECT mapping from brand_role + tone_of_voice.style",
+              "type": "constrained enum",
+              "mapping": {
+                "editorial-smart → editorial-expressive": true,
+                "technical-trustworthy → technical-precise": true,
+                "clear-direct → neutral-modern": true,
+                "premium-confident → premium-refined": true,
+                "warm-helpful → friendly-clear": true,
+                "playful-bold → editorial-expressive or friendly-clear": true
+              },
+              "schema_enum": ["neutral-modern", "premium-refined", "technical-precise", "editorial-expressive", "friendly-clear"],
+              "human_review_note": "HUMAN REVIEW REQUIRED — actual font selection must be done by a designer or theme configurator."
+            },
+            "heading_emphasis": {
+              "source": "LLM synthesis from design_style + brand_role",
+              "type": "LLM-selected enum",
+              "constraint_logic": "editorial-rich → strong; premium-clean → balanced or subtle; conversion-focused → strong; technical-structured → balanced; minimal-modern → subtle or balanced",
+              "schema_enum": ["subtle", "balanced", "strong"]
+            },
+            "readability_priority": {
+              "source": "LLM synthesis from design_style + performance_priority + audience_segments knowledge level",
+              "type": "LLM-selected enum",
+              "constraint_logic": "If performance_priority = maximum → maximum readability (avoids heavy decorative typography). If editorial-rich design_style → expressive. Otherwise balanced.",
+              "schema_enum": ["maximum", "balanced", "expressive"]
+            }
+          },
+          "component_style": {
+            "corner_style": {
+              "source": "LLM synthesis from design_style + price_positioning",
+              "type": "LLM-selected enum",
+              "constraint_logic": "premium-clean → slightly-rounded or rounded; technical-structured → sharp; editorial-rich → rounded or slightly-rounded; conversion-focused → sharp or slightly-rounded; minimal-modern → rounded or soft-rounded",
+              "schema_enum": ["sharp", "slightly-rounded", "rounded", "soft-rounded"],
+              "human_review_note": "HUMAN REVIEW REQUIRED — final component style must be validated against theme capabilities."
+            },
+            "shadow_style": {
+              "source": "LLM synthesis from design_style + layout_density",
+              "type": "LLM-selected enum",
+              "constraint_logic": "minimal-modern/airy → none or light; premium-clean/balanced → light or balanced; conversion-focused → balanced or pronounced; editorial-rich → light (shadows compete with imagery)",
+              "schema_enum": ["none", "light", "balanced", "pronounced"]
+            },
+            "button_style": {
+              "source": "DIRECT mapping from brand_positioning.conversion_style.cta_style",
+              "type": "direct-mapped enum",
+              "mapping": { "subtle": "minimal", "balanced": "clean-solid or premium-solid", "assertive": "high-contrast-cta" },
+              "schema_enum": ["minimal", "clean-solid", "premium-solid", "high-contrast-cta"],
+              "note": "If price_positioning is premium and cta_style is balanced, prefer premium-solid over clean-solid."
+            },
+            "card_style": {
+              "source": "LLM synthesis from design_style + layout_density + shadow_style",
+              "type": "LLM-selected enum",
+              "constraint_logic": "airy + premium-clean → soft-elevated; dense + conversion-focused → flat or outlined; editorial-rich → flat or soft-elevated; technical-structured → outlined",
+              "schema_enum": ["flat", "outlined", "soft-elevated", "strong-elevated"]
+            }
+          },
+          "spacing_strategy": {
+            "section_spacing": {
+              "source": "LLM synthesis from layout_density + brand_role + section_flow from pattern_manifest",
+              "type": "LLM-selected enum",
+              "constraint_logic": "airy → generous; balanced → balanced; dense → tight. story-led section_flow → generous. tight section_flow → tight.",
+              "schema_enum": ["tight", "balanced", "generous"]
+            },
+            "component_spacing": {
+              "source": "LLM synthesis from layout_density + design_style",
+              "type": "LLM-selected enum",
+              "schema_enum": ["tight", "balanced", "generous"]
+            },
+            "content_breathing_room": {
+              "source": "LLM synthesis from design_style + readability_priority",
+              "type": "LLM-selected enum",
+              "constraint_logic": "maximum readability → open; expressive readability → compact or balanced; balanced readability → balanced",
+              "schema_enum": ["compact", "balanced", "open"]
+            }
+          },
+          "trust_visibility": {
+            "proof_prominence": {
+              "source": "DIRECT mapping from pattern_manifest.trust_direction.trust_visibility + brand_positioning.trust_style.proof_mode",
+              "type": "constrained enum",
+              "constraint_logic": "trust_direction = strong AND proof_mode = social-proof-led or authority-led → high. trust_direction = light → low. Otherwise medium.",
+              "schema_enum": ["low", "medium", "high"]
+            },
+            "review_visibility": {
+              "source": "LLM synthesis from trust_style.proof_mode + trust_direction.trust_visibility",
+              "type": "LLM-selected enum",
+              "constraint_logic": "social-proof-led → high; authority-led or evidence-led → medium; guarantee-led → low or medium",
+              "schema_enum": ["low", "medium", "high"]
+            },
+            "guarantee_visibility": {
+              "source": "LLM synthesis from trust_style.proof_mode + price_positioning",
+              "type": "LLM-selected enum",
+              "constraint_logic": "guarantee-led or mixed → high; premium + evidence-led → medium; social-proof-led → low",
+              "schema_enum": ["low", "medium", "high"]
+            }
+          },
+          "media_strategy": {
+            "image_intensity": {
+              "source": "DIRECT mapping from pattern_manifest.media_direction.media_intensity",
+              "type": "direct-mapped enum",
+              "mapping": { "minimal": "light", "balanced": "balanced", "rich": "rich" },
+              "schema_enum": ["light", "balanced", "rich"]
+            },
+            "video_usage": {
+              "source": "DIRECT from intake.video_usage_preference (ceiling) AND intake.hero_video_allowed (hard constraint). Pattern manifest provides the base; intake constrains the ceiling.",
+              "type": "directly-constrained enum",
+              "constraint_logic": "If intake.hero_video_allowed = false AND pattern_manifest suggests hero-driven → downgrade to balanced or supporting-only. If intake.video_usage_preference is set, it acts as an absolute ceiling.",
+              "schema_enum": ["none", "supporting-only", "balanced", "hero-driven"]
+            },
+            "embed_usage": {
+              "source": "LLM synthesis from video_usage + brand_role + store_type",
+              "type": "LLM-selected enum",
+              "constraint_logic": "If video_usage = none → embed_usage = none. Otherwise inferred from content richness preference.",
+              "schema_enum": ["none", "limited", "balanced", "rich"]
+            },
+            "fallback_required": {
+              "source": "Boolean — true if intake.hero_video_allowed = false OR if media_strategy.video_usage is hero-driven (fallback always required for hero media) OR if performance_priority = maximum",
+              "type": "derived boolean",
+              "note": "Default to true unless performance_priority = experience-led AND hero_video_allowed = true."
+            }
+          },
+          "motion_strategy": {
+            "motion_level": {
+              "source": "DIRECT from intake.motion_level_preference (ceiling). Pattern manifest provides base recommendation; intake constrains to ceiling.",
+              "type": "directly-constrained enum",
+              "constraint_logic": "Take the lower of: pattern_manifest.media_direction.motion_usage vs intake.motion_level_preference. If intake is null, use pattern manifest value.",
+              "schema_enum": ["none", "subtle", "moderate", "cinematic"]
+            },
+            "scroll_animation_usage": {
+              "source": "DIRECT from intake.scroll_animation_preference if provided. Otherwise LLM synthesis from motion_level.",
+              "type": "direct-or-synthesized enum",
+              "constraint_logic": "scroll_animation_usage cannot exceed motion_level. If motion_level = none → scroll_animation_usage = none.",
+              "schema_enum": ["none", "light", "balanced", "strong"]
+            },
+            "interaction_animation_usage": {
+              "source": "LLM synthesis from motion_level + design_style",
+              "type": "LLM-selected enum",
+              "constraint_logic": "interaction_animation_usage cannot exceed motion_level. If motion_level = none → none. If motion_level = subtle → light. Moderate/cinematic → balanced or strong.",
+              "schema_enum": ["none", "light", "balanced", "strong"]
+            },
+            "performance_priority": {
+              "source": "DIRECT from intake.performance_priority",
+              "type": "direct-mapped enum",
+              "note": "If intake.performance_priority is null, LLM synthesizes from price_positioning (premium → balanced; value-leader → maximum).",
+              "schema_enum": ["maximum", "balanced", "experience-led"]
+            }
+          },
+          "performance_guardrails": {
+            "heavy_media_control": {
+              "source": "DIRECT mapping from intake.performance_priority",
+              "type": "direct-mapped enum",
+              "mapping": { "maximum": "strict", "balanced": "balanced", "experience-led": "flexible" },
+              "schema_enum": ["strict", "balanced", "flexible"]
+            },
+            "motion_limit_on_mobile": {
+              "source": "Boolean — true if motion_level is moderate or cinematic, OR if performance_priority = maximum or balanced. False only if motion_level = none or subtle AND performance_priority = experience-led.",
+              "type": "derived boolean",
+              "note": "Default to true. Exceptions require explicit LLM reasoning based on performance_priority = experience-led."
+            },
+            "fallback_required_for_hero_media": {
+              "source": "Boolean — true if media_strategy.video_usage = hero-driven OR intake.hero_video_allowed = false (must have fallback image for when video is unavailable). True if performance_priority = maximum.",
+              "type": "derived boolean",
+              "note": "Default to true unless no hero media is used."
+            }
+          },
+          "notes": {
+            "source": "workflow-generated synthesis metadata",
+            "type": "machine-generated",
+            "note": "Must include: synthesis timestamp, upstream artifact paths consumed, evidence boundary label, list of fields requiring human review (color_strategy, typography font selection, component_style), list of fields that were hard-constrained vs synthesized, and a human review prompt."
+          }
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-brand-positioning",
+        "provides": ["brand-positioning.json"],
+        "required": true,
+        "note": "Primary constraint source. brand_role, tone_of_voice, trust_style, conversion_style, and forbidden_impressions drive the majority of design-system field selections."
+      },
+      {
+        "workflow": "build-pattern-manifest",
+        "provides": ["pattern-manifest.json"],
+        "required": true,
+        "note": "Structural constraint source. layout_direction, media_direction, and trust_direction fields map directly to design-system fields. Must run after build-pattern-manifest completes."
+      },
+      {
+        "workflow": "build-store-profile",
+        "provides": ["store-profile.json"],
+        "required": true,
+        "note": "Provides price_positioning, vertical, brand_maturity, and catalog_type as secondary context signals."
+      },
+      {
+        "workflow": "intake-store-input",
+        "provides": ["normalized_intake_payload"],
+        "required": true,
+        "note": "motion_level_preference, scroll_animation_preference, hero_video_allowed, video_usage_preference, and performance_priority are direct user decisions that act as hard ceilings on motion and media fields."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-homepage-strategy",
+        "receives": ["design-system.json"],
+        "note": "Consumes media_strategy, motion_strategy, trust_visibility, and component_style to constrain homepage section media and motion decisions. Phase 3."
+      },
+      {
+        "workflow": "build-section-plan",
+        "receives": ["design-system.json"],
+        "note": "Out of scope for Phase 3. Documented for future reference."
+      },
+      {
+        "workflow": "build-media-plan",
+        "receives": ["design-system.json"],
+        "note": "Out of scope for Phase 3. Documented for future reference."
+      },
+      {
+        "workflow": "build-motion-media-strategy",
+        "receives": ["design-system.json"],
+        "note": "Out of scope for Phase 3. Documented for future reference."
+      }
+    ],
+
+    "schema_alignment": {
+      "design-system.schema.json": {
+        "required_fields_covered": [
+          "design_style",
+          "layout_density",
+          "visual_hierarchy",
+          "color_strategy",
+          "typography_strategy",
+          "component_style",
+          "spacing_strategy",
+          "trust_visibility",
+          "media_strategy",
+          "motion_strategy",
+          "performance_guardrails"
+        ],
+        "optional_fields_covered": [
+          "notes"
+        ],
+        "constraint_enforcement_note": "The workflow enforces intake motion and media preferences as ceilings on motion_strategy and media_strategy fields. If pattern-manifest values exceed intake ceilings, the intake value wins. This enforcement happens in the parse-and-enforce step.",
+        "validation_note": "The output must be validated against schemas/design-system.schema.json before persisting. All fields must use valid schema enum values. Boolean fields (fallback_required, motion_limit_on_mobile, fallback_required_for_hero_media) must be explicit boolean values — not null or undefined."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: brand_positioning (or path), pattern_manifest (or path), store_profile (or path), and normalized_intake_payload. All four upstream inputs must be present before this workflow begins.",
+        "input": "brand_positioning + pattern_manifest + store_profile + normalized_intake_payload",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present and structurally valid. brand_positioning must have: brand_role, tone_of_voice.style, trust_style.proof_mode, conversion_style.cta_style, forbidden_impressions (array). pattern_manifest must have: layout_direction (page_density, visual_hierarchy, section_flow), media_direction (media_intensity, motion_usage, video_usage), trust_direction (trust_visibility, proof_style). store_profile must have: store_id, price_positioning, brand_maturity. normalized_intake_payload must exist. Halt with a descriptive error if any required input is missing.",
+        "input": "all upstream inputs",
+        "output": "validated inputs or error"
+      },
+      {
+        "step": 3,
+        "name": "Extract Hard Constraint Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Extract all hard constraint and ceiling signals. Produce a constraint_signals object: (1) DESIGN STYLE CONSTRAINTS: brand_role → design_style candidates; tone_of_voice.style → font_personality; trust_style.proof_mode → trust_visibility fields; conversion_style.cta_style → button_style. (2) STRUCTURAL CONSTRAINTS from pattern_manifest: layout_direction.page_density → layout_density; layout_direction.visual_hierarchy → visual_hierarchy; media_direction fields → media_strategy fields; trust_direction.trust_visibility → proof_prominence. (3) INTAKE CEILINGS: motion_level_preference, scroll_animation_preference (direct ceilings), hero_video_allowed (boolean constraint), video_usage_preference (ceiling), performance_priority (maps to performance_guardrails). (4) NEGATIVE CONSTRAINTS: forbidden_impressions from brand_positioning + must_not_feel_like from intake (sanitized). Log all extracted constraints with source labels.",
+        "input": "validated brand_positioning + pattern_manifest + intake",
+        "output": "constraint_signals object with provenance annotations"
+      },
+      {
+        "step": 4,
+        "name": "Build LLM Design System Prompt",
+        "type": "Code node (JavaScript)",
+        "description": "Assemble the structured LLM prompt for design system synthesis. The prompt must: (1) Present all CONSTRAINT signals as non-negotiable — the LLM must respect them exactly. (2) Present all CEILING values — the LLM must not exceed them for motion or media fields. (3) Present forbidden_impressions and must_not_feel_like as NEGATIVE CONSTRAINTS — the LLM must check each design decision against these. (4) Provide the schema enum values for all fields explicitly. (5) Request output as valid JSON matching schemas/design-system.schema.json. (6) Instruct the model to flag any color_strategy, typography, or component_style field as HUMAN-REVIEW-REQUIRED in the notes field — these are planning directions, not final design choices. (7) Ask the model to resolve ambiguities by preferring the more conservative option (lower motion, lighter media) when intake preferences are unclear. (8) Remind the model that this is a planning artifact — it must not present design style choices as finalized brand identity.",
+        "input": "constraint_signals + synthesis hints (desired_style_hints, must_feel_like, visual_positioning_hint, media_style_hint) + store_profile context",
+        "output": "assembled LLM prompt string",
+        "prompt_safety_note": "Prompt must explicitly state: 'CONSTRAINT values are hard decisions. CEILING values are upper limits. Do not exceed ceilings for motion or media. Flag all color, typography, and component style selections as planning directions requiring human review. This is a planning artifact — not a finalized design specification.'"
+      },
+      {
+        "step": 5,
+        "name": "LLM Synthesis: Design System",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API. Request JSON output mode if supported. Temperature: 0.3. Max tokens: 2000.",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt",
+        "output": "raw LLM response string (expected to be JSON)"
+      },
+      {
+        "step": 6,
+        "name": "Parse and Enforce Hard Constraints and Ceilings",
+        "type": "Code node (JavaScript)",
+        "description": "Parse the raw LLM response as JSON. Then enforce constraints and ceilings: (1) STRUCTURAL CONSTRAINTS: Overwrite layout_density with pattern_manifest mapping. Overwrite visual_hierarchy from pattern_manifest. Overwrite media_strategy.image_intensity from pattern_manifest. (2) DIRECT OVERRIDES: Overwrite motion_strategy.performance_priority from intake.performance_priority. Overwrite performance_guardrails.heavy_media_control from intake.performance_priority mapping. (3) CEILING ENFORCEMENT: If motion_strategy.motion_level exceeds intake.motion_level_preference, lower it to match. If motion_strategy.scroll_animation_usage exceeds intake.scroll_animation_preference, lower it. If media_strategy.video_usage exceeds intake.video_usage_preference ceiling or violates intake.hero_video_allowed, downgrade it. (4) BOOLEAN DERIVATIONS: Set media_strategy.fallback_required, motion_strategy — wait, fallback_required is in media_strategy and performance_guardrails — derive both as documented. (5) DESIGN STYLE VALIDATION: Verify design_style is consistent with brand_role constraint — overwrite if inconsistent. (6) BUTTON STYLE: Overwrite component_style.button_style from conversion_style.cta_style mapping. (7) Inject synthesis metadata into notes field.",
+        "input": "raw LLM response + constraint_signals (for enforcement)",
+        "output": "parsed and constrained design_system object (pre-validation)"
+      },
+      {
+        "step": 7,
+        "name": "Validate Against Schema",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate the design_system object against schemas/design-system.schema.json using ajv. All required fields must be present with valid enum values. Boolean fields must be explicit booleans. Nested object structure must be complete (color_strategy requires contrast_level + palette_complexity + accent_usage, etc.). Halt on any validation failure and report the exact field and constraint violated.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/design-system.schema.json",
+        "failure_behavior": "Halt workflow. Report exact schema violation. Do not persist an invalid artifact.",
+        "input": "parsed and constrained design_system object",
+        "output": "validated design_system object or validation error"
+      },
+      {
+        "step": 8,
+        "name": "Persist design-system.json",
+        "type": "GitHub node or Write File node",
+        "description": "Write the validated design-system.json to the project artifacts path: projects/{project_id}/design-system.json. Commit with a message such as 'chore: generate design-system for {store_id} — Phase 3 draft'. This artifact is required by build-homepage-strategy.",
+        "artifact_path": "projects/{project_id}/design-system.json",
+        "git_note": "design-system.json must be committed to Git. It is the visual constraint contract for all downstream experience and content planning.",
+        "input": "validated design_system object",
+        "output": "confirmation of write + artifact path"
+      },
+      {
+        "step": 9,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the artifact path and a reference to the validated design_system object to the master orchestrator for downstream use by build-homepage-strategy.",
+        "input": "artifact_path + validated design_system object",
+        "output": "workflow output payload"
+      }
+    ],
+
+    "assumptions": [
+      "brand-positioning.json is the primary authority for design direction. Any design_style selection that conflicts with brand_role must be corrected in Step 6, even if the LLM produced a different result.",
+      "pattern-manifest.json is the secondary structural authority. layout_direction and media_direction fields map directly to design-system fields and are not overridable by LLM synthesis.",
+      "Intake motion and video preferences are hard ceilings — they represent explicit user decisions about experience trade-offs. The design system must never exceed them.",
+      "color_strategy, typography font selection, and component_style are planning directions, not final design specifications. The notes field must flag these explicitly for human review. A future workflow or human design step will translate these directions into actual brand tokens.",
+      "The design system does not produce theme configuration files, CSS variables, or Shopify theme settings. Those are implementation-layer concerns for later phases.",
+      "performance_guardrails are conservatively defaulted — motion_limit_on_mobile defaults to true and fallback_required_for_hero_media defaults to true unless performance_priority = experience-led and the user has explicitly enabled hero video.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "This workflow does not access any visual brand assets, font files, or design tools. All synthesis is from prior-phase planning artifacts."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should design-system.json include a 'human_review_required_fields' array as a top-level field to make it programmatically parseable downstream?",
+        "impact": "This would allow downstream workflows to skip or gate certain design-system fields until human input is provided.",
+        "recommended_default": "Not in Phase 3 — defer to a schema-roadmap extension. For now, include HUMAN-REVIEW-REQUIRED labels in the notes field as prose. A future schema version can formalize this."
+      },
+      {
+        "question": "What should happen when intake motion preferences conflict with brand_role? (e.g., intake.motion_level_preference = none but brand_role = editorial-guide which typically implies moderate motion)",
+        "impact": "Intake preference is a hard ceiling — editorial-guide brand cannot exceed none motion. This may produce an aesthetically weak design system.",
+        "recommended_default": "Intake wins. The design system must reflect motion_level = none. Add a note to the notes field: 'Motion level is constrained to none by intake preference. This conflicts with the editorial-guide brand direction — human review is recommended before finalizing.'"
+      },
+      {
+        "question": "Should the design system include explicit Shopify theme compatibility hints?",
+        "impact": "Some design directions (cinematic motion, strong embedded video) may not be achievable in standard Shopify themes without custom liquid or apps.",
+        "recommended_default": "Not in Phase 3 — Shopify theme compatibility validation is a later-phase concern. Flag as an open question in the notes field for human review."
+      }
+    ],
+
+    "evidence_boundaries": {
+      "direct_from_user": [
+        "motion_level_preference (ceiling for motion_strategy.motion_level)",
+        "scroll_animation_preference (direct for scroll_animation_usage)",
+        "hero_video_allowed (boolean constraint on video_usage)",
+        "video_usage_preference (ceiling for media_strategy.video_usage)",
+        "performance_priority (direct driver of performance_guardrails)",
+        "brand_role (if user-provided — drives design_style)",
+        "tone_of_voice.style (if user-provided — drives font_personality direction)",
+        "trust_style.proof_mode (if user-provided — drives trust_visibility)",
+        "conversion_style.cta_style (if user-provided — drives button_style)"
+      ],
+      "derived_from_synthesized_upstream_artifacts": [
+        "design_style (synthesized from brand_role + tone_of_voice, which may be LLM-synthesized)",
+        "color_strategy (fully synthesized — no actual brand assets available)",
+        "typography_strategy.font_personality (direction only — no actual font selected)",
+        "component_style (planning direction — not final theme configuration)",
+        "spacing_strategy (synthesized from layout_density + brand_role)",
+        "trust_visibility.review_visibility and guarantee_visibility (synthesized from trust_style + price_positioning)",
+        "motion_strategy.interaction_animation_usage (synthesized from motion_level + design_style)",
+        "media_strategy.embed_usage (synthesized from video_usage + brand_role)"
+      ],
+      "not_available_in_this_phase": [
+        "Actual brand color palette or hex values",
+        "Specific typography font files or names",
+        "Shopify theme component configuration specifics",
+        "Real user testing data on design choices",
+        "Visual accessibility audit",
+        "Competitor visual analysis from live sites"
+      ],
+      "labeling_requirement": "The notes field must include: 'DESIGN SYSTEM — SYNTHESIS ARTIFACT: This artifact is derived from brand positioning and pattern manifest planning artifacts, which are themselves LLM-synthesized. Fields marked HUMAN-REVIEW-REQUIRED (color_strategy, typography font selection, component_style) are planning directions — they require designer interpretation and actual brand asset access before implementation. All other fields are constrained by user intake preferences and brand-positioning decisions. This is not a final design specification.'"
+    },
+
+    "runtime_dependencies": [
+      "n8n Execute Workflow Trigger node — receives subworkflow call from master orchestrator",
+      "n8n Code node (JavaScript) — for input validation, constraint extraction, prompt building, response parsing, constraint enforcement, and schema validation",
+      "n8n OpenAI node OR HTTP Request node (OpenAI API) — for LLM design synthesis",
+      "n8n GitHub node OR Write File node — for persisting design-system.json",
+      "ajv (Ajv JSON Schema Validator) — for schema validation inside Code node",
+      "schemas/design-system.schema.json — must be accessible to the validation step",
+      "OpenAI API credential — stored in n8n, never in Git",
+      "build-brand-positioning, build-pattern-manifest, and build-store-profile must all complete successfully before this workflow runs"
+    ]
+  }
+}

@@ -217,6 +217,7 @@ Primary inputs:
 	•	market-intelligence.json
 	•	brand-positioning.json
 	•	competitor-cluster.json
+	•	store-profile.json
 
 Primary output:
 	•	pattern-manifest.json
@@ -239,6 +240,7 @@ Define visual, media, motion, and performance rules.
 Primary inputs:
 	•	brand-positioning.json
 	•	pattern-manifest.json
+	•	store-profile.json
 
 Primary output:
 	•	design-system.json
@@ -262,6 +264,7 @@ Define homepage role, hero logic, section flow, trust, and CTA logic.
 Primary inputs:
 	•	store-profile.json
 	•	market-intelligence.json
+	•	brand-positioning.json
 	•	pattern-manifest.json
 	•	design-system.json
 
