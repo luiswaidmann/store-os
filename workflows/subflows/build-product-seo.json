@@ -1,0 +1,575 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. Product SEO outputs are planning artifacts — not final SEO configurations, not published meta tags, and not finalized keyword strategies. All keyword decisions in this workflow are provisional. They are informed by available product data and upstream strategic context, but they are made without access to seo-strategy.json or aeo-strategy.json (workflows 11 and 12 in the chain). Those workflows are out of Phase 4 scope. Human review is required before any product-seo artifact influences live store metadata.",
+    "provisional_seo_note": "IMPORTANT — PROVISIONAL SEO DECISIONS: This workflow operates without the store-level seo-strategy.json and aeo-strategy.json artifacts. Those artifacts (workflows 11 and 12) are not yet built and are out of Phase 4 scope. As a result: (1) Primary and secondary keyword selections are provisional estimates based on product data and market intelligence — not validated keyword research. (2) Answer targets are planning seeds — not finalized AEO strategy decisions. (3) Internal linking targets are structural recommendations — not validated internal linking plans. All these fields are marked as PROVISIONAL-PENDING-SEO-STRATEGY in the output artifact notes. When seo-strategy.json and aeo-strategy.json are available in a later phase, a build-product-seo-revision workflow should be run to update these artifacts against the finalized store-level strategy.",
+    "keyword_safety_note": "This workflow must not present keyword selections as validated or research-backed. Keyword decisions here are educated planning estimates derived from product titles, descriptions, audience search intents from market intelligence, and brand context. They are planning hypotheses. They must be reviewed by a human with access to actual keyword research data before implementation. The workflow must not claim search volume certainty, ranking certainty, or competitive difficulty estimates it cannot support.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/product-seo.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+  "workflow": {
+    "id": "build-product-seo",
+    "name": "build-product-seo",
+    "category": "planning",
+    "phase": "Phase 4 — Commerce Content Planning",
+    "purpose": "Synthesize schema-validated product SEO planning artifacts for each product, drawing from the product content plan and imported Shopify product data. This workflow produces per-product SEO and AEO planning decisions: primary keyword, secondary keywords, search intent classification, SEO title, meta description, slug, entity clarity assessment, internal linking targets, and answer targets. Because seo-strategy.json and aeo-strategy.json (workflow steps 11 and 12) are not available in Phase 4, all keyword and AEO decisions are provisional estimates grounded in available product data, market intelligence search intents, and brand positioning context. All provisional decisions are explicitly labeled as PROVISIONAL-PENDING-SEO-STRATEGY. The output is a planning artifact that enables downstream content alignment and supports a future SEO strategy revision pass. No keyword certainty is claimed. No AEO strategy completeness is assumed.",
+
+    "phase_ordering_note": "In the full workflow chain, build-product-seo (step 14) is intended to receive seo-strategy.json (step 11) and aeo-strategy.json (step 12) as inputs. Phase 4 implements steps 10, 13, and 14 without steps 11 and 12. This workflow is designed to operate safely without those inputs through graceful degradation. The workflow accepts seo_strategy and aeo_strategy as OPTIONAL inputs. When absent, it uses available market intelligence search intents and brand positioning SEO/AEO hints as provisional substitutes, and marks all affected decisions as provisional.",
+
+    "inputs": {
+      "from_product_content": {
+        "source": "build-product-content → product-content.json (per product)",
+        "artifact_path": "projects/{project_id}/product-content/{product_handle}.json",
+        "data_treatment": "PRIMARY INPUT — product content plan is the main planning-layer input to SEO synthesis",
+        "fields_used": [
+          {
+            "field": "product_title",
+            "treatment": "HARD ANCHOR — the product_title from the content plan (which reflects the Shopify title) is the primary entity signal for SEO planning. The primary_keyword and seo_title must be consistent with the product_title.",
+            "note": "The product_title is operational truth (from Shopify). SEO planning builds around it — does not rename or reframe it for SEO without a clear documented reason."
+          },
+          {
+            "field": "primary_promise",
+            "treatment": "SYNTHESIS INPUT — the primary promise describes the product's core outcome. This orients search intent classification and helps determine whether the product addresses transactional, commercial, or informational queries.",
+            "note": "primary_promise is synthesized content — treat as a strategic direction, not operational truth."
+          },
+          {
+            "field": "benefit_bullets",
+            "treatment": "SYNTHESIS INPUT — benefit bullets provide keyword signal hints. Key noun phrases in benefit bullets may suggest secondary keyword candidates.",
+            "note": "These are planning-level content strings — not validated keyword research. Use as signal, not as direct keyword source."
+          },
+          {
+            "field": "use_cases",
+            "treatment": "SYNTHESIS INPUT — use cases describe customer application scenarios. These are valuable for search intent classification (informational vs transactional) and answer target question generation.",
+            "note": "Use cases are synthesized planning content — they orient SEO thinking without being verified."
+          },
+          {
+            "field": "faq_items",
+            "treatment": "SYNTHESIS INPUT — FAQ items from the content plan are planning seeds for answer_targets. question_type and answer_goal in answer_targets should be informed by the FAQ item topics.",
+            "note": "faq_items are planning seeds — they are not finalized FAQ content. Use as AEO directional signals."
+          },
+          {
+            "field": "objection_handling",
+            "treatment": "SYNTHESIS INPUT — objection topics reveal what questions buyers have before purchase. These are strong candidates for answer_targets with question_type = 'is-it-worth-it', 'why-is-it-better', or 'comparison'.",
+            "note": "Objection topics are derived from market intelligence — they represent real buyer concerns, making them valuable AEO signals."
+          },
+          {
+            "field": "cta_direction.primary_cta",
+            "treatment": "CONTEXT — CTA direction confirms the transactional intent of the product page. buy-now or add-to-cart CTA → transactional or commercial search intent. learn-more → informational or commercial.",
+            "note": "Cross-validates the search_intent classification."
+          },
+          {
+            "field": "notes",
+            "treatment": "CONTEXT — the content plan notes field may contain sparse data flags or review-required flags that affect SEO planning confidence.",
+            "note": "Sparse product data in the content plan should trigger conservative SEO planning in this workflow as well."
+          }
+        ]
+      },
+      "from_shopify_import": {
+        "source": "import-shopify-data → raw product dataset",
+        "artifact_path": "projects/{project_id}/shopify-import/products.json",
+        "data_treatment": "OPERATIONAL TRUTH SUPPLEMENT — Shopify product data provides the factual layer for slug generation, entity clarity assessment, and structured data targets",
+        "fields_used_per_product": [
+          {
+            "field": "handle",
+            "treatment": "OPERATIONAL TRUTH — the Shopify product handle is the canonical URL slug. slug in the product-seo artifact should default to the Shopify handle. It may be refined but must not conflict with the existing Shopify handle unless an explicit URL migration is planned.",
+            "note": "Do not change the Shopify handle without flagging it as a URL migration event. Default: slug = Shopify handle."
+          },
+          {
+            "field": "title",
+            "treatment": "OPERATIONAL TRUTH — product title is the primary entity signal for entity_clarity assessment.",
+            "note": "Consistent with product_title from product-content."
+          },
+          {
+            "field": "product_type",
+            "treatment": "OPERATIONAL TRUTH — product type provides entity clarity signal for product_type_clear assessment.",
+            "note": "If product_type is empty, product_type_clear defaults to false with a review flag."
+          },
+          {
+            "field": "vendor",
+            "treatment": "OPERATIONAL TRUTH — vendor provides the brand relation signal for brand_relation_clear assessment.",
+            "note": "If vendor is empty or unclear, brand_relation_clear defaults to false."
+          },
+          {
+            "field": "tags",
+            "treatment": "OPERATIONAL TRUTH — tags provide category and attribute signals that may support secondary keyword identification.",
+            "note": "Tags are optional — absence is handled gracefully."
+          }
+        ]
+      },
+      "from_market_intelligence": {
+        "source": "build-market-intelligence → market-intelligence.json",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "data_treatment": "PROVISIONAL SEO STRATEGY SUBSTITUTE — in the absence of seo-strategy.json and aeo-strategy.json, market intelligence search intents and content opportunities serve as the best available planning proxy for keyword direction",
+        "fields_used": [
+          {
+            "field": "search_intents",
+            "treatment": "PROVISIONAL KEYWORD DIRECTION — search_intents from market intelligence provide the closest available planning substitute for keyword research. intent_type (informational, commercial, transactional, comparison) and example_queries orient search_intent classification and secondary keyword identification.",
+            "provisional_note": "PROVISIONAL-PENDING-SEO-STRATEGY: These intents are market-level signals, not product-specific keyword research. They represent planning hypotheses until seo-strategy.json is available.",
+            "note": "example_queries in search_intents may provide secondary keyword candidates — treat as planning signals, not validated keywords."
+          },
+          {
+            "field": "content_opportunities",
+            "treatment": "PROVISIONAL AEO DIRECTION — content_opportunities from market intelligence suggest what questions and topics the target audience is researching. These orient answer_targets question generation.",
+            "provisional_note": "PROVISIONAL-PENDING-AEO-STRATEGY: Content opportunities are market-level planning signals, not finalized AEO strategy.",
+            "note": "Use content_opportunities to orient answer_targets question_type and answer_goal selections."
+          },
+          {
+            "field": "audience_segments",
+            "treatment": "CONTEXT — audience segment descriptions help classify whether the product targets buyers at different stages of search intent (early informational search vs late transactional search).",
+            "note": "Used to orient search_intent classification per product."
+          },
+          {
+            "field": "seo_opportunities",
+            "treatment": "PROVISIONAL KEYWORD DIRECTION — if seo_opportunities field is present in market intelligence, use it as a directional hint for primary and secondary keyword selection.",
+            "note": "Not all market intelligence artifacts will have this field — handle gracefully."
+          }
+        ]
+      },
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "fields_used_as_seo_hints": [
+          {
+            "field": "seo_tone_hint",
+            "treatment": "HINT — if seo_tone_hint is present in brand-positioning, use it to orient seo_title and meta_description copy tone. Optional field.",
+            "note": "Not a structural constraint on keyword selection — a style hint for copy fields."
+          },
+          {
+            "field": "aeo_tone_hint",
+            "treatment": "HINT — if aeo_tone_hint is present, it orients the phrasing of answer_goals in answer_targets.",
+            "note": "Optional field — graceful absence handling required."
+          },
+          {
+            "field": "value_proposition",
+            "treatment": "HINT — value proposition provides the core differentiating angle that should be present in the meta_description. The meta_description should differentiate the product within its category.",
+            "note": "This is a style hint, not a keyword constraint."
+          },
+          {
+            "field": "brand_role",
+            "treatment": "CONTEXT — brand_role provides framing for entity_clarity. A specialist brand → product_type and use_case clarity are more important. A curator → brand_relation and collection context matter more.",
+            "note": "Secondary framing signal for entity_clarity assessment."
+          }
+        ]
+      },
+      "from_seo_strategy": {
+        "source": "build-seo-strategy → seo-strategy.json (OPTIONAL — NOT AVAILABLE IN PHASE 4)",
+        "artifact_path": "projects/{project_id}/seo-strategy.json",
+        "availability": "NOT AVAILABLE IN PHASE 4 — build-seo-strategy (workflow 11) is out of Phase 4 scope",
+        "treatment_when_absent": "All keyword decisions and search_intent classification operate in provisional mode. Primary and secondary keywords are estimated from available signals. All keyword fields in output are marked PROVISIONAL-PENDING-SEO-STRATEGY.",
+        "treatment_when_present": "If seo-strategy.json is passed as an optional input (from a future run after workflow 11 is built), use it to constrain primary_keyword selection to the store's approved keyword taxonomy, validate search_intent classification against the store's declared intent strategy, and align content_depth with the store's overall content depth strategy.",
+        "fields_that_would_be_used": [
+          "keyword_taxonomy (would constrain primary_keyword and secondary_keywords)",
+          "content_depth_strategy (would constrain content_depth field)",
+          "internal_linking_strategy (would inform internal_linking_targets)"
+        ]
+      },
+      "from_aeo_strategy": {
+        "source": "build-aeo-strategy → aeo-strategy.json (OPTIONAL — NOT AVAILABLE IN PHASE 4)",
+        "artifact_path": "projects/{project_id}/aeo-strategy.json",
+        "availability": "NOT AVAILABLE IN PHASE 4 — build-aeo-strategy (workflow 12) is out of Phase 4 scope",
+        "treatment_when_absent": "All answer_targets are planning seeds derived from product content and market intelligence signals. They are not aligned to a finalized AEO strategy. All answer_target fields are marked PROVISIONAL-PENDING-AEO-STRATEGY.",
+        "treatment_when_present": "If aeo-strategy.json is passed as an optional input, use it to align question_types with the store's declared AEO question taxonomy and to validate answer_goals against the store's structured answer strategy.",
+        "fields_that_would_be_used": [
+          "question_taxonomy (would constrain answer_target question_type selection)",
+          "answer_format_strategy (would constrain answer_goal framing)",
+          "structured_data_priority (would confirm structured_data_targets selections)"
+        ]
+      }
+    },
+
+    "outputs": {
+      "product_seo_set": {
+        "description": "A set of product-seo.json artifacts, one per imported Shopify product (corresponding to each product-content.json). Each artifact conforms to schemas/product-seo.schema.json. These are provisional planning artifacts — not final SEO configurations. Primary and secondary keyword selections, answer targets, and internal linking targets are all provisional pending seo-strategy.json and aeo-strategy.json availability.",
+        "artifact_path": "projects/{project_id}/product-seo/{product_handle}.json",
+        "schema": "schemas/product-seo.schema.json",
+        "field_mapping": {
+          "primary_keyword": {
+            "source": "PROVISIONAL LLM synthesis from product_title + product_type + top search_intent example_query + market intelligence seo_opportunities",
+            "type": "provisional LLM-synthesized string",
+            "constraint": "Must be a realistic, natural-language keyword phrase. Must be derivable from available product data and market signals. Must not be invented without signal basis.",
+            "provisional_flag": "PROVISIONAL-PENDING-SEO-STRATEGY",
+            "note": "In most cases, the primary_keyword will be close to the product_title or a slightly expanded/refined form of it (e.g. product type + key attribute). Without keyword research, this is a planning estimate."
+          },
+          "secondary_keywords": {
+            "source": "PROVISIONAL LLM synthesis from benefit_bullets, use_cases, tags, search_intents example_queries, and product variants",
+            "type": "provisional LLM-synthesized array (minItems: 1)",
+            "constraint": "Must be plausible secondary search terms for this product. Must not include branded competitor names without justification. Must not fabricate keyword difficulty or volume estimates.",
+            "provisional_flag": "PROVISIONAL-PENDING-SEO-STRATEGY",
+            "note": "Secondary keywords are planning-level candidates — not validated search volume terms. 3-6 secondary keywords is a reasonable planning target."
+          },
+          "search_intent": {
+            "source": "PROVISIONAL derivation from cta_direction.primary_cta + product type + primary_promise + market_intelligence.search_intents",
+            "type": "provisional constrained enum",
+            "constraint_logic": "buy-now/add-to-cart CTA + in-stock product → transactional; learn-more CTA + explanation-heavy primary_promise → informational or commercial; choose-variant CTA + comparison language → commercial or comparison; complex high-consideration product with research phase → hybrid. Check against market search_intents for consistency.",
+            "schema_enum": ["informational", "commercial", "transactional", "comparison", "hybrid"],
+            "provisional_flag": "PROVISIONAL-PENDING-SEO-STRATEGY"
+          },
+          "seo_title": {
+            "source": "LLM synthesis — a search-engine-optimized title string conforming to schema maxLength: 70 characters. Must include primary_keyword naturally. Should include a key differentiating modifier or benefit where space allows.",
+            "type": "LLM-synthesized string — constrained by maxLength: 70",
+            "constraint": "Must include primary_keyword. Must not exceed 70 characters. Must reflect the actual product. Must be plausible for the brand's tone context.",
+            "format_guidance": "Recommended patterns: '[Product Title] — [Key Benefit/Differentiator]' OR '[Product Title] | [Brand Name]' OR '[Category] [Product Name] [Key Attribute]'. Avoid keyword stuffing.",
+            "note": "seo_title is a planning proposal — it requires human review and keyword research validation before implementation."
+          },
+          "meta_description": {
+            "source": "LLM synthesis — a compelling meta description conforming to schema maxLength: 180 characters. Should include primary_keyword, a key benefit from primary_promise, and an implicit or explicit CTA consistent with cta_direction.",
+            "type": "LLM-synthesized string — constrained by maxLength: 180",
+            "constraint": "Must not exceed 180 characters. Must be factually honest — no unsupported claims. Must reflect cta_tone from product-content. Should not be a copy of product_subtitle or short_description.",
+            "note": "meta_description is a planning proposal — not final production copy. Requires human review."
+          },
+          "slug": {
+            "source": "DEFAULT: direct from Shopify product handle. If Shopify handle is missing or invalid, generate from product_title (lowercase, hyphenated, stripped of special characters).",
+            "type": "operational truth default — only derived if Shopify handle is missing",
+            "constraint": "Must conform to pattern ^[a-z0-9-]+$. Must not conflict with existing Shopify handle without a URL migration flag.",
+            "slug_change_safety_note": "If the generated slug differs from the Shopify handle, add a note: 'SLUG-MIGRATION-REVIEW: Proposed slug differs from current Shopify handle. URL migration planning required before implementation.'"
+          },
+          "entity_clarity": {
+            "product_type_clear": {
+              "source": "Derived from Shopify product_type field availability and clarity",
+              "type": "derived boolean",
+              "logic": "true if Shopify product_type is non-empty AND clearly identifies the product category. false if product_type is empty or ambiguous."
+            },
+            "core_use_case_clear": {
+              "source": "Derived from use_cases availability in product-content AND primary_promise clarity",
+              "type": "derived boolean",
+              "logic": "true if product-content use_cases is non-empty AND primary_promise is not a PLACEHOLDER string. false if use_cases is empty or primary_promise is PLACEHOLDER-REQUIRES-REVIEW."
+            },
+            "brand_relation_clear": {
+              "source": "Derived from Shopify vendor field availability and brand positioning consistency",
+              "type": "derived boolean",
+              "logic": "true if Shopify vendor is non-empty AND is consistent with store identity from store-profile. false if vendor is empty."
+            }
+          },
+          "internal_linking_targets": {
+            "source": "PROVISIONAL LLM synthesis from product type + use_cases + homepage_strategy section types (if available) + Shopify collection membership",
+            "type": "provisional LLM-synthesized array (minItems: 1)",
+            "constraint": "Each target must have target_type (from schema enum) and target_reason (non-empty string). Must not invent specific page URLs — target_type and reason are structural planning decisions.",
+            "provisional_flag": "PROVISIONAL-PENDING-SEO-STRATEGY: Internal linking targets will be refined when the full internal linking strategy is available (workflow 23).",
+            "per_target_logic": {
+              "collection": "Recommend if product belongs to an identifiable Shopify collection or product type category",
+              "related-product": "Recommend if product has obvious related products in the Shopify catalog (same collection, complementary type)",
+              "guide-page": "Recommend if product complexity suggests a supporting how-to or guide page would be beneficial",
+              "faq-page": "Recommend for complex or high-consideration products where FAQ pages are likely",
+              "homepage": "Always recommend with reason: 'brand authority and homepage trust flow'",
+              "blog-article": "Recommend if product use_cases suggest editorial content opportunities"
+            },
+            "schema_enum": ["collection", "related-product", "guide-page", "faq-page", "homepage", "blog-article"]
+          },
+          "answer_targets": {
+            "source": "PROVISIONAL LLM synthesis from faq_items (content plan), objection_handling topics, use_cases, and market_intelligence.content_opportunities",
+            "type": "provisional LLM-synthesized array (minItems: 1)",
+            "constraint": "Each target must have question_type (from schema enum) and answer_goal (non-empty string). answer_goal describes what the answer should accomplish — not the verbatim answer text.",
+            "provisional_flag": "PROVISIONAL-PENDING-AEO-STRATEGY: Answer targets will be refined and expanded when aeo-strategy.json is available (workflow 12).",
+            "question_type_mapping_guidance": {
+              "what-is-it": "For products where product_type_clear = false or where educational context is needed",
+              "who-is-it-for": "Oriented by audience_segments — most products should have at least one",
+              "why-is-it-better": "Oriented by differentiators and objection_handling — for competitive markets",
+              "how-does-it-work": "For products with mechanism of action or process (especially health, tech, tool products)",
+              "is-it-worth-it": "For high-consideration or higher-priced products — oriented by price_positioning",
+              "comparison": "For products in competitive categories where comparison queries are common in market search_intents",
+              "compatibility": "For products where fit, size, or system compatibility are relevant",
+              "care": "For products where care_instructions in content plan are present",
+              "shipping": "For all products — a safe universal answer target",
+              "returns": "For all products — especially relevant for guarantee-led trust_style"
+            },
+            "schema_enum": ["what-is-it", "who-is-it-for", "why-is-it-better", "how-does-it-work", "is-it-worth-it", "comparison", "compatibility", "care", "shipping", "returns"]
+          },
+          "structured_data_targets": {
+            "source": "Derived from schema availability and product complexity",
+            "type": "derived array — conservative defaults",
+            "default_logic": "'product' is always included (all products have Product schema). 'review' is included only if the store has or plans to have review data. 'faq' is included if faq_items in product-content is non-empty and non-placeholder. 'breadcrumb' is always included (standard navigation schema). 'offer' is included if pricing data is available in Shopify (almost always true).",
+            "note": "structured_data_targets is optional in the schema. The detailed structured data plan is out of Phase 4 scope (build-product-structured-data is workflow 16).",
+            "schema_enum": ["product", "faq", "review", "breadcrumb", "offer"]
+          },
+          "canonical_strategy": {
+            "source": "Derived from Shopify variant structure",
+            "type": "derived enum — constrained by product variant count",
+            "constraint_logic": "Single variant → self-canonical; Multiple variants with URL-generating option values (e.g. ?variant=) → variant-aware; Standard Shopify setup without custom variant URL handling → platform-default",
+            "schema_enum": ["self-canonical", "variant-aware", "platform-default"],
+            "note": "Default to platform-default unless Shopify variant structure clearly indicates variant-aware is needed."
+          },
+          "content_depth": {
+            "source": "Derived from product content richness + market search intent complexity + product price_positioning",
+            "type": "derived enum",
+            "constraint_logic": "sparse product data → light; standard product data + commercial/transactional intent → balanced; rich product data + high-consideration product + informational/comparison intent → deep. Cannot exceed store-level content_depth strategy when seo-strategy is available.",
+            "schema_enum": ["light", "balanced", "deep"]
+          },
+          "notes": {
+            "source": "Workflow-generated synthesis metadata per product",
+            "type": "machine-generated string",
+            "note": "Must include: synthesis timestamp, Shopify product handle and ID, PROVISIONAL-PENDING-SEO-STRATEGY flag for all keyword fields, PROVISIONAL-PENDING-AEO-STRATEGY flag for all answer target fields, list of inputs used (product-content path, Shopify data fields used), evidence boundary label, instruction to re-run or revise when seo-strategy.json and aeo-strategy.json are available."
+          }
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-product-content",
+        "provides": ["product-content.json per product"],
+        "required": true,
+        "note": "Primary planning-layer input. product_title, primary_promise, benefit_bullets, use_cases, faq_items, objection_handling, and cta_direction are all consumed here. build-product-seo cannot run before build-product-content completes."
+      },
+      {
+        "workflow": "import-shopify-data",
+        "provides": ["raw product dataset"],
+        "required": true,
+        "note": "Provides Shopify handle (for slug), product_type (for entity clarity), vendor (for entity clarity), and tags (for secondary keyword signals)."
+      },
+      {
+        "workflow": "build-market-intelligence",
+        "provides": ["market-intelligence.json"],
+        "required": true,
+        "note": "Provides search_intents and content_opportunities as provisional SEO and AEO direction substitutes in the absence of seo-strategy.json and aeo-strategy.json."
+      },
+      {
+        "workflow": "build-brand-positioning",
+        "provides": ["brand-positioning.json"],
+        "required": true,
+        "note": "Provides seo_tone_hint, aeo_tone_hint, and value_proposition as SEO copy style hints. brand_role provides entity clarity framing context."
+      },
+      {
+        "workflow": "build-seo-strategy",
+        "provides": ["seo-strategy.json"],
+        "required": false,
+        "note": "OPTIONAL — NOT AVAILABLE IN PHASE 4. build-seo-strategy (workflow 11) is out of Phase 4 scope. When available in a later phase, its keyword taxonomy and content depth strategy should be used to revise provisional keyword decisions in this artifact."
+      },
+      {
+        "workflow": "build-aeo-strategy",
+        "provides": ["aeo-strategy.json"],
+        "required": false,
+        "note": "OPTIONAL — NOT AVAILABLE IN PHASE 4. build-aeo-strategy (workflow 12) is out of Phase 4 scope. When available in a later phase, its question taxonomy and answer format strategy should be used to revise provisional answer target decisions in this artifact."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-product-structured-data",
+        "receives": ["product-seo.json"],
+        "note": "Out of Phase 4 scope (workflow 16). Consumes structured_data_targets, canonical_strategy, and entity_clarity for product structured data planning."
+      },
+      {
+        "workflow": "run-validation",
+        "receives": ["product-seo.json"],
+        "note": "Out of Phase 4 scope (workflow 28). Validates product-seo artifacts against schema and store-level strategy alignment."
+      }
+    ],
+
+    "schema_alignment": {
+      "product-seo.schema.json": {
+        "required_fields_covered": [
+          "primary_keyword",
+          "secondary_keywords",
+          "search_intent",
+          "seo_title",
+          "meta_description",
+          "slug",
+          "entity_clarity",
+          "internal_linking_targets",
+          "answer_targets"
+        ],
+        "optional_fields_covered": [
+          "structured_data_targets",
+          "canonical_strategy",
+          "content_depth",
+          "notes"
+        ],
+        "secondary_keywords_note": "Schema requires minItems: 1. At least one secondary keyword must be produced per product. 3-6 secondary keywords is the planning target.",
+        "seo_title_note": "Schema maxLength: 70 — the LLM must respect this hard character limit. Validation must check character count, not just presence.",
+        "meta_description_note": "Schema maxLength: 180 — the LLM must respect this hard character limit. Validation must check character count.",
+        "slug_note": "Schema pattern: ^[a-z0-9-]+$. Slug must match this pattern. Default from Shopify handle. If Shopify handle contains special characters not matching the pattern, clean it before persisting.",
+        "entity_clarity_note": "entity_clarity is a required object with three required boolean fields: product_type_clear, core_use_case_clear, brand_relation_clear. All three must be present.",
+        "internal_linking_targets_note": "Schema requires minItems: 1. At least one internal linking target must be produced per product. target_type must be from the enum; target_reason must be non-empty.",
+        "answer_targets_note": "Schema requires minItems: 1. At least one answer target must be produced per product. question_type must be from the enum; answer_goal must be non-empty.",
+        "validation_note": "Each product-seo object must be validated against schemas/product-seo.schema.json using ajv. seo_title and meta_description must be validated for maxLength. slug must be validated against the pattern. All required sub-object fields must be present."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: product_content_paths (list of product-content artifact paths or objects), shopify_products (array), market_intelligence, brand_positioning. Optional: seo_strategy, aeo_strategy. All required inputs must be present before this workflow begins.",
+        "input": "product_content_paths + shopify_products + market_intelligence + brand_positioning + optional seo_strategy + optional aeo_strategy",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present. product_content list must be non-empty (at least one product-content artifact). shopify_products must be non-empty array. market_intelligence must have search_intents (non-empty array). brand_positioning must have value_proposition. Check whether seo_strategy and aeo_strategy are present — log their availability status. If seo_strategy is absent, set provisional_mode.seo = true. If aeo_strategy is absent, set provisional_mode.aeo = true. Log the provisional mode status prominently — it will be propagated to all output artifact notes.",
+        "input": "all inputs",
+        "output": "validated inputs + provisional_mode flags or halt error"
+      },
+      {
+        "step": 3,
+        "name": "Extract SEO Planning Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Extract and prepare planning signals for SEO synthesis. Produce a seo_signals object: (1) SEARCH INTENT SIGNALS: search_intents from market_intelligence — extract intent_type and example_queries as planning proxies. (2) CONTENT OPPORTUNITY SIGNALS: content_opportunities from market_intelligence — extract as AEO answer target orientation. (3) SEO COPY TONE: seo_tone_hint from brand_positioning (optional) — use as meta copy tone guide. (4) AEO COPY TONE: aeo_tone_hint from brand_positioning (optional) — use as answer goal tone guide. (5) BRAND VALUE ANGLE: value_proposition — for meta_description differentiation framing. (6) PROVISIONAL MODE FLAGS: seo = true/false, aeo = true/false — must be injected into all prompts and output notes. If seo_strategy is present: extract keyword_taxonomy, content_depth_strategy. If aeo_strategy is present: extract question_taxonomy, answer_format_strategy.",
+        "input": "validated market_intelligence + brand_positioning + optional seo_strategy + optional aeo_strategy + provisional_mode flags",
+        "output": "seo_signals object with provisional mode flags"
+      },
+      {
+        "step": 4,
+        "name": "Load Product Content and Shopify Data (per product)",
+        "type": "Code node (JavaScript)",
+        "description": "For each product in the product_content list, load the corresponding Shopify product data from shopify_products by matching product_handle or product ID. Produce a merged per-product input object containing: product_content fields (all fields from the product-content artifact) + shopify_fields (handle, product_type, vendor, tags, variant count). If Shopify data cannot be matched for a product-content artifact, flag that product as SHOPIFY-MATCH-REQUIRED and continue processing others.",
+        "input": "product_content list + shopify_products array",
+        "output": "merged per-product input objects array"
+      },
+      {
+        "step": 5,
+        "name": "Build LLM Product SEO Prompt (per product)",
+        "type": "Code node (JavaScript)",
+        "description": "For each product, assemble a structured LLM prompt for product SEO planning. The prompt must: (1) Present the product-content fields (product_title, primary_promise, benefit_bullets, use_cases, faq_items, objection_handling) as the content planning context. (2) Present Shopify product facts (title, handle, product_type, vendor, tags) as operational truth. (3) Present seo_signals as the planning orientation layer. (4) Include PROVISIONAL MODE notice if provisional_mode.seo = true: 'SEO STRATEGY IS NOT AVAILABLE. All keyword decisions are provisional estimates. Mark primary_keyword and secondary_keywords as PROVISIONAL-PENDING-SEO-STRATEGY in the notes field.' (5) Include PROVISIONAL AEO notice if provisional_mode.aeo = true: 'AEO STRATEGY IS NOT AVAILABLE. All answer_targets are provisional seeds. Mark them as PROVISIONAL-PENDING-AEO-STRATEGY in the notes field.' (6) Request output as valid JSON conforming to schemas/product-seo.schema.json. (7) Include schema enum values for all enum fields. (8) Enforce maxLength 70 for seo_title and maxLength 180 for meta_description with character count instructions. (9) Instruct slug = Shopify handle by default. (10) Instruct that answer_goals must describe the communication goal of the answer — not write the answer itself. (11) Prohibit: fabricated keyword volume claims, competitor name targeting without basis, invented ranking predictions.",
+        "input": "merged per-product input + seo_signals + provisional_mode flags",
+        "output": "assembled LLM prompt string per product",
+        "prompt_safety_note": "Prompt must explicitly state: 'All keyword fields are planning estimates — do not claim search volume or ranking certainty. Provisional flags must appear in the notes field. slug must default to the Shopify handle. seo_title must not exceed 70 characters. meta_description must not exceed 180 characters.'"
+      },
+      {
+        "step": 6,
+        "name": "LLM Synthesis: Product SEO Plan (per product)",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API for each product. Request JSON output mode. Temperature: 0.2 (SEO planning is more deterministic than content synthesis). Max tokens: 2000 per product.",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt per product",
+        "output": "raw LLM response string per product (expected to be JSON)"
+      },
+      {
+        "step": 7,
+        "name": "Parse and Enforce Hard Constraints (per product)",
+        "type": "Code node (JavaScript)",
+        "description": "For each product, parse the raw LLM response as JSON. Then enforce constraint integrity: (1) SLUG: Overwrite slug with the Shopify product handle if the LLM changed it. If Shopify handle is absent, validate the generated slug against pattern ^[a-z0-9-]+$ and clean if needed. Flag any slug that differs from Shopify handle as SLUG-MIGRATION-REVIEW. (2) SEO TITLE LENGTH: If seo_title exceeds 70 characters, truncate at word boundary and add '...' or rephrase — log the adjustment. (3) META DESCRIPTION LENGTH: If meta_description exceeds 180 characters, truncate at sentence boundary — log the adjustment. (4) ENTITY CLARITY: Overwrite entity_clarity.product_type_clear with derived boolean (Shopify product_type non-empty). Overwrite entity_clarity.brand_relation_clear with derived boolean (Shopify vendor non-empty). entity_clarity.core_use_case_clear is verified from product-content use_cases availability. (5) CANONICAL STRATEGY: Derive from variant count if LLM selection seems inconsistent with variant structure. (6) PROVISIONAL FLAGS: Inject PROVISIONAL-PENDING-SEO-STRATEGY into notes for all keyword fields if provisional_mode.seo = true. Inject PROVISIONAL-PENDING-AEO-STRATEGY into notes for all answer_targets if provisional_mode.aeo = true. (7) STRUCTURED DATA TARGETS: Apply conservative defaults if LLM omitted obvious targets (always include 'product'; include 'faq' if faq_items are present and non-placeholder; always include 'breadcrumb' and 'offer' if Shopify has pricing data). (8) MINIMUM COUNTS: Verify secondary_keywords >= 1, internal_linking_targets >= 1, answer_targets >= 1. Add minimal placeholder entries if any minimum is unmet.",
+        "input": "raw LLM response per product + seo_signals + Shopify product data + provisional_mode flags",
+        "output": "parsed and constrained product_seo object per product (pre-validation)"
+      },
+      {
+        "step": 8,
+        "name": "Validate Against Schema (per product)",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate each product_seo object against schemas/product-seo.schema.json using ajv. Key validations: primary_keyword non-empty, secondary_keywords minItems = 1, search_intent in enum, seo_title maxLength = 70, meta_description maxLength = 180, slug matches ^[a-z0-9-]+$ pattern, entity_clarity required object with all three boolean fields present, internal_linking_targets minItems = 1 with target_type in enum and target_reason non-empty, answer_targets minItems = 1 with question_type in enum and answer_goal non-empty. Structured_data_targets items in enum if present. Canonical_strategy in enum if present. Content_depth in enum if present. Halt per-product on validation failure — log exact field violation and product handle.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/product-seo.schema.json",
+        "failure_behavior": "Log validation failure for the specific product. Do not halt the entire workflow for one product's failure — continue processing remaining products. At the end, report all products that failed validation as requiring manual review.",
+        "input": "constrained product_seo object per product",
+        "output": "validated product_seo objects or per-product validation errors"
+      },
+      {
+        "step": 9,
+        "name": "Persist product-seo.json (per product)",
+        "type": "GitHub node or Write File node",
+        "description": "Write each validated product-seo.json to projects/{project_id}/product-seo/{product_handle}.json. Commit with a message such as 'chore: generate product-seo for {store_id} — Phase 4 draft (provisional)'. Products that failed validation are logged to a review-required manifest at projects/{project_id}/product-seo/_review-required.json. The provisional nature of keyword decisions must be visible in the commit message.",
+        "artifact_path": "projects/{project_id}/product-seo/{product_handle}.json",
+        "review_manifest_path": "projects/{project_id}/product-seo/_review-required.json",
+        "git_note": "Each product-seo.json must be committed to Git. The provisional status of keyword decisions is documented in each artifact's notes field and in the commit message. These artifacts are consumed by the future build-product-structured-data workflow (16) and run-validation (28).",
+        "input": "validated product_seo object per product",
+        "output": "confirmation of write per product + list of persisted artifact paths"
+      },
+      {
+        "step": 10,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the list of persisted product-seo artifact paths, the review-required manifest path, and the provisional_mode flags to the master orchestrator. The orchestrator must be informed that product-seo artifacts in Phase 4 are provisional — they should be flagged for re-run when seo-strategy.json and aeo-strategy.json become available.",
+        "input": "artifact_paths list + review_required manifest path + provisional_mode flags",
+        "output": "workflow output payload with provisional status metadata"
+      }
+    ],
+
+    "assumptions": [
+      "product-content.json is the primary planning-layer input. This workflow cannot run before build-product-content completes successfully. One product-seo artifact is produced for each product-content artifact.",
+      "Shopify product handle is the canonical URL slug by default. This workflow does not propose slug changes without flagging them as SLUG-MIGRATION-REVIEW.",
+      "seo-strategy.json and aeo-strategy.json are NOT available in Phase 4. All keyword and AEO decisions operate in provisional mode. This is a known, documented limitation — not a workflow error.",
+      "When seo-strategy.json and aeo-strategy.json become available in a later phase, a revision pass on all product-seo artifacts should be triggered. The revision pass should use the finalized strategy artifacts to update provisional keyword selections, content_depth, and answer_targets.",
+      "Market intelligence search_intents are the best available planning substitute for keyword research in Phase 4. They provide intent-level direction but not keyword volume or competitive difficulty data.",
+      "All keyword fields are planning estimates. No search volume, click-through rate, or ranking certainty is claimed or implied by this workflow.",
+      "Entity clarity fields (product_type_clear, brand_relation_clear) are derived directly from Shopify data availability — they are not LLM-synthesized.",
+      "Slug defaults to the Shopify handle. The workflow does not initiate URL migrations — it only flags slug divergence for review.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "This workflow processes products in the same sequence as build-product-content. A product-seo artifact is produced for each successfully validated product-content artifact."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should a product-seo-revision workflow be created (a future Phase 5+ workflow) that takes the initial provisional product-seo artifacts and updates them against finalized seo-strategy.json and aeo-strategy.json?",
+        "impact": "Without a dedicated revision workflow, the provisional product-seo artifacts may be used without being updated when SEO strategy becomes available, leading to strategy drift.",
+        "recommended_default": "Yes — a build-product-seo-revision subflow should be planned for the phase that implements build-seo-strategy and build-aeo-strategy. This workflow should accept the existing product-seo artifacts and update provisional fields in-place. Add this to the workflow map as a planned future workflow."
+      },
+      {
+        "question": "How many answer_targets should each product ideally have?",
+        "impact": "Too few answer targets under-serve AEO planning. Too many create noise.",
+        "recommended_default": "3-6 answer targets per product for standard products. 2 minimum. Complex or high-consideration products (high price_positioning, multiple use_cases) may benefit from 5-7. Simple commodity products: 2-3. The schema requires minItems: 1 — the planning guideline is more generous than the schema minimum."
+      },
+      {
+        "question": "Should product-seo.json include a provisional_status field at the top level to make the provisional nature machine-readable (not just in notes)?",
+        "impact": "A machine-readable provisional flag would allow downstream validation and orchestration workflows to automatically skip or flag provisional artifacts.",
+        "recommended_default": "Yes — this would be a valuable addition to the schema. However, adding it requires a schema change (product-seo.schema.json update). In Phase 4, the provisional status is captured in the notes field. Propose adding provisional_status as an optional boolean field to product-seo.schema.json in a future schema iteration. Document this here as an open request to the schema roadmap."
+      },
+      {
+        "question": "What is the minimum viable product-seo artifact for a product with completely sparse data (sparse content plan + missing Shopify product_type and vendor)?",
+        "impact": "A maximally sparse product-seo artifact may have entity_clarity with all false values and all keyword fields marked provisional. Is this artifact useful?",
+        "recommended_default": "Yes — even a minimal artifact with entity_clarity = all false, primary_keyword = Shopify title exactly, and all fields marked PROVISIONAL is more useful than no artifact. It documents the data gaps and creates a revision target. The review-required manifest captures these cases for human attention."
+      }
+    ],
+
+    "evidence_boundaries": {
+      "direct_operational_truth_from_shopify": [
+        "slug (default from Shopify handle — direct)",
+        "entity_clarity.product_type_clear (derived from Shopify product_type availability — direct)",
+        "entity_clarity.brand_relation_clear (derived from Shopify vendor availability — direct)"
+      ],
+      "derived_from_product_content_planning_artifact": [
+        "entity_clarity.core_use_case_clear (derived from product-content use_cases availability)",
+        "structured_data_targets (partially derived from product-content faq_items)",
+        "search_intent (partially derived from product-content cta_direction)"
+      ],
+      "provisional_from_market_intelligence_substitutes": [
+        "primary_keyword (provisional — market search_intents as planning proxy for keyword research)",
+        "secondary_keywords (provisional — market search_intents and product tags as planning signals)",
+        "search_intent classification (provisional — market intent types + CTA direction)",
+        "answer_targets (provisional — market content_opportunities + product-content faq_items)"
+      ],
+      "llm_synthesized_planning_content": [
+        "seo_title (LLM synthesis — planning proposal, not validated SEO copy)",
+        "meta_description (LLM synthesis — planning proposal, not validated SEO copy)",
+        "internal_linking_targets (provisional LLM synthesis — structural planning, not validated link strategy)",
+        "canonical_strategy (derived — but LLM validates the logic)"
+      ],
+      "not_available_in_this_phase": [
+        "Validated keyword research data (search volume, keyword difficulty, competitive analysis)",
+        "Store-level seo-strategy.json (workflow 11 — out of Phase 4 scope)",
+        "Store-level aeo-strategy.json (workflow 12 — out of Phase 4 scope)",
+        "Real click-through rate data for seo_title or meta_description variants",
+        "Existing ranking data for the store's current product pages",
+        "Competitor keyword gap analysis",
+        "Structured answer engine query data",
+        "Finalized internal linking plan (workflow 23 — far out of scope)"
+      ],
+      "labeling_requirement": "The notes field per product-seo artifact must include: 'PRODUCT SEO — PROVISIONAL PLANNING ARTIFACT: This artifact was generated in Phase 4 without access to seo-strategy.json (workflow 11) or aeo-strategy.json (workflow 12). All keyword selections (primary_keyword, secondary_keywords) are provisional estimates — PROVISIONAL-PENDING-SEO-STRATEGY. All answer_targets are provisional seeds — PROVISIONAL-PENDING-AEO-STRATEGY. seo_title and meta_description are planning proposals requiring keyword research validation and human review. slug defaults to the Shopify product handle. Entity clarity fields are derived from Shopify data availability. This artifact should be revised when build-seo-strategy and build-aeo-strategy are implemented. Human review is required before any field is used in a live store configuration.'"
+    },
+
+    "runtime_dependencies": [
+      "n8n Execute Workflow Trigger node — receives subworkflow call from master orchestrator",
+      "n8n Code node (JavaScript) — for input validation, SEO signal extraction, per-product data merging, prompt building, response parsing, hard-constraint enforcement, and schema validation",
+      "n8n OpenAI node OR HTTP Request node (OpenAI API) — for LLM product SEO synthesis (iterates per product)",
+      "n8n GitHub node OR Write File node — for persisting product-seo.json files",
+      "ajv (Ajv JSON Schema Validator) — for schema validation inside Code node",
+      "schemas/product-seo.schema.json — must be accessible to the validation step",
+      "OpenAI API credential — stored in n8n, never in Git",
+      "build-product-content must complete successfully before this workflow runs",
+      "import-shopify-data must complete successfully before this workflow runs",
+      "build-market-intelligence and build-brand-positioning must complete successfully before this workflow runs",
+      "build-seo-strategy and build-aeo-strategy are OPTIONAL inputs — workflow runs safely without them in provisional mode"
+    ]
+  }
+}
