@@ -1,0 +1,527 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. The video-plan.json output is a planning artifact only — not a production storyboard set, not a confirmed video availability report, not a pre-approved production schedule, and not a video implementation contract. All planned video slots produced here are planning-level decisions. No video footage, scripts, presenters, or product recordings are confirmed to exist. Human production review is required before any video plan decisions are applied.",
+    "planning_artifact_note": "IMPORTANT — OUTPUT IS A PLAN, NOT A PRODUCTION SCHEDULE: The video-plan.json artifact defines what video assets are needed, by role and page type, at what priority, and how the store degrades safely when video is unavailable. It does not confirm that footage has been recorded, that scripts have been written, that a presenter has been engaged, or that any video asset is ready for implementation.",
+    "production_dependency_boundary_note": "IMPORTANT — VIDEO PRODUCTION DEPENDENCIES ARE UNKNOWN AT PLANNING TIME: This workflow synthesizes a video plan from upstream strategy artifacts. It cannot confirm the existence of footage, scripts, recording equipment, presenters, or video editing resources. Every planned_video_slot must reflect the true production dependency status — slots without confirmed production paths must use availability_status values that communicate this conservatively (requires-footage, requires-script, requires-presenter, etc.).",
+    "performance_safety_note": "IMPORTANT — VIDEO IS HIGH-PERFORMANCE-RISK BY NATURE: Video assets are among the highest-impact assets on page load performance, LCP scores, and Core Web Vitals. Every planned video slot must be evaluated against design-system performance ceilings and intake performance_priority signals. Autoplay video must always be muted. Hero video must always have a poster fallback. The plan must always include a complete degradation path for every video slot — a store must function fully without video.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/video-plan.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "docs/architecture.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-video-plan",
+    "name": "build-video-plan",
+    "category": "planning",
+    "phase": "Phase 9 — Media Plan, Video Plan, and Motion Media Strategy",
+    "purpose": "Synthesize a schema-validated store-level video asset plan from media-plan, homepage-strategy, design-system, brand-positioning, store-profile, and seo-strategy. The video-plan.json output defines: the primary video goal (or 'none' for stores with no video appetite), video usage level (none, light, balanced, rich), planned video slots (by role, page type, availability status, autoplay/muted/loop configuration, poster and mobile fallback requirements, and performance risk), degradation policy (how every slot degrades when video is unavailable), missing asset policy (how each category of production dependency is handled when absent), and a video sourcing summary (what production work remains). This plan enables: (1) consistent video asset assignment that respects performance ceilings and design-system constraints, (2) explicit documentation of video production gaps, (3) a complete fallback strategy for stores where video cannot be delivered, and (4) alignment between homepage hero strategy, brand experience goals, and video production reality. All outputs are planning-level decisions — not production approvals, not storyboards, not confirmed asset availability.",
+
+    "video_plan_vs_media_plan": "build-video-plan is downstream of build-media-plan. This workflow focuses exclusively on video assets (hero-video, product-loop, explainer-clip, testimonial-style-clip, ambient-motion, etc.). Still images, graphics, icons, trust visuals, comparison visuals, and editorial imagery are scoped to build-media-plan (Phase 9, step 1). Poster images for video slots ARE referenced in this plan (as they are production dependencies of the video slots) but the poster image assets themselves are planned in build-media-plan. Motion strategy (scroll motion, interaction animation, reveal behavior, reduced-motion handling) is scoped to build-motion-media-strategy (Phase 9, step 3).",
+
+    "upstream_dependency_order": "This workflow depends on: build-media-plan (Phase 9, step 1), build-design-system (Phase 3), build-homepage-strategy (Phase 3), build-brand-positioning (Phase 2), build-store-profile (Phase 1), build-seo-strategy (Phase 7 — optional, for performance and SEO ceiling context). All upstream artifacts must be available before this workflow runs.",
+
+    "inputs": {
+      "from_media_plan": {
+        "source": "build-media-plan → media-plan.json",
+        "artifact_path": "projects/{project_id}/media-plan.json",
+        "data_treatment": "PRIMARY CONTEXT LAYER — media-plan.json is the most important input for video planning. It establishes: (1) the media goal that video must serve, (2) the hero image and poster image requirements that define fallback expectations, (3) the asset_gap_policy that establishes how missing video production dependencies should be handled, (4) the sourcing summary that reveals the overall asset creation load (video planning should not add production complexity on top of an already overwhelmed media sourcing plan).",
+        "fields_used": [
+          {
+            "field": "media_goal",
+            "treatment": "VIDEO GOAL ALIGNMENT — media_goal from the media plan is the starting context for video_goal derivation. conversion-support → video_goal = conversion-support or hybrid. storytelling-support → video_goal = storytelling-support or brand-experience. product-demonstration → video_goal = product-demonstration. trust-building → video plan may defer video in favor of trust-visual media.",
+            "note": "Video goal must be consistent with or subordinate to the broader media goal. Video should not introduce a new strategic direction that contradicts the media plan."
+          },
+          {
+            "field": "asset_gap_policy",
+            "treatment": "MISSING ASSET POLICY INHERITANCE — the media plan's asset_gap_policy defines the base policy for handling missing assets. The video plan's missing_asset_policy must be compatible with this baseline.",
+            "note": "If the media plan already uses a conservative gap policy (flag-for-review or flag-in-manifest), the video plan should match or be more conservative — never less."
+          },
+          {
+            "field": "planned_asset_slots",
+            "treatment": "POSTER IMAGE CONTEXT — review planned_asset_slots in the media plan for any slot with media_role = hero and section_role = hero. These are the poster image slots for hero video. If no poster image slot exists in the media plan AND hero video is planned → flag that a poster image slot must be added to the media plan.",
+            "note": "Poster images for hero video must be planned in build-media-plan. This workflow only verifies their existence and flags gaps — it does not create new media plan slots."
+          },
+          {
+            "field": "sourcing_requirements_summary",
+            "treatment": "PRODUCTION LOAD CALIBRATION — if the media plan already has a large number of slots requiring photography or design creation, the video plan should be more conservative about adding new production-dependent video slots. A store with already high asset creation load is a signal to prefer static media over video.",
+            "note": "Video production typically has a higher cost and lead time than photography. High existing asset creation load should be a conservative signal for video planning."
+          }
+        ]
+      },
+
+      "from_homepage_strategy": {
+        "source": "build-homepage-strategy → homepage-strategy.json",
+        "artifact_path": "projects/{project_id}/homepage-strategy.json",
+        "data_treatment": "HERO VIDEO CONTEXT — homepage-strategy.json defines the hero section behavior and whether hero media is intended to be motion-based or static. The hero_strategy fields are the primary source for hero video slot planning.",
+        "fields_used": [
+          {
+            "field": "hero_strategy.hero_media_type",
+            "treatment": "HERO VIDEO SLOT TRIGGER — if hero_media_type = video or includes video as an option AND design-system hero_video_allowed = true, a hero-video slot is planned with required = true.",
+            "note": "Hero video is the highest-impact, highest-performance-risk video slot. Even when planned, it must always have a complete fallback strategy."
+          },
+          {
+            "field": "hero_strategy.hero_impression",
+            "treatment": "HERO VIDEO DIRECTION SIGNAL — hero_impression informs the primary_message for the hero video slot. High-energy, cinematic → hero video supports rich visual brand experience. Calm, minimal → hero video may be ambient or unnecessary.",
+            "note": "Hero impression is a planning-level signal, not a confirmed creative brief."
+          },
+          {
+            "field": "section_sequence",
+            "treatment": "PRODUCT DEMO AND FEATURE VIDEO CONTEXT — if section_sequence includes product-feature or product-showcase sections with media_required = true and media_role suggesting video, those sections may generate product-loop or explainer video slot candidates.",
+            "note": "Product demo video slots are high production cost. Plan conservatively unless product complexity genuinely warrants video explanation."
+          },
+          {
+            "field": "storytelling_intensity",
+            "treatment": "VIDEO STORYTELLING SIGNAL — high storytelling_intensity AND brand_role = editorial-guide or brand-experience → editorial-video and ambient-motion slots may be relevant. Low storytelling_intensity → video storytelling is optional or deferred.",
+            "note": "Video storytelling slots require the most production work (script, filming, editing). They should only be planned when storytelling_intensity genuinely warrants it."
+          }
+        ]
+      },
+
+      "from_design_system": {
+        "source": "build-design-system → design-system.json",
+        "artifact_path": "projects/{project_id}/design-system.json",
+        "data_treatment": "HARD VIDEO CONSTRAINT CEILING — design-system.json establishes the authoritative video and motion constraints that the video plan must not exceed. These constraints were set in Phase 3 based on brand role, intake preferences, and performance requirements. They cannot be overridden by video planning.",
+        "fields_used": [
+          {
+            "field": "motion_strategy.hero_video_allowed",
+            "treatment": "HERO VIDEO HARD CONSTRAINT — if hero_video_allowed = false in design-system, no hero-video slot must be planned, regardless of homepage-strategy signals or brand preferences. Set video_goal = none if hero_video_allowed = false and no other video roles are viable.",
+            "note": "hero_video_allowed = false is a hard ceiling derived from intake performance_priority or brand_role constraints. It cannot be overridden in the video plan."
+          },
+          {
+            "field": "motion_strategy.autoplay_policy",
+            "treatment": "AUTOPLAY CONSTRAINT — design-system autoplay_policy maps directly to video slot autoplay configuration: forbidden → autoplay = false for all slots; muted-only → autoplay = true only if muted = true; limited → only one autoplay slot per page maximum; balanced → autoplay with muted is acceptable per slot.",
+            "note": "Autoplay video without muted = true must never be planned. Autoplay = true AND muted = false is forbidden in all cases."
+          },
+          {
+            "field": "motion_strategy.loop_policy",
+            "treatment": "LOOP CONSTRAINT — design-system loop_policy: forbidden → loop = false for all slots; limited → loop = true only for ambient-motion or background slots; allowed → loop is acceptable with performance review.",
+            "note": "Looping video has sustained performance impact. Even when loop_policy = allowed, high loop count should be flagged."
+          },
+          {
+            "field": "performance_guardrails",
+            "treatment": "PERFORMANCE CEILING FOR VIDEO — video is inherently high performance risk. If performance_priority = critical or heavy_media_allowed = false → video_usage_level must be none or light. If performance_priority = high → video_usage_level maximum is light or balanced. Balanced performance allows balanced video usage.",
+            "note": "Performance ceilings for video are more restrictive than for static media because video has more sustained resource impact."
+          },
+          {
+            "field": "motion_strategy.video_usage_level",
+            "treatment": "VIDEO USAGE LEVEL CEILING — design-system video_usage_level is the maximum allowed. The video plan output video_usage_level must be ≤ design-system ceiling. Never exceed the design-system video_usage_level.",
+            "note": "Design-system video_usage_level was set in Phase 3 with full brand and performance context. It is authoritative."
+          }
+        ]
+      },
+
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "data_treatment": "BRAND VIDEO APPETITE SIGNALS — brand positioning provides the brand role and trust style signals that calibrate video plan ambition.",
+        "fields_used": [
+          {
+            "field": "brand_role",
+            "treatment": "VIDEO AMBITION CALIBRATION — premium-innovator and brand-experience roles benefit from hero video and editorial video. value-leader and functional-standard roles should prefer product-loop and explainer over cinematic storytelling. editorial-guide role may benefit from ambient-motion and editorial video clips.",
+            "note": "Brand role is a positioning decision, not a confirmed creative capability or production budget commitment."
+          },
+          {
+            "field": "conversion_style",
+            "treatment": "PRODUCT DEMO VIDEO SIGNAL — if conversion_style.primary_conversion_signal = product-demonstration or feature-proof, a product-loop or explainer-clip slot is a meaningful investment. If conversion_style = social-proof, testimonial-style-clip is more relevant.",
+            "note": "Conversion style maps to video role priority. Do not over-plan video roles that don't align with the brand's conversion mechanism."
+          },
+          {
+            "field": "trust_style",
+            "treatment": "TESTIMONIAL VIDEO SIGNAL — if trust_style.primary_trust_signal = social-proof AND brand_maturity suggests review availability → testimonial-style-clip may be planned. If no presenter or customer testimonials are available → this slot must use availability_status = requires-presenter or unavailable.",
+            "note": "Testimonial-style video is high production cost and requires real people. Never plan this slot as available without confirmed presenter sourcing."
+          }
+        ]
+      },
+
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "data_treatment": "STORE CONTEXT FOR VIDEO VIABILITY — store profile provides vertical, catalog type, and brand maturity signals that calibrate video plan viability.",
+        "fields_used": [
+          {
+            "field": "vertical",
+            "treatment": "VERTICAL VIDEO RELEVANCE — verticals where video is most valuable: beauty/cosmetics → product application demos. fitness/supplements → transformation and usage videos. tech/electronics → product demo and explainer. Fashion/apparel → hero and editorial. Food/beverage → product reveal and ambient. Low video-relevance verticals: books, digital goods, simple commodities.",
+            "note": "Vertical video relevance is a generic planning heuristic — the actual store's production capacity may differ."
+          },
+          {
+            "field": "brand_maturity",
+            "treatment": "VIDEO PRODUCTION CAPACITY SIGNAL — established brand → may have existing video assets. early-stage → assume all video requires production. new-brand → video production is high investment — plan conservatively.",
+            "note": "Brand maturity is a proxy for production resource availability, not a confirmed video library inventory."
+          },
+          {
+            "field": "catalog_type",
+            "treatment": "PRODUCT LOOP SCOPE CALIBRATION — large catalog (100+ products) → product loop video planning for all products is not realistic. Focus on hero products. Small catalog → per-product video is feasible.",
+            "note": "Product loop video for every product in a large catalog is rarely achievable in an early production phase."
+          }
+        ]
+      },
+
+      "from_seo_strategy": {
+        "source": "build-seo-strategy → seo-strategy.json",
+        "artifact_path": "projects/{project_id}/seo-strategy.json",
+        "data_treatment": "PERFORMANCE AND SEO CEILING CONTEXT — seo-strategy provides signals about performance and technical quality priorities that constrain video planning.",
+        "availability": "AVAILABLE FROM PHASE 7 — optional input. If absent, derive performance signals from design-system only.",
+        "fields_used": [
+          {
+            "field": "technical_seo_priority",
+            "treatment": "PERFORMANCE CONSTRAINT REINFORCEMENT — if technical_seo_priority includes Core Web Vitals or LCP performance → hero video and above-fold video slots must be conservative. Heavy autoplay video above the fold is a strong LCP risk.",
+            "note": "SEO performance constraints reinforce design-system performance ceilings. Do not weaken design-system constraints based on SEO inputs."
+          }
+        ]
+      }
+    },
+
+    "outputs": {
+      "primary_output": "video-plan.json",
+      "artifact_path": "projects/{project_id}/video-plan.json",
+      "schema": "schemas/video-plan.schema.json",
+      "output_fields": {
+        "plan_name": {
+          "source": "LLM synthesis",
+          "type": "LLM-synthesized string",
+          "format_guidance": "Recommended pattern: '[Store Vertical] Video Plan — [Primary Goal]'. Example: 'Athletic Footwear Video Plan — Product Demonstration'. If video_usage_level = none, append: 'No Video — Static Media Strategy'.",
+          "note": "plan_name is a planning label for human orientation."
+        },
+        "video_goal": {
+          "source": "Derived from media-plan.media_goal + homepage-strategy.hero_strategy + brand-positioning.brand_role",
+          "type": "constrained enum",
+          "schema_enum": ["conversion-support", "storytelling-support", "product-demonstration", "brand-experience", "hybrid", "none"],
+          "derivation_logic": {
+            "none": "ALWAYS use when design-system.hero_video_allowed = false AND no other video roles are viable within performance ceilings. 'none' is a valid and often correct value.",
+            "conversion-support": "Video primarily serves direct conversion — product demos, feature clarity, quick buy decision support.",
+            "storytelling-support": "Video primarily tells the brand story — editorial, founder story, lifestyle content.",
+            "product-demonstration": "Video primarily demonstrates product usage, benefits, or application — most relevant for complex products.",
+            "brand-experience": "Video primarily communicates brand identity and world — cinematic hero video, editorial clips.",
+            "hybrid": "Multiple video goals are meaningfully present. Use only when the video plan includes both conversion-focused and storytelling-focused slots."
+          }
+        },
+        "video_usage_level": {
+          "source": "Derived from design-system.motion_strategy.video_usage_level + performance_guardrails + intake hero_video_allowed + brand_role",
+          "type": "constrained enum",
+          "schema_enum": ["none", "light", "balanced", "rich"],
+          "ceiling_rule": "video_usage_level must be ≤ design-system.video_usage_level ceiling. Never exceed. When in doubt, use a lower level.",
+          "derivation_logic": {
+            "none": "design-system hero_video_allowed = false AND performance_priority = critical. No video is planned.",
+            "light": "1-2 video slots maximum, low autoplay, all with poster fallbacks. Appropriate for performance-sensitive stores or stores with minimal video appetite.",
+            "balanced": "3-5 video slots covering key page types, muted autoplay acceptable for hero only, all with fallbacks.",
+            "rich": "Multiple video roles across page types. Only when design-system explicitly allows rich video and brand role warrants it."
+          }
+        },
+        "planned_video_slots": {
+          "source": "Derived from homepage-strategy hero context + section roles + brand positioning + design-system ceilings",
+          "type": "array of planned video slot objects",
+          "standard_slot_types": {
+            "hero-video": {
+              "page_type": "homepage",
+              "when_to_plan": "When design-system hero_video_allowed = true AND homepage-strategy signals video hero",
+              "required": true,
+              "autoplay": true,
+              "muted": true,
+              "loop": true,
+              "poster_required": true,
+              "mobile_fallback_required": true,
+              "performance_risk": "high",
+              "availability_default": "requires-footage — assume no footage exists unless brand confirms existing video library",
+              "degradation": "hero-image (from media-plan)"
+            },
+            "product-loop": {
+              "page_type": "product-page",
+              "when_to_plan": "When vertical signals high video value AND product complexity warrants demo video AND catalog size is manageable",
+              "required": false,
+              "autoplay": true,
+              "muted": true,
+              "loop": true,
+              "poster_required": true,
+              "mobile_fallback_required": true,
+              "performance_risk": "high",
+              "availability_default": "requires-product-recording — assume no product recordings exist",
+              "degradation": "product-image-gallery (from media-plan)"
+            },
+            "explainer-clip": {
+              "page_type": "product-page or guide-page",
+              "when_to_plan": "When product_content signals explainer media requirement AND product complexity warrants explanation",
+              "required": false,
+              "autoplay": false,
+              "muted": false,
+              "loop": false,
+              "poster_required": true,
+              "mobile_fallback_required": false,
+              "performance_risk": "medium",
+              "availability_default": "requires-script — assume no script or footage exists",
+              "degradation": "explainer-graphic (from media-plan)"
+            },
+            "testimonial-style-clip": {
+              "page_type": "homepage or product-page",
+              "when_to_plan": "When trust_style = social-proof AND conversion style signals testimonial as trust mechanism",
+              "required": false,
+              "autoplay": false,
+              "muted": false,
+              "loop": false,
+              "poster_required": true,
+              "mobile_fallback_required": false,
+              "performance_risk": "medium",
+              "availability_default": "requires-presenter — assume no presenter or customer testimonial footage exists",
+              "degradation": "trust-visual (from media-plan)"
+            },
+            "ambient-motion": {
+              "page_type": "homepage or collection-page",
+              "when_to_plan": "When brand_role = premium-innovator or brand-experience AND motion_strategy supports ambient background motion AND performance ceiling allows",
+              "required": false,
+              "autoplay": true,
+              "muted": true,
+              "loop": true,
+              "poster_required": true,
+              "mobile_fallback_required": true,
+              "performance_risk": "high",
+              "availability_default": "requires-footage",
+              "degradation": "background-image (from media-plan)"
+            }
+          },
+          "slot_availability_status_rules": {
+            "planned": "Use only when a confirmed existing video asset is known to the planning team.",
+            "requires-footage": "No raw footage exists or has been confirmed. Must be filmed.",
+            "requires-script": "No script or production brief exists. Must be written before filming can begin.",
+            "requires-presenter": "A human presenter is required but not confirmed.",
+            "requires-product-recording": "Product must be physically recorded. Recording session not yet scheduled.",
+            "placeholder": "Temporary placeholder video (e.g. color fill or stock clip) for dev/staging. Must be resolved before production.",
+            "unavailable": "No production path exists for this slot. Must be escalated per degradation_policy.",
+            "requires-review": "A potential video source exists but requires review before use."
+          }
+        },
+        "degradation_policy": {
+          "source": "Derived from media-plan hero slot + design-system fallback ceilings + brand positioning",
+          "type": "object",
+          "required_fields": ["no_video_fallback_type", "hero_no_video_fallback", "performance_ceiling_exceeded_action"],
+          "policy_rules": {
+            "no_video_fallback_type": "static-image is the safest default. Only use animated-poster if design-system motion allows and performance ceilings allow.",
+            "hero_no_video_fallback": "hero-image is always the correct fallback for hero video when no video is available. The hero image slot must already exist in the media plan.",
+            "performance_ceiling_exceeded_action": "flag-in-deployment-manifest is the safest default. Never silently remove a section without human review."
+          }
+        },
+        "missing_asset_policy": {
+          "source": "Derived from media-plan asset_gap_policy + design-system performance_guardrails + intake governance signals",
+          "type": "object",
+          "conservative_defaults": {
+            "missing_footage_handling": "mark-slot-unavailable — no footage means no video. Use flag-for-review if there is a future production path.",
+            "missing_script_handling": "mark-slot-requires-script — video without a brief is not plannable.",
+            "missing_presenter_handling": "substitute-product-only-format — prefer a product-only format (product-loop) over an unavailable testimonial format.",
+            "missing_product_recording_handling": "use-product-image-fallback — product images from media-plan are the correct fallback for missing product recordings."
+          }
+        }
+      },
+      "downstream_consumers": [
+        "build-motion-media-strategy — uses video-plan video_usage_level, autoplay settings, and degradation policy to plan motion strategy",
+        "run-validation — validates video-plan.json against schema",
+        "build-deployment-manifest — includes video production gaps as deployment flags or blockers"
+      ]
+    },
+
+    "nodes": {
+      "node_1_trigger": {
+        "id": "trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "name": "Receive Inputs",
+        "description": "Receives inputs from the orchestrating workflow.",
+        "input_contract": {
+          "project_id": "string — required",
+          "media_plan": "object — required — media-plan.json artifact from Phase 9 step 1",
+          "homepage_strategy": "object — required — homepage-strategy.json artifact",
+          "design_system": "object — required — design-system.json artifact",
+          "brand_positioning": "object — required — brand-positioning.json artifact",
+          "store_profile": "object — required — store-profile.json artifact",
+          "seo_strategy": "object — optional — seo-strategy.json artifact (for performance ceiling reinforcement)"
+        }
+      },
+
+      "node_2_validate_inputs": {
+        "id": "validate-upstream-inputs",
+        "type": "n8n-nodes-base.code",
+        "name": "Validate Upstream Inputs",
+        "description": "Validates required upstream artifacts. Fails fast if media-plan or design-system are missing.",
+        "validation_checks": [
+          "project_id must be a non-empty string",
+          "media_plan must be an object with media_goal, planned_asset_slots, and asset_gap_policy fields",
+          "homepage_strategy must have hero_strategy and section_sequence fields",
+          "design_system must have motion_strategy and performance_guardrails fields",
+          "design_system.motion_strategy must have hero_video_allowed, autoplay_policy, loop_policy, and video_usage_level fields",
+          "brand_positioning must have brand_role and conversion_style fields",
+          "store_profile must have vertical, brand_maturity, and catalog_type fields",
+          "Write design_system.motion_strategy.hero_video_allowed to workflow context as hero_video_allowed",
+          "Write design_system.motion_strategy.video_usage_level to workflow context as video_usage_level_ceiling",
+          "Write design_system.motion_strategy.autoplay_policy to workflow context as autoplay_policy_ceiling",
+          "Write design_system.motion_strategy.loop_policy to workflow context as loop_policy_ceiling",
+          "If hero_video_allowed = false → write no_hero_video = true to workflow context",
+          "If performance_guardrails.heavy_media_allowed = false OR performance_priority = critical → write performance_ceiling = strict"
+        ],
+        "on_validation_failure": "Output error object with validation_failed = true, missing_fields, message. Do not proceed."
+      },
+
+      "node_3_extract_video_context": {
+        "id": "extract-video-context",
+        "type": "n8n-nodes-base.code",
+        "name": "Extract Video Context and Constraints",
+        "description": "Extracts and normalizes all video-relevant signals from upstream artifacts. Applies design-system ceilings before LLM call.",
+        "extraction_steps": [
+          "Extract video goal signal from media_plan.media_goal → map to video_goal enum",
+          "Extract hero video intent from homepage_strategy.hero_strategy.hero_media_type",
+          "Extract hero_impression from homepage_strategy.hero_strategy for primary_message guidance",
+          "Extract storytelling_intensity from homepage_strategy for editorial/ambient video signals",
+          "Extract brand_role from brand_positioning",
+          "Extract conversion_style and trust_style from brand_positioning",
+          "Extract vertical and catalog_type from store_profile",
+          "Extract brand_maturity as proxy for video production capacity",
+          "Extract product_content video signals: any explainer or demo video requirements",
+          "Extract section_sequence for product feature section video signals",
+          "Extract design-system ceilings: hero_video_allowed, video_usage_level, autoplay_policy, loop_policy, performance_guardrails",
+          "Extract media_plan sourcing_requirements_summary to calibrate video production load conservatism",
+          "Extract media_plan asset_gap_policy.missing_source_handling as base for video missing_asset_policy",
+          "Derive video_usage_level: min(brand_desired_level, design_system.video_usage_level_ceiling)",
+          "Derive autoplay constraints from autoplay_policy_ceiling",
+          "Derive loop constraints from loop_policy_ceiling",
+          "Flag: if performance_ceiling = strict AND video_usage_level would be > none → force to light and add warning",
+          "Flag: if hero_video_allowed = false → video_goal defaults to none unless other video roles exist"
+        ]
+      },
+
+      "node_4_build_llm_prompt": {
+        "id": "build-llm-prompt",
+        "type": "n8n-nodes-base.code",
+        "name": "Build LLM Prompt",
+        "description": "Assembles the structured LLM prompt for video plan synthesis.",
+        "prompt_components": [
+          "System message: video planning assistant for schema-driven commerce OS. Output must conform to video-plan.schema.json. Must not confirm video asset availability. Must always include a degradation fallback for every planned slot. Must not exceed design-system video ceilings.",
+          "Project context: project_id, vertical, catalog_type, brand_maturity, brand_role",
+          "Design-system hard constraints: hero_video_allowed, video_usage_level_ceiling, autoplay_policy, loop_policy, performance_priority",
+          "Media goal context from media-plan: media_goal, sourcing load summary",
+          "Hero video context: hero_video_allowed, hero_impression, hero media type from homepage-strategy",
+          "Brand signals: brand_role, conversion_style, trust_style",
+          "Video production capacity context: brand_maturity, existing asset signals",
+          "Schema output shape: describe required fields and enum options for video-plan.schema.json",
+          "Slot availability status rules: when to use each status value",
+          "Degradation policy requirements: every slot must have a fallback",
+          "CRITICAL INSTRUCTIONS: video_goal = none is a valid and often correct answer. video_usage_level must not exceed design-system ceiling. Autoplay must always be paired with muted = true. hero-video must always have poster_required = true and mobile_fallback_required = true. All production-dependent slots must use the appropriate requires-* availability_status. Do not plan video for page types where no video role is justified. Every planned video slot must have a named degradation fallback."
+        ]
+      },
+
+      "node_5_llm_synthesis": {
+        "id": "llm-synthesis",
+        "type": "n8n-nodes-base.openAi",
+        "name": "LLM Synthesis — Video Plan",
+        "description": "Calls the LLM to synthesize the video plan JSON from the structured prompt.",
+        "model": "gpt-4o",
+        "temperature": 0.2,
+        "response_format": "json_object",
+        "credential_placeholder": "PLACEHOLDER — confirm actual n8n OpenAI credential name at runtime. Do not hardcode.",
+        "evidence_boundary_note": "The LLM synthesizes video planning decisions based on upstream strategy artifacts. It has no access to actual video files, footage libraries, production schedules, or presenter availability. All LLM-generated video slots are planning intentions — not confirmed production-ready assets."
+      },
+
+      "node_6_parse_and_enforce": {
+        "id": "parse-and-enforce-constraints",
+        "type": "n8n-nodes-base.code",
+        "name": "Parse and Enforce Constraints",
+        "description": "Parses the LLM output and enforces all hard design-system constraints. Overrides LLM decisions where constraints require it.",
+        "constraint_enforcement_rules": [
+          "HERO VIDEO FORBIDDEN: If hero_video_allowed = false AND any hero-video slot exists → remove slot entirely and add note to degradation_policy",
+          "VIDEO USAGE LEVEL CEILING: If output video_usage_level > design-system ceiling → downgrade to ceiling value",
+          "AUTOPLAY MUTED ENFORCEMENT: If any slot has autoplay = true AND muted = false → force muted = true",
+          "AUTOPLAY FORBIDDEN: If autoplay_policy = forbidden AND any slot has autoplay = true → force autoplay = false",
+          "LOOP FORBIDDEN: If loop_policy = forbidden AND any slot has loop = true → force loop = false",
+          "POSTER REQUIRED: If any slot has performance_risk = high AND poster_required = false → force poster_required = true",
+          "MOBILE FALLBACK FOR HERO: If hero-video slot exists AND mobile_fallback_required = false → force mobile_fallback_required = true",
+          "PERFORMANCE CEILING: If performance_ceiling = strict AND any slot has performance_risk = high → change availability_status to requires-review and add production_notes warning",
+          "DEGRADATION COVERAGE: Verify every planned_video_slot has a named fallback in degradation_policy. If any slot lacks degradation context → add flag in production_notes",
+          "VIDEO GOAL WHEN EMPTY: If planned_video_slots is empty or all slots are unavailable → force video_goal = none and video_usage_level = none",
+          "VIDEO SOURCING SUMMARY ACCURACY: Recalculate video_sourcing_summary by counting actual slot statuses — do not use LLM counts if they differ"
+        ]
+      },
+
+      "node_7_validate_schema": {
+        "id": "validate-schema",
+        "type": "n8n-nodes-base.code",
+        "name": "Validate Against Schema",
+        "description": "Validates the constrained video-plan output against schemas/video-plan.schema.json using AJV.",
+        "schema_reference": "schemas/video-plan.schema.json",
+        "on_validation_failure": "Output schema_validation_failed = true with errors array. Do not persist.",
+        "on_validation_success": "Proceed to persist."
+      },
+
+      "node_8_persist": {
+        "id": "persist",
+        "type": "n8n-nodes-base.github",
+        "name": "Persist to Git",
+        "description": "Writes the validated video-plan.json to the project folder in the Git repository.",
+        "target_path": "projects/{project_id}/video-plan.json",
+        "commit_message_pattern": "feat({project_id}): add video-plan artifact [build-video-plan]",
+        "credential_placeholder": "PLACEHOLDER — confirm actual n8n GitHub credential name at runtime. Do not hardcode.",
+        "draft_safety_note": "In draft mode, write to projects/{project_id}/drafts/video-plan.json."
+      },
+
+      "node_9_output": {
+        "id": "output",
+        "type": "n8n-nodes-base.set",
+        "name": "Output",
+        "description": "Returns the video-plan artifact and workflow status to the calling orchestrator.",
+        "output_fields": {
+          "workflow_id": "build-video-plan",
+          "project_id": "{project_id}",
+          "status": "completed | failed",
+          "artifact_path": "projects/{project_id}/video-plan.json",
+          "video_goal": "{video_goal from artifact}",
+          "video_usage_level": "{video_usage_level from artifact}",
+          "total_planned_slots": "{count of planned_video_slots}",
+          "high_risk_slots": "{count of slots with performance_risk = high}",
+          "slots_requiring_footage": "{count}",
+          "slots_with_no_production_path": "{count of unavailable slots}",
+          "downstream_consumers": ["build-motion-media-strategy", "run-validation", "build-deployment-manifest"],
+          "validation_passed": true,
+          "errors": []
+        }
+      }
+    },
+
+    "assumptions": [
+      "No video footage is assumed to exist unless intake or brand-profile data explicitly confirms an existing video library",
+      "Hero video is only planned when design-system explicitly allows it — never assumed as a default",
+      "Product loop video is only planned for manageable catalog sizes — large catalogs default to product image galleries",
+      "Testimonial-style video is never planned as available without confirmed presenter sourcing",
+      "All LLM-synthesized video planning decisions are planning intentions, not production commitments",
+      "Design-system video ceilings from Phase 3 are treated as validated and authoritative — not re-derived here",
+      "Media plan (Phase 9 step 1) is already validated before this workflow runs",
+      "Vertical-specific video relevance is a generic heuristic — actual production capacity may differ significantly"
+    ],
+
+    "evidence_boundaries": [
+      "This workflow has no access to actual video files, footage libraries, or production schedules",
+      "Brand video library availability is estimated from store-profile brand_maturity — not from actual asset inventory",
+      "LLM synthesis is based on strategic artifact signals, not video production audits or studio consultations",
+      "Video production cost and timeline estimates are outside the scope of this planning workflow",
+      "Performance impact of video slots is estimated from slot configuration — not from actual page speed testing"
+    ],
+
+    "open_questions": [
+      "Does the brand have existing video assets (hero footage, product recordings, testimonials)? Must be confirmed in production review.",
+      "What is the video production budget and timeline? Requires project management input — outside scope of this workflow.",
+      "Are product recordings available from suppliers? Supplier video licensing and quality must be verified by a human.",
+      "Should product loop video be deferred to a later phase to avoid blocking initial deployment? Governance decision.",
+      "Is there a confirmed presenter for testimonial-style video? Must be confirmed before this slot can move from requires-presenter to planned."
+    ],
+
+    "draft_dev_safety_notes": [
+      "This workflow definition is not yet executable n8n JSON. A developer must translate it before running.",
+      "All credential references are PLACEHOLDER values.",
+      "In draft/dev mode, write output to projects/{project_id}/drafts/video-plan.json.",
+      "This workflow must run AFTER build-media-plan completes successfully.",
+      "The video-plan output is a planning artifact only — not a production approval or deployment readiness confirmation."
+    ]
+  }
+}

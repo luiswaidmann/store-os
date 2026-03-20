@@ -1,0 +1,529 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. The motion-media-strategy.json output is a planning artifact only — not theme code, not CSS animation definitions, not Shopify theme configuration, and not a confirmed performance-validated animation implementation. All motion decisions produced here remain planning-level intentions. No scroll animations, interaction transitions, reveal behaviors, or motion rules have been implemented in any theme code. Human review and frontend implementation by a developer are required before any motion strategy decisions affect production pages.",
+    "planning_artifact_note": "IMPORTANT — OUTPUT IS A STRATEGY, NOT IMPLEMENTATION: The motion-media-strategy.json artifact defines the allowed motion intensity levels, page-type motion rules, video policy, embed policy, fallback requirements, and performance policy for the store. It does not generate CSS, it does not configure Shopify theme animations, it does not produce JavaScript, and it does not represent a validated production performance audit. The output is consumed by developers and theme configurators as a planning guide.",
+    "motion_vs_video_vs_media_note": "IMPORTANT — MOTION IS NOT VIDEO AND NOT STATIC MEDIA: Motion (scroll animation, interaction transitions, reveal behaviors, parallax, reduced-motion handling) is distinct from: (1) video assets — those are planned in build-video-plan, (2) static media — those are planned in build-media-plan. This workflow synthesizes the motion execution strategy that bridges the two — it defines how motion and media work together across page types, how autoplay video fits the motion context, how static media falls back when motion is unavailable, and how motion is governed by performance and accessibility rules. Motion decisions here are at the strategy level — not at the component implementation level.",
+    "implementation_certainty_boundary_note": "IMPORTANT — DO NOT FAKE IMPLEMENTATION CERTAINTY: Motion rules in this strategy are planning decisions. They have not been tested in a theme. They have not been validated for Core Web Vitals impact. They have not been reviewed by a frontend developer for feasibility in the target theme. The strategy must be explicit about what remains implementation-dependent and what cannot be confirmed without a live theme context.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/motion-media-strategy.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "docs/architecture.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-motion-media-strategy",
+    "name": "build-motion-media-strategy",
+    "category": "planning",
+    "phase": "Phase 9 — Media Plan, Video Plan, and Motion Media Strategy",
+    "purpose": "Synthesize a schema-validated store-level motion and media execution strategy from design-system, homepage-strategy, section-plan, media-plan, and video-plan. The motion-media-strategy.json output defines: the primary goal of the store's combined motion and media approach, global and per-interaction motion policies, video policy (consolidating what was planned in video-plan into execution constraints), embed policy, fallback policy (poster requirements, mobile fallbacks, static fallbacks), performance policy, and per-page-type motion/video/embed rules. This strategy is the unified motion-and-media planning artifact that enables: (1) consistent application of motion and media rules across all page types, (2) explicit accessibility and reduced-motion handling, (3) performance protection against motion complexity exceeding safe thresholds, (4) alignment between design-system ceilings, video plan decisions, and frontend implementation guidance. All outputs are planning-level strategy decisions — not theme code, CSS, JavaScript, or confirmed implementation readiness assessments.",
+
+    "motion_media_strategy_vs_earlier_artifacts": "This workflow produces the store-level motion and media STRATEGY — the combined execution policy that governs how motion, video, and media interact across the store. It is distinct from: build-media-plan (which plans static media assets), build-video-plan (which plans video slots), and build-design-system (which established the raw motion and media ceilings). This workflow synthesizes those earlier decisions into a single coherent strategy artifact that can guide implementation. The design-system established what is allowed. The media and video plans established what is needed. This workflow defines how it all works together.",
+
+    "upstream_dependency_order": "This workflow is the last in Phase 9. It depends on: build-design-system (Phase 3), build-homepage-strategy (Phase 3), build-section-plan (Phase 4), build-media-plan (Phase 9, step 1), build-video-plan (Phase 9, step 2). All upstream artifacts must be available before this workflow runs.",
+
+    "inputs": {
+      "from_design_system": {
+        "source": "build-design-system → design-system.json",
+        "artifact_path": "projects/{project_id}/design-system.json",
+        "data_treatment": "AUTHORITATIVE MOTION CEILING — design-system.json is the most authoritative input for this workflow. All motion, video, and performance decisions it established in Phase 3 are ceilings that this strategy must not exceed. The strategy may be more conservative than the design-system allows, but never more permissive.",
+        "fields_used": [
+          {
+            "field": "motion_strategy",
+            "treatment": "GLOBAL MOTION POLICY SOURCE — design-system.motion_strategy provides the base values for the output motion_policy object: global_motion_level, scroll_motion_level, interaction_motion_level, mobile_motion_limit, and reduced_motion_respect_required. The strategy output must not exceed any of these values.",
+            "note": "Design-system motion_strategy was synthesized in Phase 3 from brand_role, intake motion_level_preference, and performance_priority. These are validated planning decisions — not suggestions."
+          },
+          {
+            "field": "motion_strategy.hero_video_allowed",
+            "treatment": "VIDEO POLICY SEED — hero_video_allowed from design-system is the authoritative source for the output video_policy.hero_video_allowed field.",
+            "note": "Must match video-plan.json hero video slot presence — if design-system forbids hero video but video-plan somehow plans one, the design-system wins."
+          },
+          {
+            "field": "motion_strategy.autoplay_policy",
+            "treatment": "AUTOPLAY POLICY SEED — design-system autoplay_policy maps directly to the output video_policy.autoplay_policy field.",
+            "note": "Autoplay policy must be consistent with what was applied in video-plan. If inconsistency is found, flag it and use the more restrictive value."
+          },
+          {
+            "field": "motion_strategy.loop_policy",
+            "treatment": "LOOP POLICY SEED — design-system loop_policy maps directly to the output video_policy.loop_policy field.",
+            "note": "Loop policy must be consistent with video-plan slot configurations."
+          },
+          {
+            "field": "performance_guardrails",
+            "treatment": "PERFORMANCE POLICY SOURCE — design-system performance_guardrails provides the base values for the output performance_policy object: performance_priority, heavy_media_control (derived from heavy_media_allowed), lazy_load_required, and hero_media_review_required.",
+            "note": "Performance guardrails are the strongest constraints in the entire motion strategy. They override all creative preferences."
+          },
+          {
+            "field": "media_strategy",
+            "treatment": "EMBED AND MEDIA CONTEXT — design-system media_strategy provides context for embed_policy. If design-system restricts external embeds or has a media sourcing preference, this informs embed_usage_level and trusted_embed_sources_only.",
+            "note": "External video embeds (YouTube, Vimeo) have performance and privacy implications. embed_policy must reflect design-system media preferences."
+          }
+        ]
+      },
+
+      "from_homepage_strategy": {
+        "source": "build-homepage-strategy → homepage-strategy.json",
+        "artifact_path": "projects/{project_id}/homepage-strategy.json",
+        "data_treatment": "PAGE-TYPE MOTION CONTEXT — homepage-strategy provides the section-level signals that inform per-page-type motion rules for the homepage. Section roles, motion priorities, and media requirements from homepage-strategy define which page types receive what motion allowances.",
+        "fields_used": [
+          {
+            "field": "section_sequence",
+            "treatment": "HOMEPAGE PAGE-TYPE RULE SEED — section_sequence defines which sections appear on the homepage and their motion/media requirements. This informs the homepage entry in the output page_type_rules array: motion_allowed, video_allowed, embed_allowed, and notes.",
+            "note": "Each section in section_sequence may have different motion requirements. The homepage page_type_rule is a summary — not a per-section configuration."
+          },
+          {
+            "field": "hero_strategy",
+            "treatment": "HERO MOTION CONTEXT — hero_strategy defines the hero section's media type and impression. If hero video is allowed, hero motion context is critical. If hero is static image, motion may be applied via CSS reveal animation — but only within design-system motion ceilings.",
+            "note": "Hero motion decisions must always preserve the hero fallback from video-plan (hero-image from media-plan). Motion applied to a hero image cannot assume video will be present."
+          },
+          {
+            "field": "storytelling_intensity",
+            "treatment": "SCROLL AND REVEAL MOTION SIGNAL — high storytelling_intensity → scroll motion and reveal animations are more important on the homepage. Low intensity → minimal motion, static-first approach.",
+            "note": "Storytelling motion must respect reduced_motion_respect_required and mobile_motion_limit ceilings."
+          }
+        ]
+      },
+
+      "from_section_plan": {
+        "source": "build-section-plan → section-instances (array of section-instance.json)",
+        "artifact_path": "projects/{project_id}/section-instances/",
+        "data_treatment": "SECTION-LEVEL MOTION CONSTRAINT VERIFICATION — section instances provide the resolved, design-system-constrained section configurations. The motion_intensity and media_intensity values on section instances are already constrained by the design-system. This workflow uses them to verify that the motion strategy is consistent with what section instances allow.",
+        "fields_used": [
+          {
+            "field": "motion_intensity",
+            "treatment": "SECTION MOTION ALIGNMENT CHECK — the maximum motion_intensity across all section instances must be ≤ design-system global_motion_level. If any section instance has motion_intensity = strong AND design-system global_motion_level = subtle, this is a conflict that must be flagged.",
+            "note": "Section instances were constrained in Phase 4 — conflicts here indicate a Phase 4 enforcement gap, not a Phase 9 decision point."
+          },
+          {
+            "field": "media_intensity",
+            "treatment": "MEDIA MOTION INTERACTION — sections with high media_intensity may also have motion applied to the media (parallax, scroll-triggered entrance, fade-in). These combinations must be evaluated against performance_guardrails.",
+            "note": "High media_intensity + high motion_intensity in the same section is the most performance-risky combination. Must be flagged explicitly."
+          }
+        ]
+      },
+
+      "from_media_plan": {
+        "source": "build-media-plan → media-plan.json",
+        "artifact_path": "projects/{project_id}/media-plan.json",
+        "data_treatment": "STATIC MEDIA CONTEXT FOR MOTION PLANNING — media-plan provides the static media asset landscape that motion will be applied to. Motion decisions must be calibrated to the actual media plan: if only placeholder media exists, complex motion is inappropriate. If high-quality hero imagery is planned, reveal and parallax motion may be justified.",
+        "fields_used": [
+          {
+            "field": "media_goal",
+            "treatment": "MOTION-MEDIA GOAL ALIGNMENT — the motion strategy primary_goal must be consistent with or complementary to media_plan.media_goal. If media_goal = trust-building → motion should support trust signals (subtle reveals, gentle transitions), not distract. If media_goal = brand-experience → motion may be more expressive.",
+            "note": "Motion serving the wrong goal relative to the media plan creates visual incoherence. Alignment here is about strategic coherence, not just technical permission."
+          },
+          {
+            "field": "asset_gap_policy",
+            "treatment": "MOTION CONSERVATISM CALIBRATION — if media_plan has a high number of unavailable or placeholder slots, complex motion should be deferred. Motion applied to placeholder assets creates a poor experience that is worse than no motion at all.",
+            "note": "A media plan with many unavailable slots is a signal that motion ambition should be reduced until media sourcing is resolved."
+          },
+          {
+            "field": "planned_asset_slots",
+            "treatment": "FALLBACK MEDIA VERIFICATION — verify that every planned video slot in the video plan has a corresponding static fallback in the media plan. If hero video is planned but no hero image slot exists in the media plan, flag this as a critical gap in the motion strategy notes.",
+            "note": "The motion strategy cannot define a coherent fallback policy without confirming that static fallback assets are planned in the media plan."
+          }
+        ]
+      },
+
+      "from_video_plan": {
+        "source": "build-video-plan → video-plan.json",
+        "artifact_path": "projects/{project_id}/video-plan.json",
+        "data_treatment": "VIDEO EXECUTION CONTEXT — video-plan.json provides the resolved video slot configurations that this motion strategy must incorporate. The video_policy in the motion-media-strategy output should be consistent with what was planned in the video plan. This is an integration and validation step, not a re-planning step.",
+        "fields_used": [
+          {
+            "field": "video_goal",
+            "treatment": "VIDEO POLICY GOAL ALIGNMENT — video-plan.video_goal informs the motion-media-strategy primary_goal derivation. If video_goal = none, the motion strategy should reflect a static-media-first approach with motion as the primary experiential layer.",
+            "note": "When video_goal = none, motion takes on more importance as the primary dynamic experiential element — but must still respect all ceilings."
+          },
+          {
+            "field": "video_usage_level",
+            "treatment": "VIDEO POLICY SEED — video-plan.video_usage_level maps directly to the output video_policy.video_usage_level field.",
+            "note": "Must be ≤ design-system video_usage_level ceiling. If video-plan output exceeds the ceiling (enforcement gap in video-plan), apply the ceiling here."
+          },
+          {
+            "field": "planned_video_slots",
+            "treatment": "AUTOPLAY AND LOOP POLICY VERIFICATION — analyze planned_video_slots to verify: (1) all slots with autoplay = true also have muted = true, (2) all high-performance-risk slots have poster_required = true, (3) loop configurations are within loop_policy ceiling. Flag any inconsistencies in motion strategy notes.",
+            "note": "This is a final verification pass before the strategy is persisted — not a re-planning pass."
+          },
+          {
+            "field": "degradation_policy",
+            "treatment": "FALLBACK POLICY INTEGRATION — video-plan.degradation_policy informs the motion-media-strategy fallback_policy. The motion strategy fallback_policy must be compatible with and more specific than what the video plan defined.",
+            "note": "The motion-media-strategy fallback_policy is the store's authoritative fallback ruleset. It must be complete enough to govern implementation."
+          },
+          {
+            "field": "video_sourcing_summary.slots_with_no_production_path",
+            "treatment": "MOTION CONSERVATISM SIGNAL — if many video slots have no production path, the motion strategy should be designed to function well in a video-free state. Static media with subtle motion should be the baseline experience, not a degraded experience.",
+            "note": "A store that plans ambitious video but has no production path for most slots needs a motion strategy that works beautifully without video."
+          }
+        ]
+      }
+    },
+
+    "outputs": {
+      "primary_output": "motion-media-strategy.json",
+      "artifact_path": "projects/{project_id}/motion-media-strategy.json",
+      "schema": "schemas/motion-media-strategy.schema.json",
+      "output_fields": {
+        "strategy_name": {
+          "source": "LLM synthesis",
+          "type": "LLM-synthesized string",
+          "format_guidance": "Recommended pattern: '[Store Vertical] Motion and Media Strategy — [Primary Goal]'. Example: 'Athletic Footwear Motion and Media Strategy — Performance-First Product Experience'.",
+          "note": "strategy_name is a planning label for human orientation."
+        },
+        "primary_goal": {
+          "source": "Derived from media-plan.media_goal + video-plan.video_goal + design-system.motion_strategy global level",
+          "type": "constrained enum",
+          "schema_enum": ["conversion-support", "storytelling-support", "product-demonstration", "brand-experience", "hybrid"],
+          "derivation_logic": {
+            "conversion-support": "Both media and video goals are conversion-oriented AND motion is subtle-to-balanced. Motion primarily guides attention toward conversion triggers.",
+            "storytelling-support": "Media goal is storytelling-support AND motion adds narrative rhythm (section reveals, scroll-driven storytelling).",
+            "product-demonstration": "Video goal is product-demonstration AND motion highlights product features (hover zoom, detail reveal animations).",
+            "brand-experience": "Brand role = premium-innovator or brand-experience AND design-system allows balanced-to-strong motion AND video supports brand immersion.",
+            "hybrid": "Multiple goals are meaningfully present — conversion and storytelling, or product-demonstration and trust-building."
+          }
+        },
+        "motion_policy": {
+          "source": "Derived from design-system.motion_strategy (authoritative ceiling) + calibrated by section plan motion intensity patterns",
+          "type": "object",
+          "required_fields": ["global_motion_level", "scroll_motion_level", "interaction_motion_level", "mobile_motion_limit"],
+          "ceiling_rule": "All motion policy levels must be ≤ design-system equivalents. Never exceed.",
+          "field_derivation": {
+            "global_motion_level": "Direct from design-system.motion_strategy.global_motion_level. The strategy may use a lower value if video_goal = none and the store should feel static-first.",
+            "scroll_motion_level": "Direct from design-system.motion_strategy.scroll_motion_level. Calibrate downward if performance_priority = high or critical.",
+            "interaction_motion_level": "Direct from design-system.motion_strategy.interaction_motion_level. Interaction motion (hover, focus, click feedback) has lower performance impact than scroll motion.",
+            "mobile_motion_limit": "Direct from design-system.motion_strategy.mobile_motion_limit. Always strict or balanced for stores with performance_priority = high or critical.",
+            "reduced_motion_respect_required": "Always true unless design-system explicitly marks it false. The prefers-reduced-motion media query must always be respected — this is both an accessibility requirement and a best practice."
+          }
+        },
+        "video_policy": {
+          "source": "Derived from video-plan + design-system (use more restrictive of the two where they differ)",
+          "type": "object",
+          "required_fields": ["video_usage_level", "hero_video_allowed", "product_demo_priority", "autoplay_policy"],
+          "field_derivation": {
+            "video_usage_level": "From video-plan.video_usage_level. Must be ≤ design-system ceiling.",
+            "hero_video_allowed": "From design-system.motion_strategy.hero_video_allowed. This is a hard constraint.",
+            "product_demo_priority": "Derived from video-plan planned_video_slots: count of product-loop and explainer-clip slots with availability_status != unavailable. Many viable slots → high. Some → medium. None or all unavailable → low.",
+            "autoplay_policy": "From design-system.motion_strategy.autoplay_policy. Must be consistent with video-plan slot configurations.",
+            "loop_policy": "From design-system.motion_strategy.loop_policy. Must be consistent with video-plan slot configurations."
+          }
+        },
+        "embed_policy": {
+          "source": "Derived from design-system media_strategy + store-profile + brand positioning",
+          "type": "object",
+          "required_fields": ["external_embeds_allowed", "embed_usage_level"],
+          "field_derivation": {
+            "external_embeds_allowed": "Default to false unless design-system or intake explicitly allows external media embeds. External embeds (YouTube, Vimeo, etc.) introduce third-party performance and privacy dependencies.",
+            "embed_usage_level": "none for most stores in planning phase. light is acceptable only when a specific embed use case is justified by the content plan (e.g. a guide page that embeds a how-to video from a brand-owned channel).",
+            "trusted_embed_sources_only": "Always true when external_embeds_allowed = true. Embeds from unknown or untrusted sources must be forbidden."
+          },
+          "note": "Embed policy should be conservative by default. External video embeds are planning-phase decisions — implementation requires legal, privacy, and performance review."
+        },
+        "fallback_policy": {
+          "source": "Derived from video-plan.degradation_policy + media-plan planned slots + design-system performance_guardrails",
+          "type": "object",
+          "required_fields": ["poster_required_for_video", "mobile_fallback_required_for_hero_media", "static_fallback_required_for_motion"],
+          "field_derivation": {
+            "poster_required_for_video": "Always true. Every video slot must have a poster image. Poster images are planned in media-plan.",
+            "mobile_fallback_required_for_hero_media": "Always true for hero video. True for above-fold video. False is only acceptable for below-fold, non-autoplay video on mobile.",
+            "static_fallback_required_for_motion": "Always true. Every motion-dependent section must function correctly with motion disabled. A section that relies on animation to be readable fails accessibility and reduced-motion requirements.",
+            "text_context_required_for_media_sections": "True when media_goal includes storytelling or brand-experience. Sections that rely on media alone for communication must also have text context for accessibility."
+          }
+        },
+        "performance_policy": {
+          "source": "Direct from design-system performance_guardrails (authoritative)",
+          "type": "object",
+          "required_fields": ["performance_priority", "heavy_media_control", "lazy_load_required"],
+          "field_derivation": {
+            "performance_priority": "Direct from design-system.performance_guardrails.performance_priority. Cannot be relaxed in the motion strategy.",
+            "heavy_media_control": "Derived from design-system.performance_guardrails.heavy_media_allowed: false → strict; true with high priority → balanced; true with flexible priority → flexible.",
+            "lazy_load_required": "Always true for below-fold media. Always true for all video slots. Only hero media above the fold may skip lazy loading — and only after performance review.",
+            "hero_media_review_required": "True when any hero video or high-performance-risk hero image is planned. Hero media LCP impact must be reviewed before production deployment."
+          }
+        },
+        "page_type_rules": {
+          "source": "Derived from homepage-strategy, section-plan, video-plan, and design-system page-level permissions",
+          "type": "array of page-type rule objects",
+          "required_page_types": "homepage must always be present. Include only page types with actual motion, video, or embed decisions to make.",
+          "standard_page_type_rules": {
+            "homepage": {
+              "motion_allowed": "true (unless global_motion_level = none)",
+              "video_allowed": "from design-system hero_video_allowed + video-plan",
+              "embed_allowed": "false by default",
+              "notes": "Homepage receives the richest motion treatment within ceilings. Hero section is the primary motion investment. Scroll reveals are appropriate for storytelling sections."
+            },
+            "product-page": {
+              "motion_allowed": "true for subtle interaction motion (hover zoom, gallery transition, add-to-cart feedback)",
+              "video_allowed": "from video-plan product-loop and explainer-clip slots",
+              "embed_allowed": "false by default",
+              "notes": "Product page motion should serve product discovery and conversion — not distract. Hover zoom on product images and gentle section transitions are the primary motion investments."
+            },
+            "collection-page": {
+              "motion_allowed": "true for subtle product card entrance animations only",
+              "video_allowed": "false by default — collection pages benefit more from quality imagery than video",
+              "embed_allowed": "false",
+              "notes": "Collection page motion should support browsing efficiency — not create visual complexity. Grid animations should be subtle and performance-safe."
+            },
+            "guide-page": {
+              "motion_allowed": "true for scroll-triggered section reveals only",
+              "video_allowed": "from video-plan explainer-clip slots if any",
+              "embed_allowed": "light — guide pages may embed brand-owned instructional video if embed_policy allows",
+              "notes": "Guide page motion should support reading flow — subtle reveals that guide the reader. Motion should never distract from the content."
+            },
+            "faq-page": {
+              "motion_allowed": "true only for accordion open/close interaction",
+              "video_allowed": "false",
+              "embed_allowed": "false",
+              "notes": "FAQ pages should be minimal motion — accordion interaction only. Video and complex motion on FAQ pages distract from the informational function."
+            },
+            "cart": {
+              "motion_allowed": "true only for quantity update and remove-item feedback",
+              "video_allowed": "false",
+              "embed_allowed": "false",
+              "notes": "Cart interactions must be fast and clear. Motion should only communicate state changes — never be decorative on the cart page."
+            }
+          },
+          "note": "Only include page types with actual motion or video decisions for this store. Do not add guide-page rules if no guide pages are planned."
+        },
+        "forbidden_patterns": {
+          "source": "Derived from design-system forbidden_impressions + performance_guardrails + accessibility rules",
+          "type": "array of strings",
+          "standard_forbidden_patterns": [
+            "Autoplay video with audio — always forbidden regardless of context",
+            "Video without poster image — always forbidden for above-fold video",
+            "Motion that cannot be disabled — prefers-reduced-motion must always be respected",
+            "Infinite scroll animation on page load without user interaction trigger",
+            "External video embeds from untrusted sources",
+            "Video content without text context when video is the sole communication of important information",
+            "Heavy motion (strong or cinematic) on mobile when mobile_motion_limit = strict",
+            "Parallax scrolling on mobile — known performance and motion sickness risk"
+          ],
+          "additional_forbidden_patterns_derivation": "Derive additional forbidden patterns from design-system.forbidden_impressions (e.g. if 'cheap' is a forbidden impression → low-quality animated GIFs should be forbidden; if 'overwhelming' is forbidden → multi-layer animation stacking should be forbidden)."
+        }
+      },
+      "downstream_consumers": [
+        "run-validation — validates motion-media-strategy.json against schema",
+        "build-deployment-manifest — includes motion/video implementation requirements as deployment considerations",
+        "developer/theme implementor — uses this strategy as the authoritative implementation guide"
+      ]
+    },
+
+    "nodes": {
+      "node_1_trigger": {
+        "id": "trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "name": "Receive Inputs",
+        "description": "Receives inputs from the orchestrating workflow.",
+        "input_contract": {
+          "project_id": "string — required",
+          "design_system": "object — required — design-system.json artifact",
+          "homepage_strategy": "object — required — homepage-strategy.json artifact",
+          "section_instances": "array — required — array of section-instance.json artifacts",
+          "media_plan": "object — required — media-plan.json artifact from Phase 9 step 1",
+          "video_plan": "object — required — video-plan.json artifact from Phase 9 step 2"
+        }
+      },
+
+      "node_2_validate_inputs": {
+        "id": "validate-upstream-inputs",
+        "type": "n8n-nodes-base.code",
+        "name": "Validate Upstream Inputs",
+        "description": "Validates required upstream artifacts. Fails fast if design-system, media-plan, or video-plan are missing.",
+        "validation_checks": [
+          "project_id must be a non-empty string",
+          "design_system must have motion_strategy, performance_guardrails, and media_strategy fields",
+          "design_system.motion_strategy must have global_motion_level, scroll_motion_level, interaction_motion_level, mobile_motion_limit, hero_video_allowed, autoplay_policy, loop_policy, and video_usage_level fields",
+          "homepage_strategy must have hero_strategy and section_sequence fields",
+          "section_instances must be an array",
+          "media_plan must have media_goal, planned_asset_slots, and asset_gap_policy fields",
+          "video_plan must have video_goal, video_usage_level, planned_video_slots, degradation_policy, and missing_asset_policy fields",
+          "Cross-validate: video_plan.video_usage_level must be ≤ design_system.motion_strategy.video_usage_level. If not → write ceiling_conflict = true to workflow context",
+          "Cross-validate: all video_plan slots with autoplay = true must have muted = true. If any don't → write autoplay_muted_conflict = true",
+          "Cross-validate: any video_plan hero-video slot must have a corresponding poster-image in media_plan.planned_asset_slots. If not → write poster_gap = true",
+          "Write all design-system motion ceilings to workflow context for enforcement in node 3 and node 6"
+        ],
+        "on_validation_failure": "Output error object with validation_failed = true, missing_fields, conflicts array, message. Do not proceed."
+      },
+
+      "node_3_extract_motion_context": {
+        "id": "extract-motion-context",
+        "type": "n8n-nodes-base.code",
+        "name": "Extract Motion Context and Constraints",
+        "description": "Extracts and normalizes all motion-relevant signals from upstream artifacts. Resolves conflicts using design-system as authoritative ceiling.",
+        "extraction_steps": [
+          "Extract global_motion_level ceiling from design-system",
+          "Extract scroll_motion_level ceiling from design-system",
+          "Extract interaction_motion_level ceiling from design-system",
+          "Extract mobile_motion_limit ceiling from design-system",
+          "Extract reduced_motion_respect_required from design-system",
+          "Extract performance_priority from design-system.performance_guardrails",
+          "Extract heavy_media_control: derive from heavy_media_allowed + performance_priority",
+          "Extract lazy_load_required from design-system.performance_guardrails",
+          "Extract hero_media_review_required from design-system.performance_guardrails",
+          "Extract video_usage_level from video-plan (apply design-system ceiling if exceeded)",
+          "Extract hero_video_allowed from design-system",
+          "Extract autoplay_policy from design-system",
+          "Extract loop_policy from design-system",
+          "Extract product_demo_priority signal from video-plan slot counts",
+          "Extract embed policy signals from design-system media_strategy",
+          "Extract primary_goal signals: media-plan.media_goal + video-plan.video_goal + design-system global_motion_level",
+          "Extract storytelling_intensity from homepage-strategy",
+          "Extract section motion_intensity max value from section_instances",
+          "Extract fallback coverage: verify hero poster exists in media-plan, verify video fallbacks in video-plan.degradation_policy",
+          "Extract forbidden impressions from design-system for forbidden_patterns derivation",
+          "Build page_type_motion_map: for each relevant page type, derive motion_allowed, video_allowed, embed_allowed from upstream context",
+          "Flag any ceiling conflicts or coverage gaps from validation step",
+          "If ceiling_conflict = true → resolve by applying design-system ceiling and note the conflict in strategy notes",
+          "If poster_gap = true → note in strategy notes and flag for media-plan update",
+          "If autoplay_muted_conflict = true → enforce muted = true in video_policy output and note conflict"
+        ]
+      },
+
+      "node_4_build_llm_prompt": {
+        "id": "build-llm-prompt",
+        "type": "n8n-nodes-base.code",
+        "name": "Build LLM Prompt",
+        "description": "Assembles the structured LLM prompt for motion-media strategy synthesis.",
+        "prompt_components": [
+          "System message: motion and media strategy synthesizer for schema-driven commerce OS. Output must conform to motion-media-strategy.schema.json. Must not exceed design-system ceilings. Must not fake implementation certainty. Must always include complete fallback policy. Must always enforce reduced_motion_respect_required. The strategy is a planning artifact — not code.",
+          "Project context: project_id, vertical, brand_role, primary_goal signal",
+          "Design-system hard constraints (complete): global_motion_level, scroll_motion_level, interaction_motion_level, mobile_motion_limit, hero_video_allowed, autoplay_policy, loop_policy, video_usage_level ceiling, performance_priority, heavy_media_allowed, lazy_load_required",
+          "Media context: media_plan.media_goal, sourcing load summary, asset gap policy",
+          "Video context: video_plan.video_goal, video_usage_level, slot count and role summary, degradation policy summary",
+          "Homepage and section context: storytelling_intensity, hero type, section motion_intensity max, section count",
+          "Ceiling conflicts and gaps to acknowledge in strategy notes",
+          "Schema output shape: describe all required fields and enum options for motion-media-strategy.schema.json",
+          "Page type list for page_type_rules: homepage, product-page, collection-page, guide-page (only if guide pages exist), faq-page, cart",
+          "Forbidden patterns context: design-system forbidden_impressions to translate into forbidden motion patterns",
+          "CRITICAL INSTRUCTIONS: primary_goal must be consistent with both media and video goals. motion_policy values must be ≤ design-system ceilings — never exceed. reduced_motion_respect_required must be true unless design-system explicitly marks it false. Every page type in page_type_rules must have explicit motion_allowed, video_allowed, and embed_allowed values. fallback_policy must be complete — poster_required_for_video = true, mobile_fallback_required_for_hero_media = true, static_fallback_required_for_motion = true. forbidden_patterns must include at minimum: autoplay video with audio, video without poster above fold, motion that cannot be disabled. The strategy must NOT describe CSS implementation, animation keyframes, JavaScript, or theme configuration — those are developer implementation decisions."
+        ]
+      },
+
+      "node_5_llm_synthesis": {
+        "id": "llm-synthesis",
+        "type": "n8n-nodes-base.openAi",
+        "name": "LLM Synthesis — Motion Media Strategy",
+        "description": "Calls the LLM to synthesize the motion-media-strategy JSON from the structured prompt.",
+        "model": "gpt-4o",
+        "temperature": 0.2,
+        "response_format": "json_object",
+        "credential_placeholder": "PLACEHOLDER — confirm actual n8n OpenAI credential name at runtime. Do not hardcode.",
+        "evidence_boundary_note": "The LLM synthesizes motion and media strategy decisions based on upstream planning artifacts. It has no access to theme code, CSS, JavaScript, animation libraries, or live page performance data. All LLM-generated motion strategy decisions are planning intentions — not validated implementation specifications."
+      },
+
+      "node_6_parse_and_enforce": {
+        "id": "parse-and-enforce-constraints",
+        "type": "n8n-nodes-base.code",
+        "name": "Parse and Enforce Constraints",
+        "description": "Parses the LLM output and enforces all hard constraints. Applies design-system ceilings authoritatively.",
+        "constraint_enforcement_rules": [
+          "MOTION LEVEL CEILINGS: For each motion level field in motion_policy — if LLM output exceeds design-system ceiling → apply ceiling value and add to strategy notes",
+          "REDUCED MOTION ENFORCEMENT: If reduced_motion_respect_required is absent or false in LLM output → force to true (unless design-system explicitly marks it false — confirm in workflow context)",
+          "VIDEO USAGE LEVEL CEILING: If video_policy.video_usage_level > design-system ceiling → apply ceiling value",
+          "HERO VIDEO ENFORCEMENT: If design-system hero_video_allowed = false AND video_policy.hero_video_allowed = true → force to false",
+          "AUTOPLAY POLICY ENFORCEMENT: If video_policy.autoplay_policy is more permissive than design-system ceiling → apply ceiling value",
+          "LOOP POLICY ENFORCEMENT: If video_policy.loop_policy is more permissive than design-system ceiling → apply ceiling value",
+          "FALLBACK POLICY ENFORCEMENT: Ensure poster_required_for_video = true, mobile_fallback_required_for_hero_media = true, static_fallback_required_for_motion = true. Override if LLM set any to false without justification.",
+          "PERFORMANCE POLICY ENFORCEMENT: Verify performance_policy.performance_priority matches design-system. Verify lazy_load_required = true.",
+          "FORBIDDEN PATTERNS MINIMUM: Ensure at minimum the standard forbidden patterns are present: autoplay with audio, video without poster above fold, motion that cannot be disabled. Add any missing standard patterns.",
+          "EMBED POLICY CONSERVATISM: If embed_policy.external_embeds_allowed = true AND no specific embed use case is justified by section plan or content plan → change to false and add note",
+          "PAGE TYPE RULES COMPLETENESS: Verify homepage is always present. Remove any page types that are not in the store's content plan.",
+          "CEILING CONFLICT NOTES: If ceiling_conflict was flagged in validation → add to strategy notes field describing the conflict and resolution",
+          "POSTER GAP NOTES: If poster_gap was flagged → add to strategy notes describing the gap and recommending media-plan update"
+        ]
+      },
+
+      "node_7_validate_schema": {
+        "id": "validate-schema",
+        "type": "n8n-nodes-base.code",
+        "name": "Validate Against Schema",
+        "description": "Validates the constrained motion-media-strategy output against schemas/motion-media-strategy.schema.json using AJV.",
+        "schema_reference": "schemas/motion-media-strategy.schema.json",
+        "on_validation_failure": "Output schema_validation_failed = true with errors array. Do not persist.",
+        "on_validation_success": "Proceed to persist."
+      },
+
+      "node_8_persist": {
+        "id": "persist",
+        "type": "n8n-nodes-base.github",
+        "name": "Persist to Git",
+        "description": "Writes the validated motion-media-strategy.json to the project folder in the Git repository.",
+        "target_path": "projects/{project_id}/motion-media-strategy.json",
+        "commit_message_pattern": "feat({project_id}): add motion-media-strategy artifact [build-motion-media-strategy]",
+        "credential_placeholder": "PLACEHOLDER — confirm actual n8n GitHub credential name at runtime. Do not hardcode.",
+        "draft_safety_note": "In draft mode, write to projects/{project_id}/drafts/motion-media-strategy.json."
+      },
+
+      "node_9_output": {
+        "id": "output",
+        "type": "n8n-nodes-base.set",
+        "name": "Output",
+        "description": "Returns the motion-media-strategy artifact and workflow status to the calling orchestrator.",
+        "output_fields": {
+          "workflow_id": "build-motion-media-strategy",
+          "project_id": "{project_id}",
+          "status": "completed | failed",
+          "artifact_path": "projects/{project_id}/motion-media-strategy.json",
+          "primary_goal": "{primary_goal from artifact}",
+          "global_motion_level": "{global_motion_level from motion_policy}",
+          "video_usage_level": "{video_usage_level from video_policy}",
+          "hero_video_allowed": "{hero_video_allowed from video_policy}",
+          "reduced_motion_respect_required": "{reduced_motion_respect_required from motion_policy}",
+          "performance_priority": "{performance_priority from performance_policy}",
+          "page_type_rules_count": "{count of page_type_rules entries}",
+          "forbidden_patterns_count": "{count of forbidden_patterns}",
+          "ceiling_conflicts_resolved": "{true if any ceiling conflicts were detected and resolved}",
+          "poster_gaps_flagged": "{true if any poster gaps were detected and noted}",
+          "downstream_consumers": ["run-validation", "build-deployment-manifest", "developer/theme-implementor"],
+          "phase_9_complete": true,
+          "validation_passed": true,
+          "errors": []
+        }
+      }
+    },
+
+    "assumptions": [
+      "Design-system motion ceilings from Phase 3 are validated and authoritative — this workflow enforces them, not re-derives them",
+      "Media-plan and video-plan artifacts from Phase 9 steps 1 and 2 are validated before this workflow runs",
+      "No theme code, CSS, or animation implementation exists at planning time — the strategy is for future implementation only",
+      "Reduced-motion accessibility compliance is always required — prefers-reduced-motion must always be respected",
+      "Poster images are assumed to be planned in media-plan — if they are missing, this workflow flags the gap but does not create new media-plan slots",
+      "Autoplay video without muted = true is always forbidden — this is enforced unconditionally regardless of LLM output",
+      "The motion-media-strategy is the last Phase 9 artifact — it synthesizes the three Phase 9 plans into a unified execution strategy"
+    ],
+
+    "evidence_boundaries": [
+      "This workflow has no access to theme code, CSS animation capabilities, Shopify theme platform constraints, or JavaScript animation libraries",
+      "Motion strategy decisions have not been validated against Core Web Vitals or page performance benchmarks",
+      "The strategy cannot confirm that the target theme supports any specific animation feature (parallax, reveal, transition types)",
+      "Page-type motion rules are planning-level permissions — not confirmed theme configurations",
+      "Forbidden pattern enforcement is a planning-level constraint — it must be re-verified during theme implementation review",
+      "Poster image existence is verified by checking media-plan slots — not by confirming actual image files exist"
+    ],
+
+    "open_questions": [
+      "What theme platform and animation capabilities does the target store use? Theme-specific motion feasibility cannot be confirmed at planning time.",
+      "Have the motion levels been validated against the target theme's performance characteristics? Requires frontend developer review.",
+      "Is there a confirmed reduced-motion testing protocol for this project? Accessibility testing must be included in the implementation review.",
+      "Should parallax scrolling be explicitly forbidden given mobile performance risks? This is a conservative default — confirm with the implementation team.",
+      "What is the plan for testing motion accessibility (prefers-reduced-motion) in the target theme? Must be part of the QA plan.",
+      "Are any external video embed sources (YouTube, Vimeo) specifically approved for this store? Requires legal and privacy review."
+    ],
+
+    "draft_dev_safety_notes": [
+      "This workflow definition is not yet executable n8n JSON. A developer must translate it before running.",
+      "All credential references are PLACEHOLDER values.",
+      "This workflow must run AFTER both build-media-plan and build-video-plan complete successfully.",
+      "In draft/dev mode, write output to projects/{project_id}/drafts/motion-media-strategy.json.",
+      "This is the final Phase 9 artifact. Upon successful completion, Phase 9 is complete and Phase 10 (validation) may begin.",
+      "The motion-media-strategy output is a planning artifact only — not theme code, not CSS, not a performance audit, not a deployment approval."
+    ]
+  }
+}

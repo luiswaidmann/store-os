@@ -1,0 +1,305 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/video-plan.schema.json",
+  "title": "Video Plan Schema",
+  "description": "Schema for a store-level video asset planning artifact in store-os. This plan defines what video assets are needed, by role and page type, at what priority, and how the store degrades safely when video is not available or not desired. It is a planning artifact only — not a production storyboard set, not a confirmed video availability report, and not a pre-approved video production schedule.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "plan_name",
+    "video_goal",
+    "video_usage_level",
+    "planned_video_slots",
+    "degradation_policy",
+    "missing_asset_policy"
+  ],
+  "properties": {
+    "plan_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable name for this store's video plan. Recommended pattern: '[Store Vertical] Video Plan — [Primary Goal]'."
+    },
+    "video_goal": {
+      "type": "string",
+      "enum": [
+        "conversion-support",
+        "storytelling-support",
+        "product-demonstration",
+        "brand-experience",
+        "hybrid",
+        "none"
+      ],
+      "description": "Primary strategic intent driving this video plan. 'none' is a valid value when the store has no video appetite or performance ceilings forbid it."
+    },
+    "video_usage_level": {
+      "type": "string",
+      "enum": [
+        "none",
+        "light",
+        "balanced",
+        "rich"
+      ],
+      "description": "Store-level video usage intensity. Derived from design-system motion_strategy and intake hero_video_allowed / performance_priority signals. Must not exceed design-system ceilings."
+    },
+    "planned_video_slots": {
+      "type": "array",
+      "description": "Individual planned video slot definitions. Each slot represents one needed video asset in the store's video plan — its role, sourcing status, and constraints. An empty array is valid when video_usage_level = none.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slot_id",
+          "video_role",
+          "page_type",
+          "required",
+          "availability_status",
+          "autoplay",
+          "muted",
+          "loop",
+          "poster_required",
+          "mobile_fallback_required",
+          "performance_risk"
+        ],
+        "properties": {
+          "slot_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier for this video slot within the plan. Recommended pattern: '{page_type}-{video_role}-{index}'."
+          },
+          "video_role": {
+            "type": "string",
+            "enum": [
+              "hero-video",
+              "product-loop",
+              "explainer-clip",
+              "testimonial-style-clip",
+              "ambient-motion",
+              "comparison-video",
+              "background-video",
+              "editorial-video",
+              "other"
+            ],
+            "description": "Functional role of this video slot in the store experience."
+          },
+          "page_type": {
+            "type": "string",
+            "enum": [
+              "homepage",
+              "product-page",
+              "collection-page",
+              "guide-page",
+              "faq-page",
+              "article",
+              "generic-page",
+              "cart"
+            ]
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Whether this slot represents a required video (true) or an optional enhancement (false). Hero video and product demo video may be required if design strategy depends on them."
+          },
+          "availability_status": {
+            "type": "string",
+            "enum": [
+              "planned",
+              "requires-footage",
+              "requires-script",
+              "requires-presenter",
+              "requires-product-recording",
+              "placeholder",
+              "unavailable",
+              "requires-review"
+            ],
+            "description": "Current availability status of this video slot. Conservative handling: if any production dependency (footage, script, presenter, recording) is missing, the slot must not be treated as available."
+          },
+          "autoplay": {
+            "type": "boolean",
+            "description": "Whether this video is planned to autoplay. Must respect design-system autoplay_policy and intake performance_priority."
+          },
+          "muted": {
+            "type": "boolean",
+            "description": "Whether this video is planned to play muted. Autoplay videos must always be muted."
+          },
+          "loop": {
+            "type": "boolean",
+            "description": "Whether this video is planned to loop. Loop videos have higher performance impact."
+          },
+          "poster_required": {
+            "type": "boolean",
+            "description": "Whether a poster image is required as a fallback for this video slot. Always required for hero video and any above-fold video."
+          },
+          "mobile_fallback_required": {
+            "type": "boolean",
+            "description": "Whether a mobile-specific fallback (image or lighter video) is required for this slot."
+          },
+          "performance_risk": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "description": "Performance risk classification for this video slot. High-risk slots require review before production deployment."
+          },
+          "estimated_duration_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Planning-level estimated duration in seconds. 0 means unknown. This is a planning estimate, not a confirmed production duration."
+          },
+          "primary_message": {
+            "type": "string",
+            "description": "Planning-level description of what this video should communicate. Not a finalized script or production brief."
+          },
+          "production_notes": {
+            "type": "string",
+            "description": "Notes on production requirements, constraints, missing dependencies, or open questions for this video slot."
+          }
+        }
+      }
+    },
+    "degradation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "no_video_fallback_type",
+        "hero_no_video_fallback",
+        "performance_ceiling_exceeded_action"
+      ],
+      "description": "Policy for how the store degrades safely when video is not available, not desired, or blocked by performance constraints.",
+      "properties": {
+        "no_video_fallback_type": {
+          "type": "string",
+          "enum": [
+            "static-image",
+            "animated-poster",
+            "text-only",
+            "static-image-with-motion-overlay"
+          ],
+          "description": "Default fallback type when a video slot cannot be fulfilled."
+        },
+        "hero_no_video_fallback": {
+          "type": "string",
+          "enum": [
+            "hero-image",
+            "hero-image-with-text",
+            "static-gradient",
+            "text-only-hero"
+          ],
+          "description": "Specific fallback for the homepage hero section when no hero video is available or allowed."
+        },
+        "performance_ceiling_exceeded_action": {
+          "type": "string",
+          "enum": [
+            "remove-video-slot",
+            "downgrade-to-poster",
+            "defer-to-human-review",
+            "flag-in-deployment-manifest"
+          ],
+          "description": "Action taken when a video slot's performance_risk = high and performance_priority constraints forbid it."
+        },
+        "product_loop_no_video_fallback": {
+          "type": "string",
+          "enum": [
+            "product-image-gallery",
+            "static-product-image",
+            "no-media"
+          ],
+          "description": "Specific fallback for product page loop video when no product loop video is available."
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "missing_asset_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "missing_footage_handling",
+        "missing_script_handling",
+        "missing_presenter_handling",
+        "missing_product_recording_handling"
+      ],
+      "description": "Explicit handling rules for each category of missing video production dependency. The plan must not pretend assets exist when their production dependencies are unresolved.",
+      "properties": {
+        "missing_footage_handling": {
+          "type": "string",
+          "enum": [
+            "mark-slot-unavailable",
+            "use-stock-placeholder",
+            "defer-slot",
+            "flag-for-review"
+          ],
+          "description": "How to handle a video slot when raw footage has not been recorded and no production path exists."
+        },
+        "missing_script_handling": {
+          "type": "string",
+          "enum": [
+            "mark-slot-requires-script",
+            "defer-slot",
+            "flag-for-review"
+          ],
+          "description": "How to handle a video slot when no script or brief has been created."
+        },
+        "missing_presenter_handling": {
+          "type": "string",
+          "enum": [
+            "remove-presenter-requirement",
+            "defer-slot",
+            "substitute-product-only-format",
+            "flag-for-review"
+          ],
+          "description": "How to handle a testimonial-style or presenter-required video slot when no presenter is confirmed."
+        },
+        "missing_product_recording_handling": {
+          "type": "string",
+          "enum": [
+            "mark-slot-requires-product-recording",
+            "use-product-image-fallback",
+            "defer-slot",
+            "flag-for-review"
+          ],
+          "description": "How to handle a product demo or product loop slot when no product recording exists."
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "video_sourcing_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Summary of video production work required to fulfill this plan. Not a production schedule — a planning-level summary of gaps.",
+      "properties": {
+        "slots_requiring_footage": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "slots_requiring_script": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "slots_requiring_presenter": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "slots_with_no_production_path": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of planned video slots with no known production path — these are blocking gaps."
+        },
+        "high_performance_risk_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "General notes about this video plan, open questions, or assumptions made during synthesis."
+    }
+  }
+}

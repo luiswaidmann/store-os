@@ -1,0 +1,499 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. The media-plan.json output is a planning artifact only — not an asset inventory, not a confirmed asset availability report, and not a production-ready asset manifest. All planned asset slots produced here are planning-level decisions derived from available strategy artifacts. Media assets are not confirmed available. Photography, design work, supplier sourcing, and asset creation tasks remain open. Human review is required before any media plan decisions are applied to production pages.",
+    "planning_artifact_note": "IMPORTANT — OUTPUT IS A PLAN, NOT AN ASSET INVENTORY: The media-plan.json artifact defines what media assets are needed, by page type and section role, at what priority level. It does not confirm that assets exist, that images have been taken, that graphics have been designed, or that any supplier has provided materials. The output is consumed by developers, designers, and content producers as a planning guide — not as a confirmed asset set ready for implementation.",
+    "asset_availability_boundary_note": "IMPORTANT — ASSETS ARE NOT CONFIRMED AVAILABLE: This workflow synthesizes a media plan from upstream strategy artifacts. It has no ability to verify whether photography has been taken, whether supplier images are available, whether graphic design has been completed, or whether any visual asset actually exists. Every planned_asset_slot must be treated as a planning intention — not a confirmed available file. The availability_status field on each slot communicates the planning-level assumption about sourcing path, not a verified asset existence check.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/media-plan.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "docs/architecture.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-media-plan",
+    "name": "build-media-plan",
+    "category": "planning",
+    "phase": "Phase 9 — Media Plan, Video Plan, and Motion Media Strategy",
+    "purpose": "Synthesize a schema-validated store-level media asset plan from homepage-strategy, section-plan, page-content, product-content, collection-content, design-system, brand-positioning, market-intelligence, and store-profile. The media-plan.json output defines: the primary media goal for the store, per-page-type media coverage (required vs optional asset types and priority), individual planned asset slots (by page type, section role, media role, availability status, and performance risk), asset gap policy (how missing or unavailable assets are handled), and a sourcing requirements summary (what production work remains). This plan is the store-level media asset planning framework that enables: (1) consistent media asset assignment across all page types, (2) prioritization of asset sourcing and creation effort, (3) explicit documentation of missing assets and sourcing gaps, and (4) alignment between brand positioning, design system media strategy, and implementation-level asset requests. All outputs are planning-level decisions — not confirmed asset inventories, not confirmed production schedules, and not production deployment approvals.",
+
+    "media_plan_vs_video_plan": "This workflow produces a STORE-LEVEL media plan covering still images, graphics, icons, trust visuals, comparison visuals, explainer graphics, and editorial imagery. Video assets and motion media are NOT the primary scope of this workflow. Video-specific planning is handled by build-video-plan (Phase 9, step 2). Motion and animation strategy is handled by build-motion-media-strategy (Phase 9, step 3). Hero video poster images ARE in scope for this plan as static media requirements. The distinction: this workflow plans static and graphic media. The next workflow plans video. The third workflow plans motion.",
+
+    "upstream_dependency_order": "This workflow depends on: build-design-system (Phase 3), build-homepage-strategy (Phase 3), build-section-plan (Phase 4), build-product-content (Phase 4), build-collection-content (Phase 5), build-page-content (Phase 6), build-brand-positioning (Phase 2), build-market-intelligence (Phase 2), build-store-profile (Phase 1). All upstream artifacts must be available before this workflow runs.",
+
+    "inputs": {
+      "from_homepage_strategy": {
+        "source": "build-homepage-strategy → homepage-strategy.json",
+        "artifact_path": "projects/{project_id}/homepage-strategy.json",
+        "data_treatment": "PRIMARY MEDIA CONTEXT LAYER — homepage-strategy.json provides the most concentrated and highest-priority media signals. The hero_strategy defines whether a hero image is required and what impression it must create. The section_sequence defines which section types appear on the homepage and whether each section has a media_required flag. The media_role field defines the store's top-level media intent. These signals drive the highest-priority planned_asset_slots in the output.",
+        "fields_used": [
+          {
+            "field": "hero_strategy.hero_image_required",
+            "treatment": "HERO ASSET SLOT TRIGGER — if hero_image_required = true, a hero-image slot with required = true must appear in planned_asset_slots for page_type = homepage.",
+            "note": "Hero image is always a high-performance-risk slot. A poster_image slot must also be planned if a hero video is possible in the video plan."
+          },
+          {
+            "field": "hero_strategy.hero_impression",
+            "treatment": "HERO IMAGE DIRECTION SIGNAL — hero_impression informs the alt_text_guidance and sourcing_notes for the hero image slot. Not a confirmed image direction — a planning-level signal.",
+            "note": "hero_impression is an LLM-synthesized planning signal from an earlier workflow. It may not reflect a confirmed creative brief."
+          },
+          {
+            "field": "section_sequence",
+            "treatment": "SECTION-LEVEL MEDIA SLOT GENERATION — each section in section_sequence that has media_required = true OR media_priority != none generates at least one planned_asset_slot for the homepage. Section type determines media_role: hero → hero slot, product-feature → product-gallery or trust-support slot, social-proof → trust-support or editorial slot, collection-showcase → collection-support slot.",
+            "note": "Section sequences are planning artifacts from an earlier LLM synthesis. Section count and type may not exactly match final theme implementation. Media slots derived from section_sequence are planning intentions."
+          },
+          {
+            "field": "media_role",
+            "treatment": "PLAN-LEVEL MEDIA GOAL SIGNAL — homepage_strategy.media_role maps to the media_goal field of the output media-plan artifact.",
+            "note": "If media_role is absent or ambiguous, derive media_goal from brand_positioning.brand_role and design_system.media_strategy.media_role."
+          },
+          {
+            "field": "trust_strategy",
+            "treatment": "TRUST VISUAL SLOT TRIGGER — if trust_strategy.trust_visual_required = true, at least one trust-support slot must be planned for the homepage.",
+            "note": "Trust visuals are often brand-sourced or design-created. They are rarely available from Shopify import data."
+          },
+          {
+            "field": "storytelling_intensity",
+            "treatment": "EDITORIAL AND STORYTELLING MEDIA SIGNAL — high storytelling_intensity → editorial-image and storytelling media slots are planned. Low intensity → editorial media is optional or deferred.",
+            "note": "Storytelling media typically requires photography or curated brand assets."
+          }
+        ]
+      },
+
+      "from_section_plan": {
+        "source": "build-section-plan → section-instances (array of section-instance.json)",
+        "artifact_path": "projects/{project_id}/section-instances/",
+        "data_treatment": "SECTION-LEVEL MEDIA SLOT REFINEMENT — section-instances from Phase 4 provide the resolved, design-system-constrained section configurations. Each section instance with a media_required signal generates a planned_asset_slot. Section instances refine the higher-level signals from homepage-strategy with actual section library assignments.",
+        "fields_used": [
+          {
+            "field": "media_required",
+            "treatment": "MEDIA SLOT REQUIRED FLAG — if section_instance.media_required = true, the corresponding planned_asset_slot must have required = true.",
+            "note": "Section instances are planning artifacts. media_required flags are planning decisions, not confirmed rendering requirements."
+          },
+          {
+            "field": "section_type",
+            "treatment": "MEDIA ROLE DERIVATION — section_type maps to media_role: hero → hero, product-showcase → product-gallery, collection-banner → collection-support, editorial → editorial, trust-bar → trust-support, comparison → comparison.",
+            "note": "Override the section_type mapping if the section_instance has a more specific media_role hint."
+          },
+          {
+            "field": "media_intensity",
+            "treatment": "PERFORMANCE RISK CALIBRATION — high media_intensity → performance_risk = high. Medium → medium. Low → low. Must not exceed design-system ceilings.",
+            "note": "Media intensity from section instances is already constrained by design-system ceilings in Phase 4. Slots exceeding ceilings must still be flagged."
+          }
+        ]
+      },
+
+      "from_product_content": {
+        "source": "build-product-content → product-content.json (per product, provisional)",
+        "artifact_path": "projects/{project_id}/product-content/{product_handle}.json",
+        "data_treatment": "PRODUCT IMAGE COVERAGE ANALYSIS — per-product content artifacts are analyzed as a pattern set to understand product image requirements and gaps. This analysis seeds planned_asset_slots for page_type = product-page.",
+        "availability": "AVAILABLE FROM PHASE 4.",
+        "fields_used": [
+          {
+            "field": "media_requirements",
+            "treatment": "PRODUCT MEDIA SLOT SEEDS — if product_content includes media_requirements, these directly inform planned_asset_slots for product-page. If absent, derive from vertical and brand positioning.",
+            "note": "Product images may be available from Shopify import. However, image quality, orientation, and brand alignment must be verified by a human."
+          },
+          {
+            "field": "comparison_visual_required",
+            "treatment": "COMPARISON SLOT TRIGGER — if any product content artifact signals a comparison visual requirement, at least one comparison-visual slot is planned.",
+            "note": "Comparison visuals typically require custom design or photography."
+          },
+          {
+            "field": "explainer_graphic_required",
+            "treatment": "EXPLAINER SLOT TRIGGER — if any product content artifact signals an explainer graphic requirement, at least one explainer slot is planned.",
+            "note": "Explainer graphics often require design creation and may be product-vertical-specific."
+          }
+        ],
+        "pattern_analysis": {
+          "products_with_no_images": "Critical gap — product-page media slots cannot be fulfilled for image-less products without photography.",
+          "products_with_single_image_only": "Limited gallery depth. Media plan must note this constraint.",
+          "products_with_rich_image_sets": "Products with 3+ images support gallery, zoom, and comparison layouts."
+        }
+      },
+
+      "from_collection_content": {
+        "source": "build-collection-content → collection-content.json (per collection, provisional)",
+        "artifact_path": "projects/{project_id}/collection-content/{collection_handle}.json",
+        "data_treatment": "COLLECTION BANNER IMAGE ANALYSIS — per-collection content artifacts define the collection banner and hero image requirements for collection pages.",
+        "availability": "AVAILABLE FROM PHASE 5.",
+        "fields_used": [
+          {
+            "field": "collection_banner_required",
+            "treatment": "COLLECTION BANNER SLOT TRIGGER — if collection_banner_required = true, a collection-image slot with section_role = collection-banner is planned for page_type = collection-page.",
+            "note": "Collection banner images are typically not available from Shopify import and require photography or design."
+          },
+          {
+            "field": "collection_type",
+            "treatment": "MEDIA SCOPE CALIBRATION — featured collections on the homepage have higher media priority. featured → high. standard → medium or low.",
+            "note": "Collection type is a planning classification, not a Shopify taxonomy."
+          }
+        ]
+      },
+
+      "from_page_content": {
+        "source": "build-page-content → page-content.json (per page, provisional)",
+        "artifact_path": "projects/{project_id}/page-content/{page_handle}.json",
+        "data_treatment": "PAGE-LEVEL MEDIA REQUIREMENTS — per-page content artifacts define whether specific store pages require supporting media.",
+        "availability": "AVAILABLE FROM PHASE 6.",
+        "fields_used": [
+          {
+            "field": "media_role",
+            "treatment": "PAGE MEDIA INTENT — page_content.media_role signals whether the page has a meaningful media requirement (e.g. about page with brand storytelling images, guide page with step-by-step graphics).",
+            "note": "Most store pages beyond homepage and product pages have low media priority. Elevate only when page_content explicitly signals a media role."
+          }
+        ]
+      },
+
+      "from_design_system": {
+        "source": "build-design-system → design-system.json",
+        "artifact_path": "projects/{project_id}/design-system.json",
+        "data_treatment": "MEDIA CONSTRAINT CEILING — design-system.json establishes the hard media ceilings that the media plan must not exceed. Media slots that violate design-system ceilings must be downgraded or flagged.",
+        "fields_used": [
+          {
+            "field": "media_strategy.media_role",
+            "treatment": "TOP-LEVEL MEDIA GOAL ALIGNMENT — design-system media_role must align with the media_goal. If they conflict, design-system is the authoritative ceiling.",
+            "note": "Design system media_role was shaped by brand positioning and intake constraints. It is a validated ceiling, not a suggestion."
+          },
+          {
+            "field": "media_strategy.hero_media_allowed",
+            "treatment": "HERO MEDIA CEILING — if hero_media_allowed = false, hero video and high-intensity hero image slots must be downgraded or removed regardless of homepage-strategy signals.",
+            "note": "hero_media_allowed = false is a hard constraint from brand_role or performance_priority intake signals."
+          },
+          {
+            "field": "performance_guardrails",
+            "treatment": "PERFORMANCE RISK CEILING — if heavy_media_allowed = false or performance_priority = critical, all high-performance-risk slots must be flagged for human review.",
+            "note": "Performance guardrails are the strongest constraint on media planning."
+          },
+          {
+            "field": "media_strategy.image_quality_ceiling",
+            "treatment": "IMAGE QUALITY PLANNING SIGNAL — informs sourcing notes: retina quality requires larger original files and specific export specifications.",
+            "note": "Image quality ceiling is a planning-level signal for the production team, not an implementation configuration."
+          }
+        ]
+      },
+
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "data_treatment": "BRAND IDENTITY MEDIA SIGNALS — brand positioning defines the visual identity direction that media assets must support.",
+        "fields_used": [
+          {
+            "field": "brand_role",
+            "treatment": "MEDIA SOPHISTICATION CALIBRATION — premium-innovator and editorial-guide roles require high-quality photography. value-leader and functional-standard roles may use simpler product-focused imagery.",
+            "note": "Brand role is a positioning decision, not a confirmed creative capability."
+          },
+          {
+            "field": "trust_style",
+            "treatment": "TRUST VISUAL DIRECTION — trust_style.primary_trust_signal maps to trust-support slot requirements: social-proof → review/testimonial visuals, certification → badge/certification mark, expertise → editorial or team photography.",
+            "note": "Trust visuals must be authentic. Slots without authentic sourcing paths must be marked unavailable."
+          }
+        ]
+      },
+
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "data_treatment": "STORE CONTEXT SIGNALS — store profile provides vertical, catalog type, and brand maturity signals that calibrate media plan scope and asset gap expectations.",
+        "fields_used": [
+          {
+            "field": "vertical",
+            "treatment": "VERTICAL-SPECIFIC MEDIA EXPECTATIONS — vertical calibrates what types of media are typical. Fashion/apparel → editorial and lifestyle photography. Health/supplements → ingredient and trust visuals. Home goods → lifestyle and context photography.",
+            "note": "Vertical-specific expectations are generic planning heuristics — the actual store's asset situation may differ significantly."
+          },
+          {
+            "field": "catalog_type",
+            "treatment": "PRODUCT IMAGE SCOPE CALIBRATION — large catalog → higher image gap rate likely. Small catalog → per-product image quality review is feasible.",
+            "note": "Catalog type may be from Shopify import data (operational truth) or intake signals. Verify which source was used."
+          },
+          {
+            "field": "brand_maturity",
+            "treatment": "ASSET AVAILABILITY EXPECTATION — established brand → some existing photography likely. early-stage → assume most media requires creation.",
+            "note": "Brand maturity is a planning signal. Actual asset availability must be verified by a human."
+          }
+        ]
+      },
+
+      "from_market_intelligence": {
+        "source": "build-market-intelligence → market-intelligence.json",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "data_treatment": "COMPETITIVE MEDIA CONTEXT — market intelligence signals what media standards competitors use, calibrating whether the planned media level is competitive.",
+        "fields_used": [
+          {
+            "field": "visual_standard",
+            "treatment": "COMPETITIVE MEDIA BENCHMARK — high visual standards in the vertical → flag low-quality or placeholder-only slots as competitive risks.",
+            "note": "Competitive benchmarks are LLM-synthesized, not from actual visual audits. Treat as planning signals only."
+          }
+        ]
+      }
+    },
+
+    "outputs": {
+      "primary_output": "media-plan.json",
+      "artifact_path": "projects/{project_id}/media-plan.json",
+      "schema": "schemas/media-plan.schema.json",
+      "output_fields": {
+        "plan_name": {
+          "source": "LLM synthesis",
+          "type": "LLM-synthesized string",
+          "format_guidance": "Recommended pattern: '[Store Vertical] Media Plan — [Primary Goal]'.",
+          "note": "plan_name is a planning label for human orientation."
+        },
+        "media_goal": {
+          "source": "Derived from homepage-strategy.media_role + brand-positioning.brand_role + design-system.media_strategy.media_role",
+          "type": "constrained enum",
+          "schema_enum": ["conversion-support", "trust-building", "storytelling-support", "product-demonstration", "brand-experience", "hybrid"],
+          "derivation_logic": {
+            "conversion-support": "homepage-strategy.media_role = conversion-support AND brand_role = value-leader or functional-standard.",
+            "trust-building": "trust_strategy.trust_visual_required = true AND trust_style signals social-proof or certification as primary trust driver.",
+            "storytelling-support": "storytelling_intensity is high AND brand_role = editorial-guide or lifestyle.",
+            "product-demonstration": "vertical signals product complexity AND product demo is the primary conversion lever.",
+            "brand-experience": "brand_role = premium-innovator or luxury.",
+            "hybrid": "Multiple goals are meaningfully present and none dominates."
+          }
+        },
+        "page_type_coverage": {
+          "source": "Derived from homepage-strategy, section-plan, product-content patterns, collection-content patterns, and page-content analysis",
+          "type": "array of page-type coverage objects",
+          "standard_assignments": {
+            "homepage": "required_asset_types: [hero-image]. optional_asset_types: [editorial-image, trust-visual, supporting-graphic]. media_priority: critical.",
+            "product-page": "required_asset_types: [product-image]. optional_asset_types: [comparison-visual, explainer-graphic, trust-visual]. media_priority: high.",
+            "collection-page": "required_asset_types: [collection-image]. optional_asset_types: [supporting-graphic, editorial-image]. media_priority: medium.",
+            "guide-page": "required_asset_types: []. optional_asset_types: [supporting-graphic, explainer-graphic, editorial-image]. media_priority: low.",
+            "generic-page": "required_asset_types: []. optional_asset_types: [editorial-image, supporting-graphic]. media_priority: low."
+          },
+          "note": "Only include page types present in this store's content plan."
+        },
+        "planned_asset_slots": {
+          "source": "Derived from homepage-strategy section_sequence + section-plan + product-content + collection-content + page-content + design-system ceilings",
+          "type": "array of planned asset slot objects",
+          "slot_availability_status_rules": {
+            "planned": "Use only when a known source already exists (e.g. Shopify products with confirmed images).",
+            "requires-sourcing": "Asset type is expected to be available from a known category but not yet confirmed.",
+            "requires-creation": "No existing source known — asset must be created.",
+            "placeholder": "Development/staging only — must be resolved before production.",
+            "unavailable": "No sourcing path exists — must be escalated per asset_gap_policy.",
+            "requires-review": "Potential source exists but human review is needed to confirm fitness."
+          },
+          "performance_risk_rules": {
+            "high": "Hero images, above-fold assets. Always require size optimization review before deployment.",
+            "medium": "Product gallery images, section feature images. Standard optimization required.",
+            "low": "Icons, supporting graphics, below-fold editorial images."
+          }
+        },
+        "asset_gap_policy": {
+          "source": "Derived from design-system performance_guardrails + store-profile brand_maturity + intake governance signals",
+          "conservative_defaults": {
+            "missing_source_handling": "flag-for-review — default. Override only when a human confirms placeholder use is safe.",
+            "placeholder_allowed": "true for development/staging only.",
+            "unavailable_asset_escalation": "flag-in-manifest — do not silently remove sections without human approval."
+          }
+        },
+        "sourcing_requirements_summary": {
+          "source": "Aggregated by counting planned_asset_slots by availability_status and performance_risk",
+          "note": "Counts are planning estimates — not confirmed production scope."
+        }
+      },
+      "downstream_consumers": [
+        "build-video-plan — uses media-plan hero poster and performance context to plan video slots",
+        "build-motion-media-strategy — uses media-plan to understand what static media exists before planning motion overlays",
+        "run-validation — validates media-plan.json against schema",
+        "build-deployment-manifest — includes media sourcing gaps as deployment blockers or flags"
+      ]
+    },
+
+    "nodes": {
+      "node_1_trigger": {
+        "id": "trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "name": "Receive Inputs",
+        "description": "Receives inputs from the orchestrating workflow.",
+        "input_contract": {
+          "project_id": "string — required",
+          "homepage_strategy": "object — required — homepage-strategy.json artifact",
+          "section_instances": "array — required — array of section-instance.json artifacts",
+          "product_content_artifacts": "array — required — array of product-content.json artifacts (may be empty)",
+          "collection_content_artifacts": "array — required — array of collection-content.json artifacts (may be empty)",
+          "page_content_artifacts": "array — optional — array of page-content.json artifacts",
+          "design_system": "object — required — design-system.json artifact",
+          "brand_positioning": "object — required — brand-positioning.json artifact",
+          "store_profile": "object — required — store-profile.json artifact",
+          "market_intelligence": "object — optional — market-intelligence.json artifact"
+        }
+      },
+
+      "node_2_validate_inputs": {
+        "id": "validate-upstream-inputs",
+        "type": "n8n-nodes-base.code",
+        "name": "Validate Upstream Inputs",
+        "description": "Validates that all required upstream artifacts are present and have minimum required fields. Fails fast if critical inputs are missing.",
+        "validation_checks": [
+          "project_id must be a non-empty string",
+          "homepage_strategy must have hero_strategy, section_sequence, and media_role fields",
+          "design_system must have media_strategy and performance_guardrails fields",
+          "brand_positioning must have brand_role and trust_style fields",
+          "store_profile must have vertical, catalog_type, and brand_maturity fields",
+          "If design_system.media_strategy.hero_media_allowed = false → write hero_forbidden = true to workflow context",
+          "If design_system.performance_guardrails.heavy_media_allowed = false → write performance_ceiling = strict to workflow context"
+        ],
+        "on_validation_failure": "Output error object with validation_failed = true, missing_fields, message. Do not proceed to LLM synthesis."
+      },
+
+      "node_3_extract_media_context": {
+        "id": "extract-media-context",
+        "type": "n8n-nodes-base.code",
+        "name": "Extract Media Context and Constraints",
+        "description": "Extracts and normalizes all media-relevant signals from upstream artifacts into a structured context object for the LLM prompt. Enforces design-system media ceilings before LLM call.",
+        "extraction_steps": [
+          "Extract media_goal signal from homepage_strategy.media_role → map to schema enum",
+          "Extract hero_image_required from homepage_strategy.hero_strategy.hero_image_required",
+          "Extract hero_impression from homepage_strategy.hero_strategy (optional)",
+          "Extract section_sequence media flags: for each section, collect {section_type, media_required, media_priority, media_intensity}",
+          "Extract section_instances media requirements: collect {section_type, slot_id, media_role, media_intensity} for slots with media_required = true",
+          "Extract product image coverage: count products_without_images, products_single_image, products_rich_image_set",
+          "Extract collection banner gaps: count collections with no banner image",
+          "Extract trust visual requirement from homepage_strategy.trust_strategy + brand_positioning.trust_style",
+          "Extract storytelling media signal from homepage_strategy.storytelling_intensity + brand_positioning.brand_role",
+          "Extract design-system ceilings: hero_media_allowed, heavy_media_allowed, performance_priority, image_quality_ceiling",
+          "Flag: any section with media_intensity = high AND heavy_media_allowed = false → downgrade and add warning",
+          "Derive asset_gap_policy defaults from design-system + store_profile.brand_maturity"
+        ]
+      },
+
+      "node_4_build_llm_prompt": {
+        "id": "build-llm-prompt",
+        "type": "n8n-nodes-base.code",
+        "name": "Build LLM Prompt",
+        "description": "Assembles the structured LLM prompt for media plan synthesis. The prompt must be explicit about constraints, schema shape, available enums, and evidence boundaries.",
+        "prompt_components": [
+          "System message: media planning assistant for schema-driven commerce OS. Output must conform to media-plan.schema.json. Must not invent asset availability. Must not exceed design-system ceilings.",
+          "Project context: project_id, vertical, catalog_type, brand_maturity, brand_role",
+          "Media goal signal: derived enum value with justification",
+          "Homepage hero context: hero_required, hero_impression, performance_risk = high for hero",
+          "Section-level media requirements: list with media_role and intensity",
+          "Product image coverage summary",
+          "Collection banner gap count",
+          "Trust visual requirement and type",
+          "Storytelling media signal",
+          "Design-system media ceilings",
+          "Asset gap policy defaults and performance risk warnings",
+          "Schema output shape: describe required fields and enum options for media-plan.schema.json",
+          "CRITICAL INSTRUCTIONS: Do not invent asset availability. Use availability_status = requires-sourcing or requires-creation for unconfirmed assets. Use available = planned ONLY for assets with confirmed Shopify image data. Do not add video slots. Do not add motion entries. Do not add page types not present in this store's plan."
+        ]
+      },
+
+      "node_5_llm_synthesis": {
+        "id": "llm-synthesis",
+        "type": "n8n-nodes-base.openAi",
+        "name": "LLM Synthesis — Media Plan",
+        "description": "Calls the LLM to synthesize the media plan JSON from the structured prompt.",
+        "model": "gpt-4o",
+        "temperature": 0.2,
+        "response_format": "json_object",
+        "credential_placeholder": "PLACEHOLDER — confirm actual n8n OpenAI credential name at runtime. Do not hardcode.",
+        "evidence_boundary_note": "The LLM synthesizes planning decisions based on upstream strategy artifacts. It has no access to actual image files, photography libraries, supplier catalogs, or Shopify media CDN. All LLM-generated slots are planning intentions — not confirmed available assets."
+      },
+
+      "node_6_parse_and_enforce": {
+        "id": "parse-and-enforce-constraints",
+        "type": "n8n-nodes-base.code",
+        "name": "Parse and Enforce Constraints",
+        "description": "Parses the LLM output and enforces all hard constraints. Overrides LLM decisions where constraints require it.",
+        "constraint_enforcement_rules": [
+          "HERO MEDIA CEILING: If hero_media_allowed = false AND hero slot has performance_risk = high → downgrade and add warning",
+          "PERFORMANCE CEILING: If performance_ceiling = strict AND any slot has performance_risk = high → change to requires-review and add warning",
+          "AVAILABILITY STATUS: If any slot has availability_status = planned but no Shopify image data confirms it → change to requires-review",
+          "PLACEHOLDER SAFETY: placeholder_allowed = true is acceptable in planning artifact (dev/staging only note must be present)",
+          "VIDEO EXCLUSION: Remove any slot with asset_type = video or media_role containing video — video planning belongs in build-video-plan",
+          "MOTION EXCLUSION: Remove any slot with asset_type = animation — motion planning belongs in build-motion-media-strategy",
+          "PAGE TYPE VALIDITY: Remove coverage entries for page types not present in the store's content plan",
+          "SOURCING SUMMARY: Recalculate by counting actual slots — do not use LLM's summary counts if they differ"
+        ]
+      },
+
+      "node_7_validate_schema": {
+        "id": "validate-schema",
+        "type": "n8n-nodes-base.code",
+        "name": "Validate Against Schema",
+        "description": "Validates the constrained media-plan output against schemas/media-plan.schema.json using AJV.",
+        "schema_reference": "schemas/media-plan.schema.json",
+        "on_validation_failure": "Output schema_validation_failed = true with errors array. Do not persist.",
+        "on_validation_success": "Proceed to persist."
+      },
+
+      "node_8_persist": {
+        "id": "persist",
+        "type": "n8n-nodes-base.github",
+        "name": "Persist to Git",
+        "description": "Writes the validated media-plan.json to the project folder in the Git repository.",
+        "target_path": "projects/{project_id}/media-plan.json",
+        "commit_message_pattern": "feat({project_id}): add media-plan artifact [build-media-plan]",
+        "credential_placeholder": "PLACEHOLDER — confirm actual n8n GitHub credential name at runtime. Do not hardcode.",
+        "draft_safety_note": "In draft mode, write to projects/{project_id}/drafts/media-plan.json to prevent overwriting reviewed artifacts."
+      },
+
+      "node_9_output": {
+        "id": "output",
+        "type": "n8n-nodes-base.set",
+        "name": "Output",
+        "description": "Returns the media-plan artifact and workflow status to the calling orchestrator.",
+        "output_fields": {
+          "workflow_id": "build-media-plan",
+          "project_id": "{project_id}",
+          "status": "completed | failed",
+          "artifact_path": "projects/{project_id}/media-plan.json",
+          "media_goal": "{media_goal from artifact}",
+          "total_planned_slots": "{count of planned_asset_slots}",
+          "high_risk_slots": "{count of slots with performance_risk = high}",
+          "slots_requiring_creation": "{count of slots with availability_status = requires-creation}",
+          "slots_with_no_source": "{count of slots with availability_status = unavailable}",
+          "downstream_consumers": ["build-video-plan", "build-motion-media-strategy", "run-validation", "build-deployment-manifest"],
+          "validation_passed": true,
+          "errors": []
+        }
+      }
+    },
+
+    "assumptions": [
+      "Shopify product images (if present) are treated as planned availability — not verified quality or brand alignment",
+      "Collection banner images are assumed missing unless intake or Shopify import data explicitly confirms otherwise",
+      "Brand editorial and lifestyle photography is assumed not available unless brand_maturity = established is confirmed",
+      "Trust visuals are assumed to require sourcing unless the store has a confirmed review platform integration",
+      "All LLM-synthesized decisions are planning intentions, not confirmed creative or production commitments",
+      "Design-system media ceilings from Phase 3 are treated as validated and authoritative — not re-derived here",
+      "Vertical-specific media expectations are generic heuristics — they do not guarantee asset availability or quality"
+    ],
+
+    "evidence_boundaries": [
+      "This workflow has no access to actual image files, photography libraries, or supplier asset catalogs",
+      "Product image availability is inferred from Shopify import data — not from direct CDN inspection",
+      "Brand photography availability is estimated from store-profile brand_maturity — not from actual asset library access",
+      "LLM synthesis is based on strategic artifact signals, not visual audits or direct competitor asset analysis",
+      "Sourcing summary counts are planning estimates — not confirmed production scope"
+    ],
+
+    "open_questions": [
+      "Does the brand have an existing photography library? Must be confirmed during brand intake or sourcing review.",
+      "Are supplier images available for products? Supplier image quality and licensing must be verified by a human.",
+      "Are there existing brand identity assets that can be used directly? Must be confirmed in sourcing review.",
+      "What is the production timeline for assets requiring creation? Requires project management input.",
+      "Should collection banner images be treated as deferred by default to avoid blocking deployment? Governance decision requiring human input."
+    ],
+
+    "draft_dev_safety_notes": [
+      "This workflow definition is not yet executable n8n JSON. A developer must translate it before running.",
+      "All credential references are PLACEHOLDER values. Actual names must be confirmed from the live n8n instance.",
+      "In draft/dev mode, write output to projects/{project_id}/drafts/media-plan.json.",
+      "Do not run against production Shopify stores without confirming the n8n environment and credential configuration.",
+      "The media-plan output is a planning artifact only — not a deployment readiness approval or asset availability confirmation."
+    ]
+  }
+}
