@@ -98,8 +98,16 @@ In cloud mode, this file is never written. Instead:
 | `workflows/n8n/resolve-runtime-config.n8n.json` | Cloud-mode detection; filesystem checks conditional |
 | `workflows/n8n/orchestrate-phase1.n8n.json` | Cloud-mode detection in 3 Code nodes; `shopify_import` passthrough in Prepare Profile Input |
 | `workflows/n8n/intake-store-input.n8n.json` | Cloud-mode detection; `Create Directories and Checkpoint` skips all fs ops in cloud mode |
-| `workflows/n8n/import-shopify-data.n8n.json` | Cloud-mode detection; `Assemble Write and Checkpoint` skips fs ops, returns `shopify_import` inline |
+| `workflows/n8n/import-shopify-data.n8n.json` | Cloud-mode detection; `Assemble Write and Checkpoint` skips fs ops, returns `shopify_import` inline; **aggregation fix: added Merge node before Code node** |
 | `workflows/n8n/build-store-profile.n8n.json` | Cloud-mode detection in both Code nodes; reads `shopify_import` from input; skips AJV + writes |
+
+### Aggregation fix — import-shopify-data (post-smoke-test)
+
+During the successful n8n Cloud run, the four Shopify fetch branches (`Fetch Shop Basics`, `Fetch Active Products`, `Fetch Custom Collections`, `Fetch Smart Collections`) were connected directly to `Assemble Write and Checkpoint` on separate input indexes (0–3). In n8n Cloud this produced unreliable execution: the Code node could fire before all branches completed, resulting in missing entries in `$input.all()`.
+
+**Fix**: A `Merge` node (`Aggregate API Responses`, mode: `append`) was inserted between the four fetch branches and the Code node. The Merge node acts as an explicit synchronization barrier — it waits for all four inputs before emitting. Append mode preserves deterministic branch order: `[0] shop`, `[1] products`, `[2] customCollections`, `[3] smartCollections]`, which matches the `allItems` index assumptions already in the Code node.
+
+This is a workflow structure fix only. No business logic, no cloud/self-hosted behavior, and no Code node code was changed.
 
 ### Files NOT changed
 
