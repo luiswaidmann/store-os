@@ -1,0 +1,217 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, node structure, and safety boundaries so that a future n8n implementation can be built safely. No credentials have been resolved. No environment has been configured. No n8n instance has been provisioned.",
+    "planning_artifact_note": "IMPORTANT — THIS IS RUNTIME INFRASTRUCTURE, NOT A PLANNING ARTIFACT PRODUCER: This workflow does not produce any planning artifact (no JSON file in projects/{project_id}/). Its output is an in-memory runtime configuration payload that is passed to orchestrate-runtime-execution. It is the prerequisite for all other workflows in the chain.",
+    "credential_safety_note": "CRITICAL — NO CREDENTIALS IN THIS FILE: This workflow references credentials by placeholder name only. The actual n8n credential name is resolved from environment variables (STORE_OS_OPENAI_CREDENTIAL_NAME, STORE_OS_SHOPIFY_CREDENTIAL_NAME) at runtime. No credential value, API key, token, or secret belongs in this file or anywhere in Git. See workflows/runtime/credential-resolution-spec.md for the full credential architecture.",
+    "no_production_execution_note": "This workflow does not call Shopify APIs, does not call OpenAI APIs, and does not access any project artifacts. Its purpose is configuration validation only.",
+    "output_schema": null,
+    "related_docs": [
+      "docs/phase-11-runtime-architecture.md",
+      "docs/n8n-conventions.md",
+      "workflows/runtime/credential-resolution-spec.md",
+      "workflows/runtime/execution-contract.md",
+      "workflows/runtime/error-taxonomy.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "resolve-runtime-config",
+    "name": "resolve-runtime-config",
+    "category": "runtime-infrastructure",
+    "phase": "Phase 11 — Runtime / Execution Layer",
+    "purpose": "Read, validate, and resolve all runtime configuration values (environment variables and n8n credential references) before any planning workflow executes. This is always the first workflow in the chain. If any required configuration value is missing or invalid, this workflow halts with an explicit error — the chain does not proceed. On success, it assembles a runtime-config payload (in-memory only, not written to disk) and triggers orchestrate-runtime-execution.",
+
+    "execution_trigger": {
+      "type": "manual_trigger_or_webhook",
+      "description": "In development: triggered manually (n8n Manual Trigger). In staging and production: triggered via a secured webhook or n8n Form Trigger. Always the first trigger in the chain — no other workflow should trigger this.",
+      "n8n_node_type": "Manual Trigger (dev) or Webhook (staging/production)"
+    },
+
+    "inputs": {
+      "environment_variables": {
+        "STORE_OS_OPENAI_CREDENTIAL_NAME": {
+          "description": "The exact name of the OpenAI credential in the n8n credential store.",
+          "required": true,
+          "resolution": "Read from n8n process environment or n8n's built-in env var settings.",
+          "validation": "Must be set and non-empty. Must match a credential name in n8n."
+        },
+        "STORE_OS_SHOPIFY_CREDENTIAL_NAME": {
+          "description": "The exact name of the Shopify credential in the n8n credential store.",
+          "required": true,
+          "resolution": "Read from n8n process environment or n8n's built-in env var settings.",
+          "validation": "Must be set and non-empty. Must match a credential name in n8n."
+        },
+        "STORE_OS_ENV": {
+          "description": "Execution environment identifier.",
+          "required": true,
+          "allowed_values": ["dev", "staging", "production"],
+          "validation": "Must be one of the allowed values."
+        },
+        "STORE_OS_PROJECT_ROOT": {
+          "description": "Root directory where project folders are created.",
+          "required": true,
+          "validation": "Must be set, non-empty, and the path must exist and be writable."
+        },
+        "STORE_OS_LLM_MODEL": {
+          "description": "OpenAI model identifier for LLM synthesis nodes.",
+          "required": true,
+          "validation": "Must be set and non-empty. Model availability is not validated here (validated at first LLM call)."
+        },
+        "STORE_OS_SHOPIFY_API_VERSION": {
+          "description": "Shopify Admin API version to pin for all API calls.",
+          "required": true,
+          "validation": "Must be set and non-empty. Format: YYYY-MM (e.g., 2025-01).",
+          "format_pattern": "^[0-9]{4}-[0-9]{2}$"
+        },
+        "STORE_OS_AJV_SCHEMA_PATH": {
+          "description": "Path to the schemas/ directory for AJV schema validation.",
+          "required": true,
+          "validation": "Must be set, non-empty, and the path must exist and contain .schema.json files."
+        },
+        "STORE_OS_BACKUP_ROOT": {
+          "description": "Destination path for project backup archives.",
+          "required": false,
+          "validation": "If set, path must be writable. If not set, backup-project workflow will halt."
+        }
+      }
+    },
+
+    "outputs": {
+      "runtime_config_payload": {
+        "description": "In-memory runtime configuration payload. NOT written to disk. Passed directly to orchestrate-runtime-execution.",
+        "type": "object",
+        "fields": {
+          "project_id": {
+            "description": "Populated after intake-store-input runs. Initially null.",
+            "type": "string or null"
+          },
+          "env": { "type": "string", "source": "STORE_OS_ENV" },
+          "project_root": { "type": "string", "source": "STORE_OS_PROJECT_ROOT" },
+          "openai_credential_name": { "type": "string", "source": "STORE_OS_OPENAI_CREDENTIAL_NAME" },
+          "shopify_credential_name": { "type": "string", "source": "STORE_OS_SHOPIFY_CREDENTIAL_NAME" },
+          "llm_model": { "type": "string", "source": "STORE_OS_LLM_MODEL" },
+          "shopify_api_version": { "type": "string", "source": "STORE_OS_SHOPIFY_API_VERSION" },
+          "ajv_schema_path": { "type": "string", "source": "STORE_OS_AJV_SCHEMA_PATH" },
+          "backup_root": { "type": "string or null", "source": "STORE_OS_BACKUP_ROOT" },
+          "resolved_at": { "type": "string", "format": "ISO 8601 datetime" }
+        },
+        "safety_note": "The openai_credential_name and shopify_credential_name fields in this payload contain credential NAMES only — not credential values. The credential name is passed to downstream workflows so they can reference the correct n8n credential by name. The actual API key values are never exposed."
+      }
+    },
+
+    "upstream_dependencies": "none — this is the first workflow in the chain",
+
+    "downstream_consumers": {
+      "primary": "orchestrate-runtime-execution",
+      "note": "resolve-runtime-config passes the runtime-config payload directly to orchestrate-runtime-execution on success. No other workflow is triggered directly."
+    },
+
+    "node_execution_plan": [
+      {
+        "step": 1,
+        "node_type": "Manual Trigger (dev) or Webhook (staging/production)",
+        "description": "Chain entry point. Accepts no input parameters — configuration is read from environment.",
+        "output": "empty trigger event"
+      },
+      {
+        "step": 2,
+        "node_type": "Code (JavaScript)",
+        "description": "Read all STORE_OS_* environment variables from the n8n process environment.",
+        "logic": "Read: STORE_OS_OPENAI_CREDENTIAL_NAME, STORE_OS_SHOPIFY_CREDENTIAL_NAME, STORE_OS_ENV, STORE_OS_PROJECT_ROOT, STORE_OS_LLM_MODEL, STORE_OS_SHOPIFY_API_VERSION, STORE_OS_AJV_SCHEMA_PATH, STORE_OS_BACKUP_ROOT",
+        "output": "raw config object with all env var values"
+      },
+      {
+        "step": 3,
+        "node_type": "Code (JavaScript)",
+        "description": "Validate required environment variables.",
+        "logic": [
+          "For each required variable: check it is set and non-empty. Halt with CONFIG_MISSING if missing.",
+          "Check STORE_OS_ENV is one of: dev, staging, production. Halt if not.",
+          "Check STORE_OS_SHOPIFY_API_VERSION matches YYYY-MM format. Halt if not.",
+          "Check STORE_OS_PROJECT_ROOT path exists. Halt if not.",
+          "Check STORE_OS_PROJECT_ROOT is writable (attempt fs.accessSync with W_OK). Halt if not.",
+          "Check STORE_OS_AJV_SCHEMA_PATH exists and contains at least one .schema.json file. Halt if not."
+        ],
+        "error_handling": "Any validation failure → throw error with error_code: CONFIG_MISSING and descriptive message",
+        "output": "validated config object"
+      },
+      {
+        "step": 4,
+        "node_type": "Code (JavaScript)",
+        "description": "Verify OpenAI credential exists in n8n credential store.",
+        "logic": "Use n8n's credential lookup mechanism to confirm the credential named STORE_OS_OPENAI_CREDENTIAL_NAME exists. Do NOT make a live OpenAI API call. Existence check only.",
+        "error_handling": "Credential not found → halt with error_code: CREDENTIAL_NOT_FOUND",
+        "n8n_implementation_note": "The mechanism for checking credential existence from a Code node depends on n8n version. Options: (1) use n8n's built-in $credentials reference if available, (2) make a minimal test call to the OpenAI /models endpoint, (3) rely on the first actual LLM call to surface auth errors. The preferred approach is option 1 if available.",
+        "output": "openai_credential_validated: true/false"
+      },
+      {
+        "step": 5,
+        "node_type": "Code (JavaScript)",
+        "description": "Verify Shopify credential exists in n8n credential store.",
+        "logic": "Same pattern as step 4 for STORE_OS_SHOPIFY_CREDENTIAL_NAME.",
+        "error_handling": "Credential not found → halt with error_code: CREDENTIAL_NOT_FOUND",
+        "output": "shopify_credential_validated: true/false"
+      },
+      {
+        "step": 6,
+        "node_type": "Code (JavaScript)",
+        "description": "Assemble runtime-config payload.",
+        "logic": [
+          "Build the runtime-config object from validated env vars.",
+          "Set project_id: null (to be populated by intake-store-input).",
+          "Set resolved_at: current ISO 8601 timestamp.",
+          "Return runtime-config as workflow output."
+        ],
+        "output": "runtime-config payload (in-memory object)"
+      },
+      {
+        "step": 7,
+        "node_type": "Execute Workflow",
+        "description": "Trigger orchestrate-runtime-execution, passing runtime-config as parameters.",
+        "n8n_node": "Execute Workflow",
+        "target_workflow": "orchestrate-runtime-execution",
+        "parameters_passed": "runtime-config payload",
+        "output": "chain execution result from orchestrator"
+      }
+    ],
+
+    "error_handling": {
+      "CONFIG_MISSING": {
+        "trigger": "Required environment variable is not set or has invalid value.",
+        "action": "IMMEDIATE_HALT — do not trigger orchestrate-runtime-execution.",
+        "message": "Required configuration '{VAR_NAME}' is missing or invalid. Check n8n process environment settings.",
+        "retry": "none"
+      },
+      "CREDENTIAL_NOT_FOUND": {
+        "trigger": "Named credential does not exist in n8n credential store.",
+        "action": "IMMEDIATE_HALT — do not trigger orchestrate-runtime-execution.",
+        "message": "Credential '{CREDENTIAL_NAME}' not found in n8n credential store. Verify credential name and ensure it has been created.",
+        "retry": "none"
+      }
+    },
+
+    "validation_notes": [
+      "This workflow does not validate credential VALUES — only credential EXISTENCE. Authentication failures are handled by import-shopify-data (for Shopify) and by the first LLM synthesis workflow (for OpenAI).",
+      "Environment variable validation is strict. No defaults are assumed. Missing required variables cause an immediate halt.",
+      "The STORE_OS_BACKUP_ROOT variable is optional. If not set, the workflow does not halt — but backup-project will halt later if the backup is attempted."
+    ],
+
+    "assumptions": [
+      "n8n exposes a mechanism to read process environment variables from Code nodes (e.g., process.env in JavaScript).",
+      "n8n exposes a mechanism to check whether a named credential exists in the credential store from a Code node.",
+      "The n8n Code node has access to Node.js fs module for filesystem checks.",
+      "All environment variables are set in the n8n process environment before the chain is triggered."
+    ],
+
+    "open_questions": [
+      "What is the exact n8n mechanism for checking credential existence from a Code node? This depends on n8n version and configuration.",
+      "Should resolve-runtime-config make a lightweight test call to OpenAI (e.g., list models) to verify API connectivity, or is credential existence check sufficient?",
+      "Should the runtime-config payload be stored in n8n workflow static data for reference by subworkflows, or passed explicitly as parameters through Execute Workflow nodes?"
+    ],
+
+    "evidence_boundaries": "All logic in this workflow is deterministic configuration validation. No external APIs are called. No planning artifacts are read. No LLM is used. The only external state read is: n8n environment variables and n8n credential store."
+  }
+}

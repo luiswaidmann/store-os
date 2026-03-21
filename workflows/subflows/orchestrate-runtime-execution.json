@@ -1,0 +1,437 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended orchestration logic, chain coordination, error gate behavior, checkpoint management, and review gate handling so that a future n8n implementation can be built safely. No actual orchestration has been executed. No subworkflows have been invoked by this workflow.",
+    "planning_artifact_note": "IMPORTANT — THIS IS RUNTIME INFRASTRUCTURE, NOT A PLANNING ARTIFACT PRODUCER: This workflow does not produce planning artifacts directly. It produces runtime-checkpoint.json files (.runtime/checkpoint.json) and execution log entries (.runtime/execution-log.json) as operational state. Its role is pure orchestration: invoking subworkflows in order, checking results, managing state, and enforcing safety gates.",
+    "publish_safety_note": "CRITICAL — THIS WORKFLOW NEVER TRIGGERS PUBLISHING: This orchestrator's final step is build-publish-decision followed by backup-project. It does NOT trigger any Shopify write operation, theme update, metafield change, or production deployment. The publish-decision.json artifact is a recommendation for a human reviewer. No downstream automation is connected to the publish decision output.",
+    "credential_safety_note": "This workflow receives credential NAMES (not values) from resolve-runtime-config. It passes credential names to subworkflows as parameters. Credential values are never visible to this workflow.",
+    "human_review_gate_note": "When manual_review_required is true (from intake), this workflow pauses at the review gate using an n8n Wait node. The chain does not continue until a human explicitly approves continuation via webhook callback. This gate cannot be bypassed by any automated logic.",
+    "output_schema": null,
+    "related_docs": [
+      "docs/phase-11-runtime-architecture.md",
+      "docs/n8n-conventions.md",
+      "workflows/runtime/execution-contract.md",
+      "workflows/runtime/error-taxonomy.md",
+      "workflows/runtime/runtime-state-checkpoint-spec.md",
+      "workflows/runtime/golden-path-orchestration.md",
+      "workflows/runtime/n8n-implementation-map.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "orchestrate-runtime-execution",
+    "name": "orchestrate-runtime-execution",
+    "category": "runtime-infrastructure",
+    "phase": "Phase 11 — Runtime / Execution Layer",
+    "purpose": "Master orchestration workflow for the store-os execution chain. Receives the runtime-config payload from resolve-runtime-config and coordinates the sequential invocation of all 32 planning and governance workflows (Phases 1–10). After each workflow invocation, checks the result and either continues the chain or halts with a structured error record. Manages the checkpoint file (.runtime/checkpoint.json) after each successful step. Enforces the manual review gate before the governance chain when manual_review_required is true. After build-publish-decision and backup-project, the chain is complete. This workflow never triggers publishing or any write operation to Shopify.",
+
+    "execution_trigger": {
+      "type": "execute_workflow",
+      "description": "Called by resolve-runtime-config via n8n Execute Workflow node after successful configuration validation.",
+      "caller": "resolve-runtime-config",
+      "input_parameters": "runtime-config payload (from resolve-runtime-config)"
+    },
+
+    "inputs": {
+      "runtime_config": {
+        "source": "resolve-runtime-config → runtime-config payload (in-memory)",
+        "fields": {
+          "project_id": "null initially, populated after intake-store-input",
+          "env": "STORE_OS_ENV value",
+          "project_root": "STORE_OS_PROJECT_ROOT value",
+          "openai_credential_name": "resolved OpenAI credential name",
+          "shopify_credential_name": "resolved Shopify credential name",
+          "llm_model": "STORE_OS_LLM_MODEL value",
+          "shopify_api_version": "STORE_OS_SHOPIFY_API_VERSION value",
+          "ajv_schema_path": "STORE_OS_AJV_SCHEMA_PATH value",
+          "backup_root": "STORE_OS_BACKUP_ROOT value (may be null)"
+        }
+      }
+    },
+
+    "outputs": {
+      "runtime_checkpoint": {
+        "description": "Runtime checkpoint file tracking execution progress.",
+        "artifact_path": "projects/{project_id}/.runtime/checkpoint.json",
+        "schema": "schemas/runtime-checkpoint.schema.json",
+        "note": "Written after each successful workflow step. Not a planning artifact."
+      },
+      "execution_log": {
+        "description": "Execution event log.",
+        "artifact_path": "projects/{project_id}/.runtime/execution-log.json",
+        "note": "Append-only log of all events during the run."
+      },
+      "orchestration_result": {
+        "description": "Final result returned to resolve-runtime-config (and visible in n8n execution history).",
+        "type": "object",
+        "fields": {
+          "status": "COMPLETE | HALTED | REVIEW_REJECTED",
+          "halted_at": "workflow_id of the failed step (if HALTED)",
+          "last_successful_step": "workflow_id of the last successful step",
+          "checkpoint_path": "path to the checkpoint file",
+          "publish_decision_path": "path to publish-decision.json (if COMPLETE)"
+        }
+      }
+    },
+
+    "orchestration_chain": {
+      "description": "The ordered list of workflows invoked by this orchestrator. Each entry defines the workflow to invoke and what is checked before invoking it.",
+      "safety_note": "Sequential execution is the default and the safe baseline. Parallelism (product and collection chains) is documented but NOT implemented in Phase 11 initial build. Add parallelism only after sequential execution is proven stable.",
+
+      "steps": [
+        {
+          "step": 1,
+          "workflow_id": "intake-store-input",
+          "requires_project_id_before": false,
+          "prerequisite_artifacts": [],
+          "output_artifact": null,
+          "side_effects": "Creates project folder, creates .runtime/ directory, establishes project_id in runtime config",
+          "post_step_actions": ["extract project_id from result", "write initial checkpoint", "write CHAIN_START to execution log"]
+        },
+        {
+          "step": 2,
+          "workflow_id": "import-shopify-data",
+          "requires_project_id_before": true,
+          "prerequisite_artifacts": [],
+          "output_artifact": "shopify-import.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 3,
+          "workflow_id": "build-store-profile",
+          "requires_project_id_before": true,
+          "prerequisite_artifacts": ["shopify-import.json"],
+          "output_artifact": "store-profile.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 4,
+          "workflow_id": "build-market-intelligence",
+          "prerequisite_artifacts": ["store-profile.json"],
+          "output_artifact": "market-intelligence.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 5,
+          "workflow_id": "build-brand-positioning",
+          "prerequisite_artifacts": ["store-profile.json", "market-intelligence.json"],
+          "output_artifact": "brand-positioning.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 6,
+          "workflow_id": "build-competitor-clusters",
+          "prerequisite_artifacts": ["market-intelligence.json", "brand-positioning.json"],
+          "output_artifact": "competitor-cluster.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 7,
+          "workflow_id": "build-pattern-manifest",
+          "prerequisite_artifacts": ["market-intelligence.json", "brand-positioning.json", "competitor-cluster.json", "store-profile.json"],
+          "output_artifact": "pattern-manifest.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 8,
+          "workflow_id": "build-design-system",
+          "prerequisite_artifacts": ["brand-positioning.json", "pattern-manifest.json", "store-profile.json"],
+          "output_artifact": "design-system.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 9,
+          "workflow_id": "build-homepage-strategy",
+          "prerequisite_artifacts": ["store-profile.json", "market-intelligence.json", "brand-positioning.json", "pattern-manifest.json", "design-system.json"],
+          "output_artifact": "homepage-strategy.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 10,
+          "workflow_id": "build-section-plan",
+          "prerequisite_artifacts": ["homepage-strategy.json", "design-system.json", "pattern-manifest.json"],
+          "output_artifacts": ["section-library.json", "section-instances/ (multiple files)"],
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 11,
+          "workflow_id": "build-seo-strategy",
+          "prerequisite_artifacts": ["store-profile.json", "market-intelligence.json", "brand-positioning.json"],
+          "output_artifact": "seo-strategy.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 12,
+          "workflow_id": "build-aeo-strategy",
+          "prerequisite_artifacts": ["market-intelligence.json", "brand-positioning.json", "seo-strategy.json"],
+          "output_artifact": "aeo-strategy.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 13,
+          "workflow_id": "build-product-content",
+          "prerequisite_artifacts": ["shopify-import.json", "store-profile.json", "market-intelligence.json", "brand-positioning.json", "design-system.json"],
+          "output_artifact": "product-content.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 14,
+          "workflow_id": "build-product-seo",
+          "prerequisite_artifacts": ["product-content.json", "seo-strategy.json", "shopify-import.json"],
+          "output_artifact": "product-seo.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 15,
+          "workflow_id": "build-product-faq",
+          "prerequisite_artifacts": ["product-content.json", "aeo-strategy.json"],
+          "output_artifact": "product-faq.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 16,
+          "workflow_id": "build-product-structured-data",
+          "prerequisite_artifacts": ["shopify-import.json", "product-seo.json", "product-faq.json"],
+          "output_artifact": "product-structured-data.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 17,
+          "workflow_id": "build-collection-content",
+          "prerequisite_artifacts": ["shopify-import.json", "store-profile.json", "market-intelligence.json", "brand-positioning.json"],
+          "output_artifact": "collection-content.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 18,
+          "workflow_id": "build-collection-seo",
+          "prerequisite_artifacts": ["collection-content.json", "seo-strategy.json"],
+          "output_artifact": "collection-seo.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 19,
+          "workflow_id": "build-collection-navigation",
+          "prerequisite_artifacts": ["shopify-import.json", "collection-content.json", "collection-seo.json", "homepage-strategy.json"],
+          "output_artifact": "collection-navigation.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 20,
+          "workflow_id": "build-page-content",
+          "prerequisite_artifacts": ["brand-positioning.json", "market-intelligence.json", "design-system.json"],
+          "output_artifact": "page-content.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 21,
+          "workflow_id": "build-page-seo",
+          "prerequisite_artifacts": ["page-content.json", "seo-strategy.json"],
+          "output_artifact": "page-seo.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 22,
+          "workflow_id": "build-faq-page",
+          "prerequisite_artifacts": ["aeo-strategy.json", "page-content.json"],
+          "output_artifact": "faq-page.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 23,
+          "workflow_id": "build-internal-linking",
+          "prerequisite_artifacts": ["seo-strategy.json", "aeo-strategy.json", "homepage-strategy.json", "product-seo.json", "collection-seo.json", "page-content.json"],
+          "output_artifact": "internal-linking.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 24,
+          "workflow_id": "build-structured-data-plan",
+          "prerequisite_artifacts": ["seo-strategy.json", "aeo-strategy.json", "faq-page.json"],
+          "output_artifact": "structured-data-plan.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 25,
+          "workflow_id": "build-media-plan",
+          "prerequisite_artifacts": ["homepage-strategy.json", "section-instances/", "product-content.json", "collection-content.json", "page-content.json", "design-system.json", "brand-positioning.json", "store-profile.json"],
+          "output_artifact": "media-plan.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 26,
+          "workflow_id": "build-video-plan",
+          "prerequisite_artifacts": ["media-plan.json", "homepage-strategy.json", "design-system.json", "brand-positioning.json", "store-profile.json"],
+          "output_artifact": "video-plan.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 27,
+          "workflow_id": "build-motion-media-strategy",
+          "prerequisite_artifacts": ["design-system.json", "homepage-strategy.json", "section-instances/", "media-plan.json", "video-plan.json"],
+          "output_artifact": "motion-media-strategy.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": "REVIEW_GATE",
+          "type": "human_review_gate",
+          "condition": "manual_review_required === true (from intake payload)",
+          "n8n_node_type": "Wait (webhook resume)",
+          "description": "If manual_review_required is true, the orchestrator pauses here. The chain does not continue until a human approves continuation via webhook callback. If manual_review_required is false, this gate is skipped (review_gate_status: NOT_APPLICABLE in checkpoint). If the gate is rejected by the human reviewer, chain_status is set to REVIEW_REJECTED and no further steps run.",
+          "post_gate_actions": ["update checkpoint review_gate_status", "log REVIEW_GATE_APPROVED or REVIEW_GATE_REJECTED"]
+        },
+        {
+          "step": 28,
+          "workflow_id": "run-validation",
+          "prerequisite_artifacts": ["all artifacts from steps 2-27"],
+          "output_artifact": "validation-report.json",
+          "note": "run-validation does not block on individual check failures. It aggregates all checks and produces the report regardless of check outcomes. The report's overall_status determines governance routing.",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 29,
+          "workflow_id": "build-quality-score",
+          "prerequisite_artifacts": ["validation-report.json"],
+          "output_artifact": "quality-score.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 30,
+          "workflow_id": "build-deployment-manifest",
+          "prerequisite_artifacts": ["validation-report.json", "quality-score.json"],
+          "output_artifact": "deployment-manifest.json",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 31,
+          "workflow_id": "build-publish-decision",
+          "prerequisite_artifacts": ["validation-report.json", "quality-score.json", "deployment-manifest.json"],
+          "output_artifact": "publish-decision.json",
+          "note": "CRITICAL: build-publish-decision produces a recommendation artifact only. The orchestrator does NOT trigger any publishing action after this step. The chain continues to backup-project and then terminates.",
+          "post_step_actions": ["update checkpoint", "log ARTIFACT_WRITE"]
+        },
+        {
+          "step": 32,
+          "workflow_id": "backup-project",
+          "prerequisite_artifacts": [],
+          "output_artifact": "backup archive (at STORE_OS_BACKUP_ROOT)",
+          "note": "Runs regardless of validation and publish decision outcomes. Always the last step.",
+          "post_step_actions": ["update checkpoint to chain_status: COMPLETE", "log CHAIN_COMPLETE"]
+        }
+      ]
+    },
+
+    "error_gate_behavior": {
+      "description": "After each Execute Workflow call, the orchestrator checks the result. If the result indicates a HALT, the orchestrator stops the chain.",
+      "implementation": {
+        "n8n_node_after_each_execute_workflow": "If node",
+        "success_branch": "Continue to next Execute Workflow (next step in chain)",
+        "failure_branch": "Code node: update checkpoint with HALTED status + failed_at details → log CHAIN_HALT event → return halt result to resolve-runtime-config"
+      },
+      "halt_result_format": {
+        "status": "HALTED",
+        "halted_at": "workflow_id",
+        "error_code": "error code from subworkflow",
+        "message": "error message",
+        "last_successful_step": "workflow_id of last completed step",
+        "checkpoint_path": "projects/{project_id}/.runtime/checkpoint.json"
+      }
+    },
+
+    "checkpoint_management": {
+      "initial_checkpoint_creation": "Created by intake-store-input (step 1) after project folder setup. The orchestrator reads this checkpoint to confirm step 1 completed.",
+      "checkpoint_update_after_each_step": "After each successful Execute Workflow call, the orchestrator's Code node appends to completed_workflows, updates last_updated_timestamp, and updates next_workflow.",
+      "checkpoint_write_failure": "If the checkpoint write fails after a successful workflow step, the orchestrator halts with WRITE_ERROR. The subworkflow's output artifact is already written — the checkpoint inconsistency will require human review on resume.",
+      "resume_behavior": "On resume, the orchestrator reads the checkpoint to determine next_workflow and starts from that step. See: runtime-state-checkpoint-spec.md"
+    },
+
+    "node_execution_plan": [
+      {
+        "step": 1,
+        "node_type": "Execute Workflow Trigger",
+        "description": "Entry point — called by resolve-runtime-config."
+      },
+      {
+        "step": 2,
+        "node_type": "Set",
+        "description": "Store runtime-config payload in workflow context (openai_credential_name, shopify_credential_name, llm_model, project_root, env, ajv_schema_path, etc.)."
+      },
+      {
+        "step": 3,
+        "node_type": "Code (JavaScript)",
+        "description": "Check if a checkpoint exists for this project_id. If yes: load it. If no: proceed fresh. If checkpoint.chain_status is COMPLETE: return immediately (nothing to do). If AWAITING_REVIEW: resume at review gate. If HALTED or IN_PROGRESS: resume from next_workflow.",
+        "note": "At chain start (no checkpoint yet), project_id is not known until intake-store-input runs. The orchestrator starts fresh if no checkpoint exists."
+      },
+      {
+        "step": 4,
+        "node_type": "Execute Workflow",
+        "description": "intake-store-input"
+      },
+      {
+        "step": 5,
+        "node_type": "If",
+        "description": "Did intake-store-input succeed?"
+      },
+      {
+        "step": 6,
+        "node_type": "Code (JavaScript)",
+        "description": "SUCCESS branch: Extract project_id from intake result. Write initial checkpoint."
+      },
+      {
+        "step": "6b",
+        "node_type": "Code (JavaScript)",
+        "description": "FAILURE branch: Log CHAIN_HALT, return halt result."
+      },
+      {
+        "step": 7,
+        "node_type": "Execute Workflow → If → Code (update checkpoint or halt) × 31",
+        "description": "Repeat the Execute Workflow → If → Code success/failure pattern for all remaining workflows (steps 3–31 in the orchestration chain). Each iteration: call subworkflow, check result, update checkpoint on success or halt on failure.",
+        "n8n_implementation_note": "In n8n, this is a linear sequence of Execute Workflow nodes, each followed by an If node. The number of nodes in the orchestrator workflow is approximately 34 (1 per subworkflow) × 3 (Execute Workflow + If + Code) = ~100 nodes total. This is verbose but clear and maintainable."
+      },
+      {
+        "step": "REVIEW_GATE_NODE",
+        "node_type": "If → Wait → If",
+        "description": "If manual_review_required: true → pause at Wait node (webhook resume). After wait: check if approved (REVIEW_GATE_APPROVED webhook) or rejected (REVIEW_GATE_REJECTED webhook). If approved: continue to run-validation. If rejected: update checkpoint, log, return REVIEW_REJECTED result."
+      },
+      {
+        "step": "FINAL",
+        "node_type": "Code (JavaScript)",
+        "description": "Write final checkpoint (chain_status: COMPLETE). Log CHAIN_COMPLETE. Return orchestration result to resolve-runtime-config."
+      }
+    ],
+
+    "validation_notes": [
+      "The orchestrator itself does not validate artifact content. It delegates validation to run-validation (step 28).",
+      "The orchestrator validates that each Execute Workflow call returned a success status — not the semantic content of what was returned.",
+      "Prerequisite artifact existence for each step is checked INSIDE each subworkflow (read contract from artifact-io-spec.md). The orchestrator trusts subworkflow results."
+    ],
+
+    "assumptions": [
+      "n8n Execute Workflow nodes return a structured result that the orchestrator can inspect to determine success vs. failure.",
+      "Subworkflows signal failure by either throwing an error (caught by n8n's error handling) or returning a structured failure object. The orchestrator's If node can distinguish these.",
+      "n8n Wait node can be configured with a webhook callback URL for the review gate.",
+      "The runtime config payload is passed through Execute Workflow parameters — it does not need to be re-read from environment variables in each subworkflow.",
+      "The orchestrator workflow has access to the file system (via Code nodes) to write checkpoint and execution log files."
+    ],
+
+    "open_questions": [
+      "How does n8n route subworkflow error output to the calling orchestrator? Does the Execute Workflow node expose an error output pin, or does it require try/catch in the Code node?",
+      "What is the n8n mechanism for implementing a webhook-based Wait node for the review gate? How is the webhook URL generated and communicated to the human reviewer?",
+      "Should the orchestrator be split into multiple n8n workflows (e.g., one for Phases 1-3, one for 4-9, one for 10) to avoid hitting n8n's node count or execution time limits?",
+      "How does the orchestrator handle the section-instances/ directory as input to later steps? It must enumerate the directory, not just check for a single file."
+    ],
+
+    "evidence_boundaries": "All orchestration logic in this workflow operates on the project folder filesystem and the n8n execution context. It reads checkpoint.json (if it exists) and writes checkpoint.json after each step. It does not read planning artifact content — it delegates that to subworkflows. It does not call any external API — it delegates that to import-shopify-data and LLM synthesis subworkflows.",
+
+    "scope_exclusions": [
+      "This workflow does NOT implement Shopify write operations.",
+      "This workflow does NOT implement theme deployment.",
+      "This workflow does NOT implement automatic publishing.",
+      "This workflow does NOT implement CI/CD triggers.",
+      "This workflow does NOT implement production monitoring.",
+      "These exclusions are intentional. Phase 11 defines the planning and governance execution chain only."
+    ]
+  }
+}
