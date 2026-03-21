@@ -1,266 +1,266 @@
 {
-“$schema”: “https://json-schema.org/draft/2020-12/schema”,
-“$id”: “https://example.com/schemas/motion-media-strategy.schema.json”,
-“title”: “Motion Media Strategy Schema”,
-“description”: “Schema for store-level motion, video, embed, and performance strategy inside store-os”,
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“strategy_name”,
-“primary_goal”,
-“motion_policy”,
-“video_policy”,
-“embed_policy”,
-“fallback_policy”,
-“performance_policy”,
-“page_type_rules”
+"$schema": "https://json-schema.org/draft/2020-12/schema",
+"$id": "https://example.com/schemas/motion-media-strategy.schema.json",
+"title": "Motion Media Strategy Schema",
+"description": "Schema for store-level motion, video, embed, and performance strategy inside store-os",
+"type": "object",
+"additionalProperties": false,
+"required": [
+"strategy_name",
+"primary_goal",
+"motion_policy",
+"video_policy",
+"embed_policy",
+"fallback_policy",
+"performance_policy",
+"page_type_rules"
 ],
-“properties”: {
-“strategy_name”: {
-“type”: “string”,
-“minLength”: 1
+"properties": {
+"strategy_name": {
+"type": "string",
+"minLength": 1
 },
-“primary_goal”: {
-“type”: “string”,
-“enum”: [
-“conversion-support”,
-“storytelling-support”,
-“product-demonstration”,
-“brand-experience”,
-“hybrid”
+"primary_goal": {
+"type": "string",
+"enum": [
+"conversion-support",
+"storytelling-support",
+"product-demonstration",
+"brand-experience",
+"hybrid"
 ]
 },
-“motion_policy”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“global_motion_level”,
-“scroll_motion_level”,
-“interaction_motion_level”,
-“mobile_motion_limit”
+"motion_policy": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"global_motion_level",
+"scroll_motion_level",
+"interaction_motion_level",
+"mobile_motion_limit"
 ],
-“properties”: {
-“global_motion_level”: {
-“type”: “string”,
-“enum”: [
-“none”,
-“subtle”,
-“balanced”,
-“strong”,
-“cinematic”
+"properties": {
+"global_motion_level": {
+"type": "string",
+"enum": [
+"none",
+"subtle",
+"balanced",
+"strong",
+"cinematic"
 ]
 },
-“scroll_motion_level”: {
-“type”: “string”,
-“enum”: [
-“none”,
-“light”,
-“balanced”,
-“strong”
+"scroll_motion_level": {
+"type": "string",
+"enum": [
+"none",
+"light",
+"balanced",
+"strong"
 ]
 },
-“interaction_motion_level”: {
-“type”: “string”,
-“enum”: [
-“none”,
-“light”,
-“balanced”,
-“strong”
+"interaction_motion_level": {
+"type": "string",
+"enum": [
+"none",
+"light",
+"balanced",
+"strong"
 ]
 },
-“mobile_motion_limit”: {
-“type”: “string”,
-“enum”: [
-“strict”,
-“balanced”,
-“relaxed”
+"mobile_motion_limit": {
+"type": "string",
+"enum": [
+"strict",
+"balanced",
+"relaxed"
 ]
 },
-“reduced_motion_respect_required”: {
-“type”: “boolean”
+"reduced_motion_respect_required": {
+"type": "boolean"
 }
 }
 },
-“video_policy”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“video_usage_level”,
-“hero_video_allowed”,
-“product_demo_priority”,
-“autoplay_policy”
+"video_policy": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"video_usage_level",
+"hero_video_allowed",
+"product_demo_priority",
+"autoplay_policy"
 ],
-“properties”: {
-“video_usage_level”: {
-“type”: “string”,
-“enum”: [
-“none”,
-“light”,
-“balanced”,
-“rich”
+"properties": {
+"video_usage_level": {
+"type": "string",
+"enum": [
+"none",
+"light",
+"balanced",
+"rich"
 ]
 },
-“hero_video_allowed”: {
-“type”: “boolean”
+"hero_video_allowed": {
+"type": "boolean"
 },
-“product_demo_priority”: {
-“type”: “string”,
-“enum”: [
-“low”,
-“medium”,
-“high”
+"product_demo_priority": {
+"type": "string",
+"enum": [
+"low",
+"medium",
+"high"
 ]
 },
-“autoplay_policy”: {
-“type”: “string”,
-“enum”: [
-“forbidden”,
-“muted-only”,
-“limited”,
-“balanced”
+"autoplay_policy": {
+"type": "string",
+"enum": [
+"forbidden",
+"muted-only",
+"limited",
+"balanced"
 ]
 },
-“loop_policy”: {
-“type”: “string”,
-“enum”: [
-“forbidden”,
-“limited”,
-“allowed”
+"loop_policy": {
+"type": "string",
+"enum": [
+"forbidden",
+"limited",
+"allowed"
 ]
 }
 }
 },
-“embed_policy”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“external_embeds_allowed”,
-“embed_usage_level”
+"embed_policy": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"external_embeds_allowed",
+"embed_usage_level"
 ],
-“properties”: {
-“external_embeds_allowed”: {
-“type”: “boolean”
+"properties": {
+"external_embeds_allowed": {
+"type": "boolean"
 },
-“embed_usage_level”: {
-“type”: “string”,
-“enum”: [
-“none”,
-“light”,
-“balanced”,
-“rich”
+"embed_usage_level": {
+"type": "string",
+"enum": [
+"none",
+"light",
+"balanced",
+"rich"
 ]
 },
-“trusted_embed_sources_only”: {
-“type”: “boolean”
+"trusted_embed_sources_only": {
+"type": "boolean"
 }
 }
 },
-“fallback_policy”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“poster_required_for_video”,
-“mobile_fallback_required_for_hero_media”,
-“static_fallback_required_for_motion”
+"fallback_policy": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"poster_required_for_video",
+"mobile_fallback_required_for_hero_media",
+"static_fallback_required_for_motion"
 ],
-“properties”: {
-“poster_required_for_video”: {
-“type”: “boolean”
+"properties": {
+"poster_required_for_video": {
+"type": "boolean"
 },
-“mobile_fallback_required_for_hero_media”: {
-“type”: “boolean”
+"mobile_fallback_required_for_hero_media": {
+"type": "boolean"
 },
-“static_fallback_required_for_motion”: {
-“type”: “boolean”
+"static_fallback_required_for_motion": {
+"type": "boolean"
 },
-“text_context_required_for_media_sections”: {
-“type”: “boolean”
+"text_context_required_for_media_sections": {
+"type": "boolean"
 }
 }
 },
-“performance_policy”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“performance_priority”,
-“heavy_media_control”,
-“lazy_load_required”
+"performance_policy": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"performance_priority",
+"heavy_media_control",
+"lazy_load_required"
 ],
-“properties”: {
-“performance_priority”: {
-“type”: “string”,
-“enum”: [
-“balanced”,
-“high”,
-“critical”
+"properties": {
+"performance_priority": {
+"type": "string",
+"enum": [
+"balanced",
+"high",
+"critical"
 ]
 },
-“heavy_media_control”: {
-“type”: “string”,
-“enum”: [
-“strict”,
-“balanced”,
-“flexible”
+"heavy_media_control": {
+"type": "string",
+"enum": [
+"strict",
+"balanced",
+"flexible"
 ]
 },
-“lazy_load_required”: {
-“type”: “boolean”
+"lazy_load_required": {
+"type": "boolean"
 },
-“hero_media_review_required”: {
-“type”: “boolean”
+"hero_media_review_required": {
+"type": "boolean"
 }
 }
 },
-“page_type_rules”: {
-“type”: “array”,
-“minItems”: 1,
-“items”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“page_type”,
-“motion_allowed”,
-“video_allowed”,
-“embed_allowed”
+"page_type_rules": {
+"type": "array",
+"minItems": 1,
+"items": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"page_type",
+"motion_allowed",
+"video_allowed",
+"embed_allowed"
 ],
-“properties”: {
-“page_type”: {
-“type”: “string”,
-“enum”: [
-“homepage”,
-“product-page”,
-“collection-page”,
-“guide-page”,
-“faq-page”,
-“article”,
-“generic-page”,
-“cart”
+"properties": {
+"page_type": {
+"type": "string",
+"enum": [
+"homepage",
+"product-page",
+"collection-page",
+"guide-page",
+"faq-page",
+"article",
+"generic-page",
+"cart"
 ]
 },
-“motion_allowed”: {
-“type”: “boolean”
+"motion_allowed": {
+"type": "boolean"
 },
-“video_allowed”: {
-“type”: “boolean”
+"video_allowed": {
+"type": "boolean"
 },
-“embed_allowed”: {
-“type”: “boolean”
+"embed_allowed": {
+"type": "boolean"
 },
-“notes”: {
-“type”: “string”
+"notes": {
+"type": "string"
 }
 }
 }
 },
-“forbidden_patterns”: {
-“type”: “array”,
-“items”: {
-“type”: “string”,
-“minLength”: 1
+"forbidden_patterns": {
+"type": "array",
+"items": {
+"type": "string",
+"minLength": 1
 }
 },
-“notes”: {
-“type”: “string”
+"notes": {
+"type": "string"
 }
 }
 }

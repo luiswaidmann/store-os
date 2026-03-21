@@ -1,177 +1,177 @@
 {
-“$schema”: “https://json-schema.org/draft/2020-12/schema”,
-“$id”: “https://example.com/schemas/brand-positioning.schema.json”,
-“title”: “Brand Positioning Schema”,
-“description”: “Schema for brand positioning inside store-os”,
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“brand_role”,
-“value_proposition”,
-“positioning_statement”,
-“differentiators”,
-“brand_traits”,
-“tone_of_voice”,
-“trust_style”,
-“conversion_style”
+"$schema": "https://json-schema.org/draft/2020-12/schema",
+"$id": "https://example.com/schemas/brand-positioning.schema.json",
+"title": "Brand Positioning Schema",
+"description": "Schema for brand positioning inside store-os",
+"type": "object",
+"additionalProperties": false,
+"required": [
+"brand_role",
+"value_proposition",
+"positioning_statement",
+"differentiators",
+"brand_traits",
+"tone_of_voice",
+"trust_style",
+"conversion_style"
 ],
-“properties”: {
-“brand_role”: {
-“type”: “string”,
-“enum”: [
-“specialist”,
-“curator”,
-“problem-solver”,
-“premium-innovator”,
-“editorial-guide”,
-“value-leader”
+"properties": {
+"brand_role": {
+"type": "string",
+"enum": [
+"specialist",
+"curator",
+"problem-solver",
+"premium-innovator",
+"editorial-guide",
+"value-leader"
 ]
 },
-“value_proposition”: {
-“type”: “string”,
-“minLength”: 1
+"value_proposition": {
+"type": "string",
+"minLength": 1
 },
-“positioning_statement”: {
-“type”: “string”,
-“minLength”: 1
+"positioning_statement": {
+"type": "string",
+"minLength": 1
 },
-“differentiators”: {
-“type”: “array”,
-“minItems”: 1,
-“items”: {
-“type”: “string”,
-“minLength”: 1
+"differentiators": {
+"type": "array",
+"minItems": 1,
+"items": {
+"type": "string",
+"minLength": 1
 }
 },
-“brand_traits”: {
-“type”: “array”,
-“minItems”: 2,
-“items”: {
-“type”: “string”,
-“minLength”: 1
+"brand_traits": {
+"type": "array",
+"minItems": 2,
+"items": {
+"type": "string",
+"minLength": 1
 }
 },
-“tone_of_voice”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“style”,
-“clarity_level”,
-“emotional_intensity”
+"tone_of_voice": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"style",
+"clarity_level",
+"emotional_intensity"
 ],
-“properties”: {
-“style”: {
-“type”: “string”,
-“enum”: [
-“clear-direct”,
-“premium-confident”,
-“warm-helpful”,
-“editorial-smart”,
-“playful-bold”,
-“technical-trustworthy”
+"properties": {
+"style": {
+"type": "string",
+"enum": [
+"clear-direct",
+"premium-confident",
+"warm-helpful",
+"editorial-smart",
+"playful-bold",
+"technical-trustworthy"
 ]
 },
-“clarity_level”: {
-“type”: “string”,
-“enum”: [
-“very-clear”,
-“balanced”,
-“more-expressive”
+"clarity_level": {
+"type": "string",
+"enum": [
+"very-clear",
+"balanced",
+"more-expressive"
 ]
 },
-“emotional_intensity”: {
-“type”: “string”,
-“enum”: [
-“low”,
-“medium”,
-“high”
+"emotional_intensity": {
+"type": "string",
+"enum": [
+"low",
+"medium",
+"high"
 ]
 }
 }
 },
-“trust_style”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“proof_mode”,
-“reassurance_level”
+"trust_style": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"proof_mode",
+"reassurance_level"
 ],
-“properties”: {
-“proof_mode”: {
-“type”: “string”,
-“enum”: [
-“evidence-led”,
-“social-proof-led”,
-“authority-led”,
-“guarantee-led”,
-“mixed”
+"properties": {
+"proof_mode": {
+"type": "string",
+"enum": [
+"evidence-led",
+"social-proof-led",
+"authority-led",
+"guarantee-led",
+"mixed"
 ]
 },
-“reassurance_level”: {
-“type”: “string”,
-“enum”: [
-“light”,
-“moderate”,
-“strong”
+"reassurance_level": {
+"type": "string",
+"enum": [
+"light",
+"moderate",
+"strong"
 ]
 }
 }
 },
-“conversion_style”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“cta_style”,
-“sales_pressure”
+"conversion_style": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"cta_style",
+"sales_pressure"
 ],
-“properties”: {
-“cta_style”: {
-“type”: “string”,
-“enum”: [
-“subtle”,
-“balanced”,
-“assertive”
+"properties": {
+"cta_style": {
+"type": "string",
+"enum": [
+"subtle",
+"balanced",
+"assertive"
 ]
 },
-“sales_pressure”: {
-“type”: “string”,
-“enum”: [
-“low”,
-“medium”,
-“high”
+"sales_pressure": {
+"type": "string",
+"enum": [
+"low",
+"medium",
+"high"
 ]
 }
 }
 },
-“objection_handling_style”: {
-“type”: “string”,
-“enum”: [
-“minimal”,
-“balanced”,
-“detailed”
+"objection_handling_style": {
+"type": "string",
+"enum": [
+"minimal",
+"balanced",
+"detailed"
 ]
 },
-“visual_positioning_hint”: {
-“type”: “string”
+"visual_positioning_hint": {
+"type": "string"
 },
-“media_style_hint”: {
-“type”: “string”
+"media_style_hint": {
+"type": "string"
 },
-“seo_tone_hint”: {
-“type”: “string”
+"seo_tone_hint": {
+"type": "string"
 },
-“aeo_tone_hint”: {
-“type”: “string”
+"aeo_tone_hint": {
+"type": "string"
 },
-“forbidden_impressions”: {
-“type”: “array”,
-“items”: {
-“type”: “string”,
-“minLength”: 1
+"forbidden_impressions": {
+"type": "array",
+"items": {
+"type": "string",
+"minLength": 1
 }
 },
-“notes”: {
-“type”: “string”
+"notes": {
+"type": "string"
 }
 }
 }

@@ -1,225 +1,225 @@
 {
-“$schema”: “https://json-schema.org/draft/2020-12/schema”,
-“$id”: “https://example.com/schemas/section-instance.schema.json”,
-“title”: “Section Instance Schema”,
-“description”: “Schema for a concrete section instance placed on a page inside store-os”,
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“section_id”,
-“section_type”,
-“page_type”,
-“purpose”,
-“enabled”,
-“priority”,
-“content_config”,
-“media_config”,
-“motion_config”,
-“seo_config”,
-“conversion_config”
+"$schema": "https://json-schema.org/draft/2020-12/schema",
+"$id": "https://example.com/schemas/section-instance.schema.json",
+"title": "Section Instance Schema",
+"description": "Schema for a concrete section instance placed on a page inside store-os",
+"type": "object",
+"additionalProperties": false,
+"required": [
+"section_id",
+"section_type",
+"page_type",
+"purpose",
+"enabled",
+"priority",
+"content_config",
+"media_config",
+"motion_config",
+"seo_config",
+"conversion_config"
 ],
-“properties”: {
-“section_id”: {
-“type”: “string”,
-“minLength”: 1,
-“pattern”: “^[a-z0-9-]+$”
+"properties": {
+"section_id": {
+"type": "string",
+"minLength": 1,
+"pattern": "^[a-z0-9-]+$"
 },
-“section_type”: {
-“type”: “string”,
-“enum”: [
-“hero”,
-“featured-products”,
-“featured-collections”,
-“usp-strip”,
-“trust-proof”,
-“review-section”,
-“comparison-section”,
-“problem-solution”,
-“how-it-works”,
-“video-section”,
-“storytelling-section”,
-“benefit-grid”,
-“faq-preview”,
-“editorial-content”,
-“newsletter”,
-“category-navigation”,
-“social-proof”,
-“brand-story”,
-“cta-banner”,
-“spec-grid”,
-“media-gallery”,
-“before-after”,
-“icon-grid”
+"section_type": {
+"type": "string",
+"enum": [
+"hero",
+"featured-products",
+"featured-collections",
+"usp-strip",
+"trust-proof",
+"review-section",
+"comparison-section",
+"problem-solution",
+"how-it-works",
+"video-section",
+"storytelling-section",
+"benefit-grid",
+"faq-preview",
+"editorial-content",
+"newsletter",
+"category-navigation",
+"social-proof",
+"brand-story",
+"cta-banner",
+"spec-grid",
+"media-gallery",
+"before-after",
+"icon-grid"
 ]
 },
-“page_type”: {
-“type”: “string”,
-“enum”: [
-“homepage”,
-“product-page”,
-“collection-page”,
-“page”,
-“article”,
-“blog-index”,
-“cart”
+"page_type": {
+"type": "string",
+"enum": [
+"homepage",
+"product-page",
+"collection-page",
+"page",
+"article",
+"blog-index",
+"cart"
 ]
 },
-“purpose”: {
-“type”: “string”,
-“minLength”: 1
+"purpose": {
+"type": "string",
+"minLength": 1
 },
-“enabled”: {
-“type”: “boolean”
+"enabled": {
+"type": "boolean"
 },
-“priority”: {
-“type”: “string”,
-“enum”: [
-“core”,
-“supporting”,
-“optional”
+"priority": {
+"type": "string",
+"enum": [
+"core",
+"supporting",
+"optional"
 ]
 },
-“content_config”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“headline”,
-“body_mode”,
-“cta_mode”
+"content_config": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"headline",
+"body_mode",
+"cta_mode"
 ],
-“properties”: {
-“headline”: {
-“type”: “string”
+"properties": {
+"headline": {
+"type": "string"
 },
-“body_mode”: {
-“type”: “string”,
-“enum”: [
-“none”,
-“short”,
-“balanced”,
-“long”
+"body_mode": {
+"type": "string",
+"enum": [
+"none",
+"short",
+"balanced",
+"long"
 ]
 },
-“cta_mode”: {
-“type”: “string”,
-“enum”: [
-“none”,
-“single”,
-“multiple”
+"cta_mode": {
+"type": "string",
+"enum": [
+"none",
+"single",
+"multiple"
 ]
 },
-“faq_mode”: {
-“type”: “string”,
-“enum”: [
-“none”,
-“light”,
-“balanced”
+"faq_mode": {
+"type": "string",
+"enum": [
+"none",
+"light",
+"balanced"
 ]
 }
 }
 },
-“media_config”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“uses_images”,
-“uses_video”,
-“uses_embeds”,
-“fallback_required”
+"media_config": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"uses_images",
+"uses_video",
+"uses_embeds",
+"fallback_required"
 ],
-“properties”: {
-“uses_images”: {
-“type”: “boolean”
+"properties": {
+"uses_images": {
+"type": "boolean"
 },
-“uses_video”: {
-“type”: “boolean”
+"uses_video": {
+"type": "boolean"
 },
-“uses_embeds”: {
-“type”: “boolean”
+"uses_embeds": {
+"type": "boolean"
 },
-“fallback_required”: {
-“type”: “boolean”
+"fallback_required": {
+"type": "boolean"
 },
-“media_priority”: {
-“type”: “string”,
-“enum”: [
-“low”,
-“medium”,
-“high”
+"media_priority": {
+"type": "string",
+"enum": [
+"low",
+"medium",
+"high"
 ]
 }
 }
 },
-“motion_config”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“scroll_motion”,
-“interaction_motion”,
-“motion_intensity”
+"motion_config": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"scroll_motion",
+"interaction_motion",
+"motion_intensity"
 ],
-“properties”: {
-“scroll_motion”: {
-“type”: “boolean”
+"properties": {
+"scroll_motion": {
+"type": "boolean"
 },
-“interaction_motion”: {
-“type”: “boolean”
+"interaction_motion": {
+"type": "boolean"
 },
-“motion_intensity”: {
-“type”: “string”,
-“enum”: [
-“none”,
-“subtle”,
-“balanced”,
-“strong”
+"motion_intensity": {
+"type": "string",
+"enum": [
+"none",
+"subtle",
+"balanced",
+"strong"
 ]
 }
 }
 },
-“seo_config”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“indexable_text”,
-“internal_links_allowed”
+"seo_config": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"indexable_text",
+"internal_links_allowed"
 ],
-“properties”: {
-“indexable_text”: {
-“type”: “boolean”
+"properties": {
+"indexable_text": {
+"type": "boolean"
 },
-“internal_links_allowed”: {
-“type”: “boolean”
+"internal_links_allowed": {
+"type": "boolean"
 },
-“keyword_support”: {
-“type”: “boolean”
+"keyword_support": {
+"type": "boolean"
 },
-“answer_support”: {
-“type”: “boolean”
+"answer_support": {
+"type": "boolean"
 }
 }
 },
-“conversion_config”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“supports_cta”,
-“supports_trust”,
-“supports_objection_handling”
+"conversion_config": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"supports_cta",
+"supports_trust",
+"supports_objection_handling"
 ],
-“properties”: {
-“supports_cta”: {
-“type”: “boolean”
+"properties": {
+"supports_cta": {
+"type": "boolean"
 },
-“supports_trust”: {
-“type”: “boolean”
+"supports_trust": {
+"type": "boolean"
 },
-“supports_objection_handling”: {
-“type”: “boolean”
+"supports_objection_handling": {
+"type": "boolean"
 }
 }
 },
-“notes”: {
-“type”: “string”
+"notes": {
+"type": "string"
 }
 }
 }

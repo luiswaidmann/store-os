@@ -1,176 +1,176 @@
 {
-“$schema”: “https://json-schema.org/draft/2020-12/schema”,
-“$id”: “https://example.com/schemas/project.schema.json”,
-“title”: “Project Schema”,
-“description”: “Schema for a generic commerce project inside store-os”,
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“project_id”,
-“project_type”,
-“status”,
-“vertical”,
-“business_model”,
-“platform”,
-“target_markets”,
-“languages”,
-“price_positioning”,
-“design_direction”,
-“content_strategy”,
-“competitor_strategy”,
-“theme_strategy”,
-“deployment_strategy”,
-“paths”
+"$schema": "https://json-schema.org/draft/2020-12/schema",
+"$id": "https://example.com/schemas/project.schema.json",
+"title": "Project Schema",
+"description": "Schema for a generic commerce project inside store-os",
+"type": "object",
+"additionalProperties": false,
+"required": [
+"project_id",
+"project_type",
+"status",
+"vertical",
+"business_model",
+"platform",
+"target_markets",
+"languages",
+"price_positioning",
+"design_direction",
+"content_strategy",
+"competitor_strategy",
+"theme_strategy",
+"deployment_strategy",
+"paths"
 ],
-“properties”: {
-“project_id”: {
-“type”: “string”,
-“minLength”: 1,
-“pattern”: “^[a-z0-9-]+$”,
-“description”: “Unique project identifier using lowercase letters, numbers, and hyphens only”
+"properties": {
+"project_id": {
+"type": "string",
+"minLength": 1,
+"pattern": "^[a-z0-9-]+$",
+"description": "Unique project identifier using lowercase letters, numbers, and hyphens only"
 },
-“project_type”: {
-“type”: “string”,
-“enum”: [“shopify-store”, “commerce-project”, “brand-system”]
+"project_type": {
+"type": "string",
+"enum": ["shopify-store", "commerce-project", "brand-system"]
 },
-“status”: {
-“type”: “string”,
-“enum”: [“draft”, “active”, “archived”]
+"status": {
+"type": "string",
+"enum": ["draft", "active", "archived"]
 },
-“vertical”: {
-“type”: “string”,
-“minLength”: 1
+"vertical": {
+"type": "string",
+"minLength": 1
 },
-“business_model”: {
-“type”: “string”,
-“enum”: [“ecommerce”, “dropshipping”, “hybrid”, “other”]
+"business_model": {
+"type": "string",
+"enum": ["ecommerce", "dropshipping", "hybrid", "other"]
 },
-“platform”: {
-“type”: “string”,
-“enum”: [“shopify”, “woocommerce”, “custom”, “other”]
+"platform": {
+"type": "string",
+"enum": ["shopify", "woocommerce", "custom", "other"]
 },
-“target_markets”: {
-“type”: “array”,
-“minItems”: 1,
-“items”: {
-“type”: “string”,
-“minLength”: 2
+"target_markets": {
+"type": "array",
+"minItems": 1,
+"items": {
+"type": "string",
+"minLength": 2
 }
 },
-“languages”: {
-“type”: “array”,
-“minItems”: 1,
-“items”: {
-“type”: “string”,
-“minLength”: 2
+"languages": {
+"type": "array",
+"minItems": 1,
+"items": {
+"type": "string",
+"minLength": 2
 }
 },
-“price_positioning”: {
-“type”: “string”,
-“minLength”: 1
+"price_positioning": {
+"type": "string",
+"minLength": 1
 },
-“design_direction”: {
-“type”: “string”,
-“minLength”: 1
+"design_direction": {
+"type": "string",
+"minLength": 1
 },
-“content_strategy”: {
-“type”: “string”,
-“minLength”: 1
+"content_strategy": {
+"type": "string",
+"minLength": 1
 },
-“competitor_strategy”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“mode”,
-“direct_copy_forbidden”
+"competitor_strategy": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"mode",
+"direct_copy_forbidden"
 ],
-“properties”: {
-“mode”: {
-“type”: “string”,
-“enum”: [“cluster-and-extract”, “manual”, “hybrid”]
+"properties": {
+"mode": {
+"type": "string",
+"enum": ["cluster-and-extract", "manual", "hybrid"]
 },
-“direct_copy_forbidden”: {
-“type”: “boolean”
+"direct_copy_forbidden": {
+"type": "boolean"
 }
 }
 },
-“theme_strategy”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“use_existing_theme_as_reference_only”,
-“allow_direct_theme_reuse”
+"theme_strategy": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"use_existing_theme_as_reference_only",
+"allow_direct_theme_reuse"
 ],
-“properties”: {
-“use_existing_theme_as_reference_only”: {
-“type”: “boolean”
+"properties": {
+"use_existing_theme_as_reference_only": {
+"type": "boolean"
 },
-“allow_direct_theme_reuse”: {
-“type”: “boolean”
+"allow_direct_theme_reuse": {
+"type": "boolean"
 }
 }
 },
-“deployment_strategy”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“draft_first”,
-“publish_requires_validation”
+"deployment_strategy": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"draft_first",
+"publish_requires_validation"
 ],
-“properties”: {
-“draft_first”: {
-“type”: “boolean”
+"properties": {
+"draft_first": {
+"type": "boolean"
 },
-“publish_requires_validation”: {
-“type”: “boolean”
+"publish_requires_validation": {
+"type": "boolean"
 }
 }
 },
-“paths”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“input”,
-“research”,
-“manifests”,
-“theme”,
-“content”,
-“assets”,
-“exports”,
-“notes”
+"paths": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"input",
+"research",
+"manifests",
+"theme",
+"content",
+"assets",
+"exports",
+"notes"
 ],
-“properties”: {
-“input”: {
-“type”: “string”,
-“const”: “./input”
+"properties": {
+"input": {
+"type": "string",
+"const": "./input"
 },
-“research”: {
-“type”: “string”,
-“const”: “./research”
+"research": {
+"type": "string",
+"const": "./research"
 },
-“manifests”: {
-“type”: “string”,
-“const”: “./manifests”
+"manifests": {
+"type": "string",
+"const": "./manifests"
 },
-“theme”: {
-“type”: “string”,
-“const”: “./theme”
+"theme": {
+"type": "string",
+"const": "./theme"
 },
-“content”: {
-“type”: “string”,
-“const”: “./content”
+"content": {
+"type": "string",
+"const": "./content"
 },
-“assets”: {
-“type”: “string”,
-“const”: “./assets”
+"assets": {
+"type": "string",
+"const": "./assets"
 },
-“exports”: {
-“type”: “string”,
-“const”: “./exports”
+"exports": {
+"type": "string",
+"const": "./exports"
 },
-“notes”: {
-“type”: “string”,
-“const”: “./notes”
+"notes": {
+"type": "string",
+"const": "./notes"
 }
 }
 }

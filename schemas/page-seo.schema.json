@@ -1,164 +1,164 @@
 {
-“$schema”: “https://json-schema.org/draft/2020-12/schema”,
-“$id”: “https://example.com/schemas/page-seo.schema.json”,
-“title”: “Page SEO Schema”,
-“description”: “Schema for general page SEO and AEO planning inside store-os”,
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“primary_keyword”,
-“secondary_keywords”,
-“search_intent”,
-“seo_title”,
-“meta_description”,
-“slug”,
-“page_role”,
-“internal_linking_targets”,
-“answer_targets”
+"$schema": "https://json-schema.org/draft/2020-12/schema",
+"$id": "https://example.com/schemas/page-seo.schema.json",
+"title": "Page SEO Schema",
+"description": "Schema for general page SEO and AEO planning inside store-os",
+"type": "object",
+"additionalProperties": false,
+"required": [
+"primary_keyword",
+"secondary_keywords",
+"search_intent",
+"seo_title",
+"meta_description",
+"slug",
+"page_role",
+"internal_linking_targets",
+"answer_targets"
 ],
-“properties”: {
-“primary_keyword”: {
-“type”: “string”,
-“minLength”: 1
+"properties": {
+"primary_keyword": {
+"type": "string",
+"minLength": 1
 },
-“secondary_keywords”: {
-“type”: “array”,
-“minItems”: 1,
-“items”: {
-“type”: “string”,
-“minLength”: 1
+"secondary_keywords": {
+"type": "array",
+"minItems": 1,
+"items": {
+"type": "string",
+"minLength": 1
 }
 },
-“search_intent”: {
-“type”: “string”,
-“enum”: [
-“informational”,
-“commercial”,
-“transactional”,
-“comparison”,
-“hybrid”
+"search_intent": {
+"type": "string",
+"enum": [
+"informational",
+"commercial",
+"transactional",
+"comparison",
+"hybrid"
 ]
 },
-“seo_title”: {
-“type”: “string”,
-“minLength”: 1,
-“maxLength”: 70
+"seo_title": {
+"type": "string",
+"minLength": 1,
+"maxLength": 70
 },
-“meta_description”: {
-“type”: “string”,
-“minLength”: 1,
-“maxLength”: 180
+"meta_description": {
+"type": "string",
+"minLength": 1,
+"maxLength": 180
 },
-“slug”: {
-“type”: “string”,
-“minLength”: 1,
-“pattern”: “^[a-z0-9-]+$”
+"slug": {
+"type": "string",
+"minLength": 1,
+"pattern": "^[a-z0-9-]+$"
 },
-“page_role”: {
-“type”: “string”,
-“enum”: [
-“trust-page”,
-“guide-page”,
-“faq-page”,
-“support-page”,
-“landing-page”,
-“about-page”,
-“hybrid-page”
+"page_role": {
+"type": "string",
+"enum": [
+"trust-page",
+"guide-page",
+"faq-page",
+"support-page",
+"landing-page",
+"about-page",
+"hybrid-page"
 ]
 },
-“internal_linking_targets”: {
-“type”: “array”,
-“minItems”: 1,
-“items”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“target_type”,
-“target_reason”
+"internal_linking_targets": {
+"type": "array",
+"minItems": 1,
+"items": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"target_type",
+"target_reason"
 ],
-“properties”: {
-“target_type”: {
-“type”: “string”,
-“enum”: [
-“homepage”,
-“collection-page”,
-“product-page”,
-“guide-page”,
-“faq-page”,
-“blog-article”,
-“page”
+"properties": {
+"target_type": {
+"type": "string",
+"enum": [
+"homepage",
+"collection-page",
+"product-page",
+"guide-page",
+"faq-page",
+"blog-article",
+"page"
 ]
 },
-“target_reason”: {
-“type”: “string”,
-“minLength”: 1
+"target_reason": {
+"type": "string",
+"minLength": 1
 }
 }
 }
 },
-“answer_targets”: {
-“type”: “array”,
-“minItems”: 1,
-“items”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“question_type”,
-“answer_goal”
+"answer_targets": {
+"type": "array",
+"minItems": 1,
+"items": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"question_type",
+"answer_goal"
 ],
-“properties”: {
-“question_type”: {
-“type”: “string”,
-“enum”: [
-“what-is-it”,
-“who-is-it-for”,
-“how-does-it-work”,
-“why-does-it-matter”,
-“comparison”,
-“trust”,
-“shipping”,
-“returns”,
-“contact”,
-“support”
+"properties": {
+"question_type": {
+"type": "string",
+"enum": [
+"what-is-it",
+"who-is-it-for",
+"how-does-it-work",
+"why-does-it-matter",
+"comparison",
+"trust",
+"shipping",
+"returns",
+"contact",
+"support"
 ]
 },
-“answer_goal”: {
-“type”: “string”,
-“minLength”: 1
+"answer_goal": {
+"type": "string",
+"minLength": 1
 }
 }
 }
 },
-“structured_data_targets”: {
-“type”: “array”,
-“items”: {
-“type”: “string”,
-“enum”: [
-“faq”,
-“article”,
-“breadcrumb”,
-“how-to”,
-“organization”
+"structured_data_targets": {
+"type": "array",
+"items": {
+"type": "string",
+"enum": [
+"faq",
+"article",
+"breadcrumb",
+"how-to",
+"organization"
 ]
 }
 },
-“canonical_strategy”: {
-“type”: “string”,
-“enum”: [
-“self-canonical”,
-“platform-default”
+"canonical_strategy": {
+"type": "string",
+"enum": [
+"self-canonical",
+"platform-default"
 ]
 },
-“content_depth”: {
-“type”: “string”,
-“enum”: [
-“light”,
-“balanced”,
-“deep”
+"content_depth": {
+"type": "string",
+"enum": [
+"light",
+"balanced",
+"deep"
 ]
 },
-“notes”: {
-“type”: “string”
+"notes": {
+"type": "string"
 }
 }
 }

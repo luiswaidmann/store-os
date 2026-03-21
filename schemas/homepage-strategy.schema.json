@@ -1,273 +1,273 @@
 {
-“$schema”: “https://json-schema.org/draft/2020-12/schema”,
-“$id”: “https://example.com/schemas/homepage-strategy.schema.json”,
-“title”: “Homepage Strategy Schema”,
-“description”: “Schema for homepage structure, section flow, trust, storytelling, and media strategy inside store-os”,
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“homepage_goal”,
-“hero_strategy”,
-“section_sequence”,
-“trust_strategy”,
-“storytelling_intensity”,
-“seo_role”,
-“media_role”,
-“cta_strategy”
+"$schema": "https://json-schema.org/draft/2020-12/schema",
+"$id": "https://example.com/schemas/homepage-strategy.schema.json",
+"title": "Homepage Strategy Schema",
+"description": "Schema for homepage structure, section flow, trust, storytelling, and media strategy inside store-os",
+"type": "object",
+"additionalProperties": false,
+"required": [
+"homepage_goal",
+"hero_strategy",
+"section_sequence",
+"trust_strategy",
+"storytelling_intensity",
+"seo_role",
+"media_role",
+"cta_strategy"
 ],
-“properties”: {
-“homepage_goal”: {
-“type”: “string”,
-“enum”: [
-“conversion-first”,
-“brand-introduction”,
-“editorial-discovery”,
-“catalog-navigation”,
-“hybrid”
+"properties": {
+"homepage_goal": {
+"type": "string",
+"enum": [
+"conversion-first",
+"brand-introduction",
+"editorial-discovery",
+"catalog-navigation",
+"hybrid"
 ]
 },
-“hero_strategy”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“hero_type”,
-“primary_focus”,
-“media_intensity”
+"hero_strategy": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"hero_type",
+"primary_focus",
+"media_intensity"
 ],
-“properties”: {
-“hero_type”: {
-“type”: “string”,
-“enum”: [
-“single-hero”,
-“split-hero”,
-“carousel-hero”,
-“video-hero”,
-“storytelling-hero”
+"properties": {
+"hero_type": {
+"type": "string",
+"enum": [
+"single-hero",
+"split-hero",
+"carousel-hero",
+"video-hero",
+"storytelling-hero"
 ]
 },
-“primary_focus”: {
-“type”: “string”,
-“enum”: [
-“flagship-product”,
-“collection-entry”,
-“brand-message”,
-“offer”,
-“problem-solution”
+"primary_focus": {
+"type": "string",
+"enum": [
+"flagship-product",
+"collection-entry",
+"brand-message",
+"offer",
+"problem-solution"
 ]
 },
-“media_intensity”: {
-“type”: “string”,
-“enum”: [
-“light”,
-“balanced”,
-“rich”
+"media_intensity": {
+"type": "string",
+"enum": [
+"light",
+"balanced",
+"rich"
 ]
 },
-“fallback_required”: {
-“type”: “boolean”
+"fallback_required": {
+"type": "boolean"
 }
 }
 },
-“section_sequence”: {
-“type”: “array”,
-“minItems”: 3,
-“items”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“section_type”,
-“purpose”
+"section_sequence": {
+"type": "array",
+"minItems": 3,
+"items": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"section_type",
+"purpose"
 ],
-“properties”: {
-“section_type”: {
-“type”: “string”,
-“enum”: [
-“hero”,
-“featured-products”,
-“featured-collections”,
-“usp-strip”,
-“trust-proof”,
-“review-section”,
-“comparison-section”,
-“problem-solution”,
-“how-it-works”,
-“video-section”,
-“storytelling-section”,
-“benefit-grid”,
-“faq-preview”,
-“editorial-content”,
-“newsletter”,
-“category-navigation”,
-“social-proof”,
-“brand-story”,
-“cta-banner”
+"properties": {
+"section_type": {
+"type": "string",
+"enum": [
+"hero",
+"featured-products",
+"featured-collections",
+"usp-strip",
+"trust-proof",
+"review-section",
+"comparison-section",
+"problem-solution",
+"how-it-works",
+"video-section",
+"storytelling-section",
+"benefit-grid",
+"faq-preview",
+"editorial-content",
+"newsletter",
+"category-navigation",
+"social-proof",
+"brand-story",
+"cta-banner"
 ]
 },
-“purpose”: {
-“type”: “string”,
-“minLength”: 1
+"purpose": {
+"type": "string",
+"minLength": 1
 },
-“priority”: {
-“type”: “string”,
-“enum”: [
-“core”,
-“supporting”,
-“optional”
+"priority": {
+"type": "string",
+"enum": [
+"core",
+"supporting",
+"optional"
 ]
 },
-“motion_allowed”: {
-“type”: “boolean”
+"motion_allowed": {
+"type": "boolean"
 },
-“media_allowed”: {
-“type”: “boolean”
+"media_allowed": {
+"type": "boolean"
 }
 }
 }
 },
-“trust_strategy”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“trust_placement”,
-“proof_intensity”
+"trust_strategy": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"trust_placement",
+"proof_intensity"
 ],
-“properties”: {
-“trust_placement”: {
-“type”: “string”,
-“enum”: [
-“early”,
-“balanced”,
-“late”
+"properties": {
+"trust_placement": {
+"type": "string",
+"enum": [
+"early",
+"balanced",
+"late"
 ]
 },
-“proof_intensity”: {
-“type”: “string”,
-“enum”: [
-“light”,
-“balanced”,
-“strong”
+"proof_intensity": {
+"type": "string",
+"enum": [
+"light",
+"balanced",
+"strong"
 ]
 },
-“review_usage”: {
-“type”: “string”,
-“enum”: [
-“none”,
-“light”,
-“balanced”,
-“strong”
+"review_usage": {
+"type": "string",
+"enum": [
+"none",
+"light",
+"balanced",
+"strong"
 ]
 }
 }
 },
-“storytelling_intensity”: {
-“type”: “string”,
-“enum”: [
-“minimal”,
-“balanced”,
-“strong”
+"storytelling_intensity": {
+"type": "string",
+"enum": [
+"minimal",
+"balanced",
+"strong"
 ]
 },
-“seo_role”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“homepage_keyword_role”,
-“content_depth”
+"seo_role": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"homepage_keyword_role",
+"content_depth"
 ],
-“properties”: {
-“homepage_keyword_role”: {
-“type”: “string”,
-“enum”: [
-“brand-only”,
-“brand-plus-category”,
-“category-supporting”,
-“hybrid”
+"properties": {
+"homepage_keyword_role": {
+"type": "string",
+"enum": [
+"brand-only",
+"brand-plus-category",
+"category-supporting",
+"hybrid"
 ]
 },
-“content_depth”: {
-“type”: “string”,
-“enum”: [
-“light”,
-“balanced”,
-“deep”
+"content_depth": {
+"type": "string",
+"enum": [
+"light",
+"balanced",
+"deep"
 ]
 }
 }
 },
-“media_role”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“video_role”,
-“image_role”,
-“motion_role”
+"media_role": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"video_role",
+"image_role",
+"motion_role"
 ],
-“properties”: {
-“video_role”: {
-“type”: “string”,
-“enum”: [
-“none”,
-“supporting”,
-“balanced”,
-“hero-driven”
+"properties": {
+"video_role": {
+"type": "string",
+"enum": [
+"none",
+"supporting",
+"balanced",
+"hero-driven"
 ]
 },
-“image_role”: {
-“type”: “string”,
-“enum”: [
-“supporting”,
-“balanced”,
-“dominant”
+"image_role": {
+"type": "string",
+"enum": [
+"supporting",
+"balanced",
+"dominant"
 ]
 },
-“motion_role”: {
-“type”: “string”,
-“enum”: [
-“none”,
-“subtle”,
-“balanced”,
-“cinematic”
+"motion_role": {
+"type": "string",
+"enum": [
+"none",
+"subtle",
+"balanced",
+"cinematic"
 ]
 }
 }
 },
-“cta_strategy”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“primary_cta_focus”,
-“cta_repetition”
+"cta_strategy": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"primary_cta_focus",
+"cta_repetition"
 ],
-“properties”: {
-“primary_cta_focus”: {
-“type”: “string”,
-“enum”: [
-“shop-now”,
-“explore-collections”,
-“view-flagship”,
-“learn-more”,
-“mixed”
+"properties": {
+"primary_cta_focus": {
+"type": "string",
+"enum": [
+"shop-now",
+"explore-collections",
+"view-flagship",
+"learn-more",
+"mixed"
 ]
 },
-“cta_repetition”: {
-“type”: “string”,
-“enum”: [
-“low”,
-“balanced”,
-“high”
+"cta_repetition": {
+"type": "string",
+"enum": [
+"low",
+"balanced",
+"high"
 ]
 }
 }
 },
-“forbidden_homepage_patterns”: {
-“type”: “array”,
-“items”: {
-“type”: “string”,
-“minLength”: 1
+"forbidden_homepage_patterns": {
+"type": "array",
+"items": {
+"type": "string",
+"minLength": 1
 }
 },
-“notes”: {
-“type”: “string”
+"notes": {
+"type": "string"
 }
 }
 }
