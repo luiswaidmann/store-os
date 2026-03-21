@@ -17,3 +17,4 @@ projects/*/exports/shopify/
 projects/*/exports/reports/
 projects/*/assets/images/generated/
 projects/*/theme/assets/generated/
+.claude/
