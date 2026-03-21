@@ -1,0 +1,576 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. Pattern manifest outputs are planning hypotheses — not validated design decisions. Human review is required before downstream design and content workflows consume this artifact.",
+    "evidence_boundary_note": "Approved and forbidden patterns in this artifact are derived from three synthesized upstream artifacts (market-intelligence, brand-positioning, competitor-clusters) and from user intake preferences (forbidden_styles, must_not_feel_like, desired_style_hints). No live competitor analysis, external design research, or validated user testing informs this artifact. All inferred pattern approvals are planning hypotheses. Intake-provided forbidden signals are treated as hard constraints and must not be overridden by LLM synthesis. Competitor cluster patterns are treated as candidate signals — not as proven best practices.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/pattern-manifest.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+  "workflow": {
+    "id": "build-pattern-manifest",
+    "name": "build-pattern-manifest",
+    "category": "planning",
+    "phase": "Phase 3 — Experience Planning",
+    "purpose": "Synthesize a schema-validated pattern manifest from market intelligence, brand positioning, competitor clusters, and user intake style preferences. The output defines which patterns are approved for use, which are explicitly forbidden, and what directional constraints apply across layout, trust, PDP, collection, SEO, AEO, and media dimensions. Intake-provided forbidden signals (forbidden_styles, must_not_feel_like) are hard constraints that cannot be overridden. Competitor cluster adaptation_opportunities are candidate inputs — not direct approvals. All approved patterns must be traceable to a brand-aligned rationale. The output must remain generic and planning-oriented — not tied to any specific store identity.",
+
+    "inputs": {
+      "from_market_intelligence": {
+        "source": "build-market-intelligence → market-intelligence.json",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "fields_used": [
+          "market_category",
+          "audience_segments",
+          "core_problems",
+          "purchase_motivators",
+          "trust_factors",
+          "positioning_goals"
+        ],
+        "treatment": "CONTEXT — provides audience-grounded reasoning for pattern approval decisions. Positioning goals help determine which layout and trust patterns serve the store's strategic direction.",
+        "note": "market-intelligence is a synthesis artifact from Phase 2. Its evidence boundaries apply here: all values are LLM-synthesized from intake and store profile. This context is used to evaluate pattern relevance — not as verified market research."
+      },
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "fields_used_as_hard_constraints": [
+          {
+            "field": "brand_role",
+            "treatment": "HARD CONSTRAINT — constrains which layout_direction.visual_hierarchy values are appropriate. Premium-innovator and editorial-guide roles constrain toward editorial-layered or clean-linear. Value-leader and specialist roles allow conversion-first.",
+            "note": "If brand_role was user-provided in intake, it carries maximum authority. If it was LLM-synthesized, it still acts as a hard constraint downstream — but human review of brand-positioning.json is recommended before this workflow runs."
+          },
+          {
+            "field": "tone_of_voice.style",
+            "treatment": "HARD CONSTRAINT — influences copy-pattern and storytelling-pattern approvals. A technical-trustworthy tone permits specification-led trust patterns. A playful-bold tone permits social-proof-led patterns. An editorial-smart tone permits editorial storytelling patterns.",
+            "note": "If tone_of_voice.style was user-provided, it is a direct brand signal. If synthesized, treat as planning input."
+          },
+          {
+            "field": "trust_style.proof_mode",
+            "treatment": "HARD CONSTRAINT — maps directly to trust_direction.proof_style in output. If user provided trust_style in intake, the manifest must reflect it.",
+            "mapping": {
+              "evidence-led": "specification-led",
+              "social-proof-led": "social-proof-led",
+              "authority-led": "authority-led",
+              "guarantee-led": "mixed",
+              "mixed": "mixed"
+            }
+          },
+          {
+            "field": "conversion_style.cta_style",
+            "treatment": "HARD CONSTRAINT — influences pdp_direction.cta_prominence. Subtle CTA style constrains toward balanced or story-led section flow. Assertive CTA style permits tight, conversion-first flow.",
+            "mapping": {
+              "subtle": "pdp_direction.cta_prominence = subtle",
+              "balanced": "pdp_direction.cta_prominence = balanced",
+              "assertive": "pdp_direction.cta_prominence = strong"
+            }
+          },
+          {
+            "field": "objection_handling_style",
+            "treatment": "HARD CONSTRAINT — maps directly to pdp_direction.objection_handling in output.",
+            "mapping": {
+              "minimal": "pdp_direction.objection_handling = minimal",
+              "balanced": "pdp_direction.objection_handling = balanced",
+              "detailed": "pdp_direction.objection_handling = detailed"
+            }
+          },
+          {
+            "field": "forbidden_impressions",
+            "treatment": "HARD CONSTRAINT — contributes to forbidden_patterns. Any brand impression explicitly forbidden here must be reflected as a forbidden pattern category.",
+            "note": "forbidden_impressions may contain both user-provided values (from intake.must_not_feel_like + forbidden_styles) and LLM-inferred additions from brand-positioning synthesis. This workflow must preserve the full list."
+          },
+          {
+            "field": "visual_positioning_hint",
+            "treatment": "SYNTHESIS HINT — informs layout_direction.visual_hierarchy selection and approved_patterns of type layout or storytelling-pattern.",
+            "note": "Optional field. If absent, rely on brand_role + price_positioning for layout direction."
+          }
+        ],
+        "fields_used_as_synthesis_hints": [
+          {
+            "field": "differentiators",
+            "treatment": "HINT — LLM uses these to validate that approved patterns support the store's differentiating position. Patterns that would erase or contradict differentiators should be flagged or forbidden."
+          },
+          {
+            "field": "value_proposition",
+            "treatment": "HINT — used to evaluate whether approved copy-pattern and storytelling-pattern types serve the core value proposition."
+          }
+        ]
+      },
+      "from_competitor_clusters": {
+        "source": "build-competitor-clusters → competitor-clusters.json",
+        "artifact_path": "projects/{project_id}/competitor-clusters.json",
+        "fields_used_as_candidate_signals": [
+          {
+            "field": "shared_patterns",
+            "treatment": "CANDIDATE — each shared pattern from each cluster is a candidate for the approved_patterns list. Approval requires brand alignment check: does this pattern serve the store's brand_role and positioning_goals? Patterns that serve differentiation are candidates for approval. Patterns that would make the store indistinguishable from that cluster should be rejected.",
+            "note": "shared_patterns are LLM-inferred archetypes — not verified observations. They must not be blindly approved because they appear in competitor clusters. Each must be evaluated against brand-positioning constraints."
+          },
+          {
+            "field": "adaptation_opportunities",
+            "treatment": "CANDIDATE — the most direct input to approved_patterns. Each adaptation opportunity describes a pattern that can be adopted while avoiding cluster weaknesses. These are higher-quality candidates than shared_patterns because they are already framed as differentiation-aware.",
+            "note": "Still LLM-inferred. Not verified competitive intelligence."
+          },
+          {
+            "field": "non_copyable_elements",
+            "treatment": "HARD EXCLUSION — elements listed here for any cluster must be excluded from approved_patterns. They rely on scale, brand equity, or resources the store does not have.",
+            "note": "These become candidates for forbidden_patterns if they represent a common temptation in the vertical."
+          },
+          {
+            "field": "cluster_role",
+            "treatment": "CONTEXT — used to understand which cluster an adaptation is coming from, and whether the store's brand_role creates a competitive relationship or a differentiation opportunity with that cluster."
+          }
+        ],
+        "evidence_boundary": "All competitor cluster data is LLM-inferred from Phase 2 synthesis. No live competitor research informs this workflow. Pattern approvals derived from clusters must be labeled as 'adapted from competitor archetype inference — not validated competitive research' in the manifest notes.",
+        "note": "competitor-clusters.json is an array. The workflow iterates over all clusters and collects candidate patterns and adaptation opportunities before synthesis."
+      },
+      "from_intake": {
+        "source": "intake-store-input → normalized_intake_payload",
+        "fields_used_as_hard_constraints": [
+          {
+            "field": "forbidden_styles",
+            "treatment": "HARD CONSTRAINT — each value in this array must appear in the forbidden_patterns list. These are explicit user rejections. LLM must not approve any pattern that conflicts with these signals.",
+            "note": "Array of enum strings from intake form. Must be carried through directly."
+          },
+          {
+            "field": "must_not_feel_like",
+            "treatment": "HARD CONSTRAINT — free-text negative aesthetic signal. Contributes to forbidden_patterns as a prose-format entry. Must not be filtered out or softened by LLM synthesis.",
+            "note": "Sanitize before including in prompt."
+          }
+        ],
+        "fields_used_as_synthesis_hints": [
+          {
+            "field": "desired_style_hints",
+            "treatment": "HINT — array of positive aesthetic signals. Informs which pattern types to prioritize in approved_patterns, but must not override brand-positioning constraints or brand_role logic.",
+            "note": "Should influence, not dominate. A desired_style_hint that conflicts with brand_role should be noted and deprioritized."
+          },
+          {
+            "field": "must_feel_like",
+            "treatment": "HINT — positive aesthetic intent signal. Used to evaluate whether approved patterns support this aesthetic direction.",
+            "note": "Sanitize before including in prompt."
+          },
+          {
+            "field": "price_positioning",
+            "treatment": "HINT — from store-profile via intake. Influences layout_direction.page_density and pdp_direction.information_depth.",
+            "source_note": "Consumed from store-profile.json if not available directly from intake payload."
+          }
+        ]
+      },
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "fields_used": [
+          "store_id",
+          "vertical",
+          "price_positioning",
+          "store_type",
+          "catalog_type"
+        ],
+        "treatment": "CONTEXT — vertical and catalog_type help determine seo_direction.content_depth and aeo_direction defaults. price_positioning acts as a secondary constraint on layout_direction and pdp_direction when brand-positioning does not provide a stronger signal.",
+        "note": "store-profile is not a strategic artifact — it provides operational context that frames pattern decisions without overriding strategic signals from brand-positioning."
+      }
+    },
+
+    "outputs": {
+      "pattern_manifest": {
+        "description": "Validated pattern-manifest.json conforming to schemas/pattern-manifest.schema.json. Defines approved patterns, forbidden patterns, and directional constraints across all major experience dimensions. A planning artifact — not a final design specification.",
+        "artifact_path": "projects/{project_id}/pattern-manifest.json",
+        "schema": "schemas/pattern-manifest.schema.json",
+        "field_mapping": {
+          "manifest_name": {
+            "source": "Workflow-generated — composed from store_id and synthesis phase label",
+            "type": "machine-generated",
+            "example": "Pattern Manifest — {store_id} — Phase 3 Planning Draft"
+          },
+          "manifest_goal": {
+            "source": "LLM synthesis from positioning_goals + brand_role + value_proposition",
+            "type": "LLM-synthesized",
+            "note": "A one-sentence description of what this manifest is optimizing for. Must reflect the store's strategic direction, not generic patterns."
+          },
+          "approved_patterns": {
+            "source": "LLM synthesis from competitor cluster adaptation_opportunities + shared_patterns (filtered by brand alignment) + desired_style_hints",
+            "type": "LLM-synthesized from structured candidate inputs",
+            "note": "Each approved pattern must have: pattern_type (schema enum), pattern_name, description, intended_effect. Optional: conditions (when it applies), risks (if overused). The LLM is instructed to approve patterns only when they serve the store's brand_role and positioning_goals, and do not conflict with forbidden signals or exclusion_elements.",
+            "minimum_items": 1,
+            "pattern_types_available": ["layout", "navigation", "pdp-structure", "collection-structure", "trust-pattern", "seo-pattern", "aeo-pattern", "copy-pattern", "media-pattern", "motion-pattern", "offer-pattern", "storytelling-pattern"]
+          },
+          "forbidden_patterns": {
+            "source": "intake.forbidden_styles (direct) + intake.must_not_feel_like (normalized) + brand-positioning.forbidden_impressions + competitor_cluster.non_copyable_elements (inferred) + LLM-identified patterns that contradict brand_role",
+            "type": "hybrid — direct from intake + LLM-inferred additions",
+            "note": "Intake-sourced entries are mandatory and cannot be removed. LLM may add additional forbidden patterns inferred from brand-positioning constraints, but must not remove user-provided entries. Array of strings — each entry is a plain-language description of what is forbidden and why.",
+            "minimum_items": 1
+          },
+          "layout_direction": {
+            "page_density": {
+              "source": "LLM synthesis from brand_role + price_positioning + visual_positioning_hint",
+              "type": "LLM-selected enum",
+              "constraint_logic": "premium-innovator/editorial-guide → minimal or balanced; value-leader → balanced or information-rich; specialist/problem-solver → balanced; curator → minimal or balanced",
+              "schema_enum": ["minimal", "balanced", "information-rich"]
+            },
+            "visual_hierarchy": {
+              "source": "Constrained from brand_role, then confirmed or refined by visual_positioning_hint",
+              "type": "constrained enum",
+              "constraint_logic": "editorial-guide/premium-innovator → editorial-layered or clean-linear; value-leader/problem-solver → conversion-first; specialist/curator → clean-linear or editorial-layered",
+              "schema_enum": ["clean-linear", "editorial-layered", "conversion-first"]
+            },
+            "section_flow": {
+              "source": "LLM synthesis from conversion_style + brand_role + storytelling intent from positioning_goals",
+              "type": "LLM-selected enum — constrained by conversion_style.cta_style",
+              "constraint_logic": "assertive CTA → tight; subtle CTA → story-led or balanced; balanced CTA → balanced",
+              "schema_enum": ["tight", "balanced", "story-led"]
+            }
+          },
+          "trust_direction": {
+            "trust_visibility": {
+              "source": "LLM synthesis from price_positioning + brand_maturity + trust_factors",
+              "type": "LLM-selected enum",
+              "constraint_logic": "premium or new brands → strong; established mid-price brands → moderate; value-leader/high-volume → light or moderate",
+              "schema_enum": ["light", "moderate", "strong"]
+            },
+            "proof_style": {
+              "source": "DIRECT mapping from brand-positioning.trust_style.proof_mode",
+              "type": "direct-mapped enum",
+              "mapping": {
+                "evidence-led": "specification-led",
+                "social-proof-led": "social-proof-led",
+                "authority-led": "authority-led",
+                "guarantee-led": "mixed",
+                "mixed": "mixed"
+              },
+              "schema_enum": ["specification-led", "social-proof-led", "authority-led", "mixed"]
+            }
+          },
+          "pdp_direction": {
+            "information_depth": {
+              "source": "LLM synthesis from price_positioning + vertical + catalog_type + purchase_motivators",
+              "type": "LLM-selected enum",
+              "constraint_logic": "high-price or technical verticals → deep; mid-price → balanced; impulse/commodity → light",
+              "schema_enum": ["light", "balanced", "deep"]
+            },
+            "objection_handling": {
+              "source": "DIRECT mapping from brand-positioning.objection_handling_style (if non-null) OR LLM synthesis",
+              "type": "direct-or-synthesized enum",
+              "schema_enum": ["minimal", "balanced", "detailed"]
+            },
+            "cta_prominence": {
+              "source": "DIRECT mapping from brand-positioning.conversion_style.cta_style",
+              "type": "direct-mapped enum",
+              "mapping": {
+                "subtle": "subtle",
+                "balanced": "balanced",
+                "assertive": "strong"
+              },
+              "schema_enum": ["subtle", "balanced", "strong"]
+            }
+          },
+          "collection_direction": {
+            "seo_content_depth": {
+              "source": "LLM synthesis from positioning_goals + market_category + store_type",
+              "type": "LLM-selected enum",
+              "note": "Should align with seo_direction.content_depth — they are derived from the same signals.",
+              "schema_enum": ["light", "balanced", "deep"]
+            },
+            "navigation_depth": {
+              "source": "LLM synthesis from catalog_type + store_type + market_category",
+              "type": "LLM-selected enum",
+              "constraint_logic": "large catalogs → rich; focused catalogs → simple or balanced",
+              "schema_enum": ["simple", "balanced", "rich"]
+            }
+          },
+          "seo_direction": {
+            "keyword_targeting": {
+              "source": "LLM synthesis from market_category + positioning_goals + vertical",
+              "type": "LLM-selected enum",
+              "note": "Directional signal for later seo-strategy workflows — not a keyword list.",
+              "schema_enum": ["focused", "balanced", "broad"]
+            },
+            "content_depth": {
+              "source": "LLM synthesis from positioning_goals + audience knowledge level + vertical",
+              "type": "LLM-selected enum",
+              "schema_enum": ["light", "balanced", "deep"]
+            }
+          },
+          "aeo_direction": {
+            "answer_density": {
+              "source": "LLM synthesis from core_problems + trust_factors + vertical",
+              "type": "LLM-selected enum",
+              "schema_enum": ["light", "balanced", "high"]
+            },
+            "faq_usage": {
+              "source": "LLM synthesis from purchase_motivators + objection_handling_style + vertical",
+              "type": "LLM-selected enum",
+              "schema_enum": ["light", "balanced", "strong"]
+            }
+          },
+          "media_direction": {
+            "media_intensity": {
+              "source": "LLM synthesis from brand_role + price_positioning + visual_positioning_hint + desired_style_hints",
+              "type": "LLM-selected enum — constrained downward by forbidden_styles media signals",
+              "constraint_logic": "premium-innovator/editorial-guide → rich or balanced; specialist/problem-solver → balanced; value-leader → balanced or minimal. If forbidden_styles includes heavy-media signals, constrain toward minimal.",
+              "schema_enum": ["minimal", "balanced", "rich"]
+            },
+            "motion_usage": {
+              "source": "LLM synthesis from brand_role + desired_style_hints. Constrained by intake.motion_level_preference if provided.",
+              "type": "constrained LLM-selected enum",
+              "note": "intake.motion_level_preference acts as a ceiling — the manifest cannot recommend cinematic motion if the user selected none or subtle. This field informs the design-system workflow.",
+              "schema_enum": ["none", "subtle", "moderate", "cinematic"]
+            },
+            "video_usage": {
+              "source": "Direct constraint from intake.hero_video_allowed and intake.video_usage_preference, then confirmed or narrowed by LLM",
+              "type": "constrained enum",
+              "constraint_logic": "If intake.hero_video_allowed = false → video_usage cannot be hero-driven. If intake.video_usage_preference = none → video_usage = none.",
+              "schema_enum": ["none", "supporting-only", "balanced", "hero-driven"]
+            }
+          },
+          "notes": {
+            "source": "workflow-generated synthesis metadata",
+            "type": "machine-generated",
+            "note": "Must include: synthesis timestamp, upstream artifact paths consumed, evidence boundary label, list of which signals were hard constraints vs hints, and a human review prompt reminding the reviewer that all approved patterns are planning hypotheses."
+          }
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-market-intelligence",
+        "provides": ["market-intelligence.json"],
+        "required": true,
+        "note": "Provides audience context and positioning goals that determine which pattern directions serve the store's market position."
+      },
+      {
+        "workflow": "build-brand-positioning",
+        "provides": ["brand-positioning.json"],
+        "required": true,
+        "note": "The primary constraint layer. brand_role, trust_style, conversion_style, and forbidden_impressions are hard constraints on the manifest. Human review of brand-positioning.json is recommended before this workflow runs."
+      },
+      {
+        "workflow": "build-competitor-clusters",
+        "provides": ["competitor-clusters.json"],
+        "required": true,
+        "note": "Provides candidate patterns (adaptation_opportunities, shared_patterns) and hard exclusions (non_copyable_elements). Without competitor clusters, the pattern approval rationale loses market grounding."
+      },
+      {
+        "workflow": "build-store-profile",
+        "provides": ["store-profile.json"],
+        "required": true,
+        "note": "Provides operational context (vertical, catalog_type, price_positioning) that frames pattern decisions."
+      },
+      {
+        "workflow": "intake-store-input",
+        "provides": ["normalized_intake_payload"],
+        "required": true,
+        "note": "forbidden_styles and must_not_feel_like are hard constraints. desired_style_hints and must_feel_like are synthesis hints."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-design-system",
+        "receives": ["pattern-manifest.json"],
+        "note": "Consumes layout_direction, media_direction, and trust_direction as structural constraints for the design system. Phase 3."
+      },
+      {
+        "workflow": "build-homepage-strategy",
+        "receives": ["pattern-manifest.json"],
+        "note": "Consumes approved_patterns, forbidden_patterns, layout_direction, trust_direction, and media_direction to constrain homepage section choices and hero logic. Phase 3."
+      },
+      {
+        "workflow": "build-section-plan",
+        "receives": ["pattern-manifest.json"],
+        "note": "Out of scope for Phase 3. Documented for future reference."
+      }
+    ],
+
+    "schema_alignment": {
+      "pattern-manifest.schema.json": {
+        "required_fields_covered": [
+          "manifest_name",
+          "manifest_goal",
+          "approved_patterns",
+          "forbidden_patterns",
+          "layout_direction",
+          "trust_direction",
+          "pdp_direction",
+          "collection_direction",
+          "seo_direction",
+          "aeo_direction",
+          "media_direction"
+        ],
+        "optional_fields_covered": [
+          "notes"
+        ],
+        "enum_sourcing_note": "All enum values in direction fields are constrained by the schema. The LLM prompt must include the exact enum values from the schema — not from intake form definitions, which use different vocabularies in some cases.",
+        "approved_patterns_note": "Each approved_pattern item must include pattern_type (from schema enum), pattern_name, description, and intended_effect. Optional conditions and risks arrays should be populated where the LLM can provide grounded reasoning.",
+        "forbidden_patterns_note": "forbidden_patterns is an array of strings — plain-language descriptions. Each entry should state what is forbidden and a brief rationale.",
+        "validation_note": "The output must be validated against schemas/pattern-manifest.schema.json before persisting. All direction fields must use valid schema enum values. approved_patterns must have at least 1 item. forbidden_patterns must have at least 1 item."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: market_intelligence (or path), brand_positioning (or path), competitor_clusters (or path), store_profile (or path), and normalized_intake_payload. All five upstream inputs must be present before this workflow begins.",
+        "input": "market_intelligence + brand_positioning + competitor_clusters + store_profile + normalized_intake_payload",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present and structurally valid. brand_positioning must have: brand_role (non-null), trust_style.proof_mode, conversion_style.cta_style, forbidden_impressions (array). market_intelligence must have: positioning_goals (non-empty), audience_segments (non-empty), purchase_motivators (non-empty). competitor_clusters must be a non-empty array (or object with non-empty clusters array). store_profile must have: store_id, vertical, price_positioning. normalized_intake_payload must exist. Halt with a descriptive error if any required input is missing or malformed.",
+        "input": "all upstream inputs",
+        "output": "validated inputs or error"
+      },
+      {
+        "step": 3,
+        "name": "Extract Hard Constraint Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Extract all hard-constraint signals and classify them explicitly. Produce a constraint_signals object containing: (1) DIRECT forbidden inputs: intake.forbidden_styles (array, may be empty), intake.must_not_feel_like (sanitized string or null), brand_positioning.forbidden_impressions (array). (2) DIRECT direction mappings: brand_role → layout and visual_hierarchy constraints; trust_style.proof_mode → trust_direction.proof_style; conversion_style.cta_style → pdp_direction.cta_prominence; objection_handling_style → pdp_direction.objection_handling. (3) EXCLUSION list: flatten all non_copyable_elements from all competitor clusters into a single exclusion_elements array. Log all extracted constraint signals with their source labels.",
+        "input": "validated brand_positioning + intake + competitor_clusters",
+        "output": "constraint_signals object with provenance annotations"
+      },
+      {
+        "step": 4,
+        "name": "Extract Candidate Pattern Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Iterate over all competitor clusters. For each cluster, collect: (1) adaptation_opportunities array — each opportunity becomes a high-confidence candidate pattern entry. (2) shared_patterns array — each pattern is a lower-confidence candidate that requires brand alignment check. (3) cluster_role — context for evaluating relevance to the store's brand_role. Produce a candidate_patterns list: each entry includes the source cluster_role, the pattern data, and a confidence label ('adaptation-opportunity' or 'shared-pattern'). Also collect synthesis hints from intake: desired_style_hints (array), must_feel_like (sanitized string or null).",
+        "input": "validated competitor_clusters + intake synthesis hints",
+        "output": "candidate_patterns list + synthesis_hints object"
+      },
+      {
+        "step": 5,
+        "name": "Build LLM Pattern Synthesis Prompt",
+        "type": "Code node (JavaScript)",
+        "description": "Assemble the structured LLM prompt for pattern manifest synthesis. The prompt must: (1) Present all hard constraint signals as CONSTRAINTS — must not be overridden. (2) Present all candidate patterns with confidence labels. Instruct the model to evaluate each candidate against brand_role and positioning_goals — approve, reject, or adapt each one. (3) Present synthesis hints as HINTS — may influence but not override constraints. (4) Request output as valid JSON matching schemas/pattern-manifest.schema.json. (5) Include full schema enum values for all direction fields and pattern_type. (6) Require at minimum 1 approved_pattern entry, with at least 1 forbidden_pattern per user-provided forbidden signal. (7) Include the exclusion_elements list and instruct the model that none of these should appear in approved_patterns. (8) Require that each approved_pattern's intended_effect explains why it serves the store's brand_role. (9) Remind the model that all outputs are planning hypotheses — do not present pattern approvals as proven design truths.",
+        "input": "constraint_signals + candidate_patterns + synthesis_hints + market_intelligence context + store_profile context",
+        "output": "assembled LLM prompt string",
+        "prompt_safety_note": "Prompt must explicitly state: 'All CONSTRAINT values are hard user or brand decisions. Do not override them. All approved patterns are planning hypotheses. Do not treat competitor cluster patterns as proven best practices — they are inferences from archetype analysis.'"
+      },
+      {
+        "step": 6,
+        "name": "LLM Synthesis: Pattern Manifest",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API. Request JSON output mode if supported. Temperature: 0.3. Max tokens: 3000 (higher allocation due to approved_patterns array breadth).",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt",
+        "output": "raw LLM response string (expected to be JSON)"
+      },
+      {
+        "step": 7,
+        "name": "Parse and Enforce Hard Constraints",
+        "type": "Code node (JavaScript)",
+        "description": "Parse the raw LLM response as JSON. Then enforce hard-constraint integrity: (1) Verify that all entries from intake.forbidden_styles and intake.must_not_feel_like are present in forbidden_patterns — inject any that are missing. (2) Verify that trust_direction.proof_style matches the mapped brand-positioning.trust_style.proof_mode — overwrite if not. (3) Verify that pdp_direction.cta_prominence matches the mapped conversion_style.cta_style — overwrite if not. (4) Verify that pdp_direction.objection_handling matches brand_positioning.objection_handling_style (if non-null) — overwrite if not. (5) Scan approved_patterns for any entry that conflicts with forbidden signals or exclusion_elements — remove and log any conflicts found. (6) Inject synthesis metadata into notes field: list which signals were hard constraints vs hints, evidence boundary label, synthesis timestamp.",
+        "input": "raw LLM response + constraint_signals (for enforcement)",
+        "output": "parsed and constrained pattern_manifest object (pre-validation)"
+      },
+      {
+        "step": 8,
+        "name": "Validate Against Schema",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate the pattern_manifest object against schemas/pattern-manifest.schema.json using ajv. Required fields to verify: manifest_name, manifest_goal, approved_patterns (minItems: 1, each item has pattern_type in enum, pattern_name, description, intended_effect), forbidden_patterns (minItems: 1), and all direction fields with enum-valid values. Halt workflow on any schema violation and report the exact field and constraint that failed.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/pattern-manifest.schema.json",
+        "failure_behavior": "Halt workflow. Report exact schema violation. Do not persist an invalid artifact.",
+        "input": "parsed and constrained pattern_manifest object",
+        "output": "validated pattern_manifest object or validation error"
+      },
+      {
+        "step": 9,
+        "name": "Persist pattern-manifest.json",
+        "type": "GitHub node or Write File node",
+        "description": "Write the validated pattern-manifest.json to the project artifacts path: projects/{project_id}/pattern-manifest.json. Commit with a message such as 'chore: generate pattern-manifest for {store_id} — Phase 3 draft'. This artifact is required by the design-system and homepage-strategy workflows.",
+        "artifact_path": "projects/{project_id}/pattern-manifest.json",
+        "git_note": "pattern-manifest.json must be committed to Git. It is the primary planning contract for the design-system and section-planning phases.",
+        "input": "validated pattern_manifest object",
+        "output": "confirmation of write + artifact path"
+      },
+      {
+        "step": 10,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the artifact path and a reference to the validated pattern_manifest object to the master orchestrator for downstream use by build-design-system.",
+        "input": "artifact_path + validated pattern_manifest object",
+        "output": "workflow output payload"
+      }
+    ],
+
+    "assumptions": [
+      "brand-positioning.json is the highest-authority input to this workflow. Its hard-constraint fields (brand_role, trust_style.proof_mode, conversion_style.cta_style, objection_handling_style, forbidden_impressions) cannot be overridden by LLM synthesis or competitor cluster signals.",
+      "competitor-clusters.json may be in archetype mode (no real competitor URLs). In that case, adaptation_opportunities and shared_patterns are doubly-hypothetical — inferences from inferences. The evidence boundary label must be explicit.",
+      "The approved_patterns list is expected to be diverse: the manifest should produce patterns covering layout, trust, and at least one content/copy dimension. A manifest with only 1 pattern is technically valid but strategically weak — the LLM prompt should encourage breadth within brand constraints.",
+      "forbidden_patterns is guaranteed to have at least 1 entry because intake.forbidden_styles or brand-positioning.forbidden_impressions will always contain at least one signal. If both are empty arrays, this is a data quality issue that should be flagged — but the workflow can proceed with LLM-inferred forbidden patterns.",
+      "seo_direction and aeo_direction in this manifest are directional signals only. They are not a substitute for the seo-strategy and aeo-strategy workflows, which are out of scope for Phase 3.",
+      "media_direction.video_usage and media_direction.motion_usage are constrained by intake preferences (hero_video_allowed, motion_level_preference). If these intake fields are null, the LLM synthesizes based on brand_role and price_positioning.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "This workflow does not perform any external research, competitor URL fetching, or design tool queries. All outputs are derived from prior-phase artifacts and LLM synthesis."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should the manifest include an explicit 'evidence_source' annotation per approved_pattern, labeling whether it was adapted from an adaptation_opportunity, a shared_pattern, a brand inference, or a desired_style_hint?",
+        "impact": "This would make human review of individual patterns much more efficient.",
+        "recommended_default": "Yes — add an optional prose provenance note in each pattern's conditions array for now. Consider a formal evidence_source field in a future schema-roadmap iteration."
+      },
+      {
+        "question": "What should happen when a desired_style_hint conflicts with a brand_role constraint?",
+        "impact": "Silently deprioritizing the hint loses user intent. Blindly following it overrides brand strategy.",
+        "recommended_default": "Follow the brand_role constraint. Include a note in the manifest.notes field flagging the conflict. Do not surface this as a workflow error — it is a planning trade-off."
+      },
+      {
+        "question": "Should collection_direction.seo_content_depth and seo_direction.content_depth be forced to align?",
+        "impact": "Allowing them to differ could produce inconsistent downstream signals.",
+        "recommended_default": "Enforce consistency in Step 7: if they differ by more than one level, overwrite the collection value to match or flag the inconsistency in notes."
+      }
+    ],
+
+    "evidence_boundaries": {
+      "direct_from_user": [
+        "forbidden_styles (from intake — mapped directly to forbidden_patterns)",
+        "must_not_feel_like (from intake — normalized and included in forbidden_patterns)",
+        "brand_role (if user-provided in intake — constrains layout and visual_hierarchy)",
+        "trust_style (if user-provided in intake — constrains proof_style)",
+        "conversion_style (if user-provided in intake — constrains cta_prominence)",
+        "objection_handling_style (if user-provided in intake — constrains pdp objection_handling)"
+      ],
+      "derived_from_synthesized_upstream_artifacts": [
+        "All approved_patterns (derived from competitor cluster adaptation_opportunities and shared_patterns — all LLM-inferred archetypes)",
+        "manifest_goal (derived from positioning_goals — LLM-synthesized in market-intelligence)",
+        "layout_direction.page_density (synthesized from brand_role + price_positioning)",
+        "layout_direction.section_flow (synthesized from conversion_style + brand_role)",
+        "trust_direction.trust_visibility (synthesized from price_positioning + brand_maturity)",
+        "pdp_direction.information_depth (synthesized from price_positioning + vertical + purchase_motivators)",
+        "collection_direction (fully synthesized from catalog_type + store_type)",
+        "seo_direction and aeo_direction (directional signals only — not validated strategy)",
+        "media_direction.media_intensity (synthesized unless overridden by intake constraints)"
+      ],
+      "not_available_in_this_phase": [
+        "Verified competitor design research",
+        "Validated user testing data on pattern effectiveness",
+        "Keyword or SEO validation data",
+        "Performance benchmarks for approved patterns",
+        "External design audit or visual analysis"
+      ],
+      "labeling_requirement": "The notes field must include: 'PATTERN MANIFEST — SYNTHESIS ARTIFACT: This manifest is derived from prior-phase LLM-synthesized artifacts (market intelligence, brand positioning, competitor clusters) and user intake preferences. Hard-constraint fields (forbidden_patterns, trust_direction.proof_style, pdp_direction.cta_prominence) reflect user or brand decisions. All approved patterns are planning hypotheses — not validated design best practices. Human review is required before this manifest informs design system or section planning decisions.'"
+    },
+
+    "runtime_dependencies": [
+      "n8n Execute Workflow Trigger node — receives subworkflow call from master orchestrator",
+      "n8n Code node (JavaScript) — for input validation, constraint extraction, candidate pattern collection, prompt building, response parsing, hard-constraint enforcement, and schema validation",
+      "n8n OpenAI node OR HTTP Request node (OpenAI API) — for LLM pattern synthesis",
+      "n8n GitHub node OR Write File node — for persisting pattern-manifest.json",
+      "ajv (Ajv JSON Schema Validator) — for schema validation inside Code node",
+      "schemas/pattern-manifest.schema.json — must be accessible to the validation step",
+      "OpenAI API credential — stored in n8n, never in Git",
+      "build-market-intelligence, build-brand-positioning, build-competitor-clusters, and build-store-profile must all complete successfully before this workflow runs"
+    ]
+  }
+}

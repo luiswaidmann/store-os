@@ -1,0 +1,586 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. Homepage strategy outputs are planning artifacts — not implementation instructions. The section_sequence is a strategic recommendation, not a final section configuration. A future build-section-plan workflow will translate this into executable section instances. Human review is required before this artifact informs content generation, theme configuration, or media planning.",
+    "evidence_boundary_note": "Homepage strategy decisions in this workflow are synthesized from four prior-phase planning artifacts (store-profile, market-intelligence, brand-positioning, pattern-manifest) and the design-system constraint layer. All upstream artifacts are themselves LLM-synthesized from user intake and Shopify import data. No live site analysis, user journey research, heatmap data, or conversion optimization testing informs this artifact. Section sequence and hero type recommendations are informed structural hypotheses — not validated UX decisions. Video and motion roles are constrained by intake preferences and design-system guardrails.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/homepage-strategy.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+  "workflow": {
+    "id": "build-homepage-strategy",
+    "name": "build-homepage-strategy",
+    "category": "planning",
+    "phase": "Phase 3 — Experience Planning",
+    "purpose": "Synthesize a schema-validated homepage strategy artifact that defines the homepage's strategic role, hero logic, section sequence, trust placement, CTA strategy, media role, and SEO function. Brand positioning defines the homepage's primary goal, conversion style, and trust approach. Pattern manifest constrains which section types are approved and which patterns are forbidden. Design system constrains which media and motion behaviors are permissible per section. Market intelligence and store profile provide audience and business context that shapes section sequence logic. The output is a planning artifact — not an executable section configuration. It informs the future build-section-plan workflow. Video and motion usage must not exceed the ceilings established in the design system.",
+
+    "inputs": {
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "fields_used": [
+          "store_id",
+          "vertical",
+          "store_type",
+          "catalog_type",
+          "brand_maturity",
+          "price_positioning",
+          "business_model"
+        ],
+        "treatment": "CONTEXT — store_type, catalog_type, and brand_maturity shape the homepage_goal selection. A new brand needs brand-introduction. A mature catalog store may need catalog-navigation. A DTC brand with a flagship product may need conversion-first or hybrid.",
+        "note": "store-profile is operational truth. It frames the strategic context but does not override user intent signals from brand-positioning or intake."
+      },
+      "from_market_intelligence": {
+        "source": "build-market-intelligence → market-intelligence.json",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "fields_used": [
+          "audience_segments",
+          "core_problems",
+          "purchase_motivators",
+          "trust_factors",
+          "positioning_goals"
+        ],
+        "treatment": "CONTEXT — audience_segments inform what the homepage must communicate first. core_problems and purchase_motivators drive hero primary_focus selection and section sequence logic (e.g. if trust is a major purchase barrier, trust sections must appear early). positioning_goals inform the homepage_goal and storytelling_intensity.",
+        "note": "market-intelligence is a synthesis artifact. Evidence boundaries from Phase 2 apply. Audience signals are LLM-synthesized from intake and store profile — not from real user research."
+      },
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "fields_used_as_hard_constraints": [
+          {
+            "field": "brand_role",
+            "treatment": "HARD CONSTRAINT — primary driver of homepage_goal selection. premium-innovator → brand-introduction or hybrid; editorial-guide → editorial-discovery or brand-introduction; specialist → conversion-first or hybrid; problem-solver → conversion-first (problem-solution hero); curator → editorial-discovery or catalog-navigation; value-leader → conversion-first or catalog-navigation.",
+            "note": "If brand_role was user-provided in intake, it is a hard user decision. If LLM-synthesized, it is still a strong planning constraint."
+          },
+          {
+            "field": "conversion_style.cta_style",
+            "treatment": "HARD CONSTRAINT — directly constrains cta_strategy. subtle → cta_repetition = low, primary_cta_focus = learn-more or explore-collections; balanced → cta_repetition = balanced, primary_cta_focus = mixed or view-flagship; assertive → cta_repetition = high, primary_cta_focus = shop-now.",
+            "note": "Must remain consistent with pdp_direction.cta_prominence from pattern-manifest."
+          },
+          {
+            "field": "trust_style.proof_mode",
+            "treatment": "HARD CONSTRAINT — constrains trust_strategy. social-proof-led → review_usage = strong, trust_placement = early; evidence-led → proof_intensity = balanced, trust_placement = balanced; authority-led → trust_placement = early, proof_intensity = strong; guarantee-led → trust_placement = balanced or late; mixed → all balanced.",
+            "note": "Trust placement early vs late is also influenced by audience trust_factors from market-intelligence."
+          },
+          {
+            "field": "value_proposition",
+            "treatment": "SYNTHESIS HINT — informs hero primary_focus. A product-specific value proposition → flagship-product hero. A category or discovery proposition → collection-entry hero. A mission/brand proposition → brand-message hero.",
+            "note": "LLM uses this to select hero primary_focus from the schema enum."
+          },
+          {
+            "field": "forbidden_impressions",
+            "treatment": "HARD CONSTRAINT — contributes to forbidden_homepage_patterns. Any impression explicitly forbidden must be reflected in the homepage strategy as a forbidden pattern.",
+            "note": "Includes intake must_not_feel_like and LLM-inferred additions from brand-positioning."
+          },
+          {
+            "field": "objection_handling_style",
+            "treatment": "CONTEXT — detailed objection handling → trust sections and FAQ preview sections are higher priority in section_sequence. Minimal → less emphasis on trust and FAQ sections.",
+            "note": "Secondary signal for section_sequence priority decisions."
+          }
+        ],
+        "fields_used_as_synthesis_hints": [
+          {
+            "field": "differentiators",
+            "treatment": "HINT — used to evaluate which section types best surface the store's differentiators (e.g. how-it-works section if differentiation is process; benefit-grid if differentiation is product features)."
+          },
+          {
+            "field": "brand_traits",
+            "treatment": "HINT — used to calibrate storytelling_intensity and editorial vs conversion-first section balance."
+          }
+        ]
+      },
+      "from_pattern_manifest": {
+        "source": "build-pattern-manifest → pattern-manifest.json",
+        "artifact_path": "projects/{project_id}/pattern-manifest.json",
+        "fields_used_as_structural_constraints": [
+          {
+            "field": "approved_patterns",
+            "treatment": "APPROVED PALETTE — section types and hero types recommended in the homepage strategy must be consistent with approved layout, trust, and storytelling patterns. The LLM must not recommend a section type that would require a forbidden pattern.",
+            "note": "Approved patterns do not mandate a specific section sequence — they constrain which section types are appropriate candidates."
+          },
+          {
+            "field": "forbidden_patterns",
+            "treatment": "HARD EXCLUSION — section types, hero types, or media behaviors that would require a forbidden pattern must not appear in the section_sequence or hero_strategy. Forbidden patterns feed directly into forbidden_homepage_patterns.",
+            "note": "This is the primary source of forbidden_homepage_patterns alongside brand-positioning.forbidden_impressions."
+          },
+          {
+            "field": "layout_direction.section_flow",
+            "treatment": "STRUCTURAL CONSTRAINT — constrains the section sequence logic. tight → fewer sections, higher density, faster conversion path; balanced → standard section variety; story-led → more storytelling sections, slower discovery flow.",
+            "mapping": {
+              "tight": "fewer sections (3-5), conversion-oriented sequence",
+              "balanced": "standard variety (5-8 sections)",
+              "story-led": "richer sequence (6-10 sections) with storytelling sections"
+            }
+          },
+          {
+            "field": "trust_direction.trust_visibility",
+            "treatment": "STRUCTURAL CONSTRAINT — constrains trust_strategy.proof_intensity. light → light; moderate → balanced; strong → strong.",
+            "schema_mapping": { "light": "light", "moderate": "balanced", "strong": "strong" }
+          },
+          {
+            "field": "media_direction",
+            "treatment": "STRUCTURAL CONSTRAINT — media_intensity constrains hero media_intensity. video_usage constrains media_role.video_role. motion_usage constrains media_role.motion_role.",
+            "note": "These values come from pattern-manifest which already has intake preferences applied. Design-system values take precedence if they are more conservative."
+          }
+        ]
+      },
+      "from_design_system": {
+        "source": "build-design-system → design-system.json",
+        "artifact_path": "projects/{project_id}/design-system.json",
+        "fields_used_as_motion_and_media_ceilings": [
+          {
+            "field": "motion_strategy.motion_level",
+            "treatment": "CEILING — no section in section_sequence may have motion_allowed = true if motion_level = none. If motion_level = subtle, only select sections may have motion_allowed = true.",
+            "note": "This is the definitive motion ceiling after all intake preferences have been applied."
+          },
+          {
+            "field": "media_strategy.video_usage",
+            "treatment": "CEILING — media_role.video_role cannot exceed this value. If video_usage = none → video_role = none. If supporting-only → video_role = supporting.",
+            "note": "This value already incorporates intake.hero_video_allowed and intake.video_usage_preference ceilings from the design-system workflow."
+          },
+          {
+            "field": "media_strategy.fallback_required",
+            "treatment": "PROPAGATED REQUIREMENT — if fallback_required = true in design-system, hero_strategy.fallback_required must also be true.",
+            "note": "Direct boolean propagation — no synthesis required."
+          },
+          {
+            "field": "trust_visibility",
+            "treatment": "CONTEXT — confirms and validates trust_strategy field selections against the design-system trust directions.",
+            "note": "Should already be consistent with pattern-manifest.trust_direction. If inconsistency is detected, design-system takes precedence (it is downstream of pattern-manifest)."
+          },
+          {
+            "field": "performance_guardrails",
+            "treatment": "CONTEXT — informs which sections may allow heavy media. If heavy_media_control = strict, sections with media_allowed = true should be limited and fallbacks required.",
+            "note": "Heavy media control constrains how many sections in section_sequence may have media_allowed = true."
+          }
+        ]
+      },
+      "from_intake": {
+        "source": "intake-store-input → normalized_intake_payload",
+        "fields_used_as_hints": [
+          {
+            "field": "desired_style_hints",
+            "treatment": "HINT — secondary signals for hero_type selection and storytelling_intensity. Must not override brand_role or conversion_style constraints.",
+            "note": "Used to tiebreak between compatible options."
+          },
+          {
+            "field": "must_feel_like",
+            "treatment": "HINT — positive aesthetic signal. Informs whether the homepage should lean editorial, clean, bold, or technical within the allowed constraint space.",
+            "note": "Sanitize before including in prompt."
+          },
+          {
+            "field": "must_not_feel_like",
+            "treatment": "HINT — supplements forbidden_homepage_patterns from pattern-manifest and brand-positioning.",
+            "note": "Sanitize before including in prompt."
+          }
+        ],
+        "note": "The direct intake constraints (motion, video, performance) have already been applied in the design-system workflow. This workflow consumes design-system values as the authoritative ceiling and does not re-apply raw intake fields for motion/media. Intake style hints are still relevant for editorial direction."
+      }
+    },
+
+    "outputs": {
+      "homepage_strategy": {
+        "description": "Validated homepage-strategy.json conforming to schemas/homepage-strategy.schema.json. Defines homepage goal, hero strategy, section sequence, trust strategy, storytelling intensity, SEO role, media role, CTA strategy, and forbidden homepage patterns. A planning artifact — not a final section configuration or content plan.",
+        "artifact_path": "projects/{project_id}/homepage-strategy.json",
+        "schema": "schemas/homepage-strategy.schema.json",
+        "field_mapping": {
+          "homepage_goal": {
+            "source": "Constrained by brand_role (hard constraint) + store_type + brand_maturity + positioning_goals",
+            "type": "constrained enum",
+            "constraint_logic": "premium-innovator → brand-introduction or hybrid; editorial-guide → editorial-discovery or brand-introduction; specialist → conversion-first or hybrid; problem-solver → conversion-first; curator → editorial-discovery or catalog-navigation; value-leader → conversion-first or catalog-navigation. brand_maturity adjustment: new brand + any role → lean toward brand-introduction if role allows it.",
+            "schema_enum": ["conversion-first", "brand-introduction", "editorial-discovery", "catalog-navigation", "hybrid"],
+            "note": "hybrid is appropriate when brand_role maps to multiple goals or when positioning_goals include both conversion and brand-building objectives."
+          },
+          "hero_strategy": {
+            "hero_type": {
+              "source": "LLM synthesis from homepage_goal + brand_role + value_proposition + desired_style_hints",
+              "type": "LLM-selected enum — constrained by media_role.video_role",
+              "constraint_logic": "conversion-first → single-hero or split-hero; brand-introduction → storytelling-hero or single-hero; editorial-discovery → storytelling-hero or split-hero; catalog-navigation → single-hero or carousel-hero; hybrid → any. If video_role = hero-driven → video-hero is allowed; if video_role = none → video-hero is forbidden.",
+              "schema_enum": ["single-hero", "split-hero", "carousel-hero", "video-hero", "storytelling-hero"]
+            },
+            "primary_focus": {
+              "source": "LLM synthesis from value_proposition + catalog_type + homepage_goal + positioning_goals",
+              "type": "LLM-selected enum",
+              "constraint_logic": "If catalog_type = single-product → flagship-product. If catalog_type = curated-collection → collection-entry or brand-message. If homepage_goal = conversion-first and price_positioning = budget → offer. If brand_role = problem-solver → problem-solution. Brand-introduction goal → brand-message.",
+              "schema_enum": ["flagship-product", "collection-entry", "brand-message", "offer", "problem-solution"]
+            },
+            "media_intensity": {
+              "source": "CEILING applied from design_system.media_strategy.image_intensity and design_system.media_strategy.video_usage",
+              "type": "constrained enum — cannot exceed design-system ceiling",
+              "constraint_logic": "Take the lower of pattern_manifest.media_direction.media_intensity and design_system constraint. light/minimal → light; balanced → balanced; rich → rich (only if design_system.media_strategy allows it).",
+              "schema_enum": ["light", "balanced", "rich"]
+            },
+            "fallback_required": {
+              "source": "DIRECT propagation from design_system.media_strategy.fallback_required",
+              "type": "direct boolean propagation",
+              "note": "If design-system requires fallback, hero also requires fallback. This is not negotiable."
+            }
+          },
+          "section_sequence": {
+            "source": "LLM synthesis from homepage_goal + brand_role + trust_strategy + approved_patterns + section_flow constraint from pattern-manifest",
+            "type": "LLM-synthesized array — constrained by approved_patterns, forbidden_patterns, section_flow, and motion/media ceilings",
+            "minimum_items": 3,
+            "constraint_logic": "Section sequence must: (1) Begin with hero. (2) Include at minimum one trust/proof section if trust_direction.trust_visibility = moderate or strong. (3) Not include any section_type that would require a forbidden pattern. (4) Respect section_flow — tight flow limits total sections; story-led flow allows more. (5) Set motion_allowed = false for all sections if design_system.motion_strategy.motion_level = none. (6) Set media_allowed = false for sections where heavy_media_control = strict and the section would require rich media.",
+            "per_item_fields": {
+              "section_type": {
+                "source": "LLM selection from schema enum — constrained by approved_patterns and forbidden_patterns",
+                "schema_enum": ["hero", "featured-products", "featured-collections", "usp-strip", "trust-proof", "review-section", "comparison-section", "problem-solution", "how-it-works", "video-section", "storytelling-section", "benefit-grid", "faq-preview", "editorial-content", "newsletter", "category-navigation", "social-proof", "brand-story", "cta-banner"]
+              },
+              "purpose": {
+                "source": "LLM synthesis — plain language description of why this section is in the sequence at this position",
+                "note": "Must be a non-empty string. Should explain the strategic role of the section in the homepage flow."
+              },
+              "priority": {
+                "source": "LLM selection from schema enum based on homepage_goal and section role",
+                "schema_enum": ["core", "supporting", "optional"],
+                "note": "hero is always core. Trust sections are core if trust_visibility = strong. Newsletter and FAQ preview are optional unless aeo_direction.faq_usage = strong."
+              },
+              "motion_allowed": {
+                "source": "Derived boolean — true only if design_system.motion_strategy.motion_level is not none AND the section type benefits from motion AND performance_guardrails allow it",
+                "type": "derived boolean",
+                "note": "Default to false for all sections if motion_level = none. For motion_level = subtle, allow motion_allowed = true only on hero and video-section. For moderate/cinematic, allow more broadly."
+              },
+              "media_allowed": {
+                "source": "Derived boolean — true if design_system.media_strategy allows this section to carry imagery or video, false if heavy_media_control = strict and section would require rich media",
+                "type": "derived boolean",
+                "note": "Default to true for hero. For other sections, set based on image_intensity (light → only hero and featured-products; balanced → most sections; rich → all sections)."
+              }
+            }
+          },
+          "trust_strategy": {
+            "trust_placement": {
+              "source": "LLM synthesis from trust_style.proof_mode + trust_factors from market-intelligence + brand_maturity",
+              "type": "LLM-selected enum — constrained by trust_style.proof_mode",
+              "constraint_logic": "social-proof-led AND new brand → early; authority-led → early; evidence-led → balanced (after product introduction); guarantee-led → late or balanced; mixed → balanced. New brand with any strong trust need → early.",
+              "schema_enum": ["early", "balanced", "late"]
+            },
+            "proof_intensity": {
+              "source": "DIRECT mapping from pattern_manifest.trust_direction.trust_visibility",
+              "type": "direct-mapped enum",
+              "mapping": { "light": "light", "moderate": "balanced", "strong": "strong" },
+              "schema_enum": ["light", "balanced", "strong"]
+            },
+            "review_usage": {
+              "source": "LLM synthesis from trust_style.proof_mode + trust_direction.trust_visibility + brand_maturity",
+              "type": "LLM-selected enum",
+              "constraint_logic": "social-proof-led → strong or balanced; authority-led → light or none (authority evidence preferred over reviews); evidence-led → light (specs preferred); guarantee-led → light; new brand without reviews → none or light",
+              "schema_enum": ["none", "light", "balanced", "strong"]
+            }
+          },
+          "storytelling_intensity": {
+            "source": "LLM synthesis from brand_role + homepage_goal + section_flow from pattern-manifest",
+            "type": "LLM-selected enum",
+            "constraint_logic": "editorial-guide/premium-innovator AND story-led section_flow → strong; specialist/problem-solver AND tight section_flow → minimal; balanced section_flow → balanced. curator → balanced or strong.",
+            "schema_enum": ["minimal", "balanced", "strong"]
+          },
+          "seo_role": {
+            "homepage_keyword_role": {
+              "source": "LLM synthesis from positioning_goals + seo_direction.keyword_targeting from pattern-manifest + brand_role",
+              "type": "LLM-selected enum",
+              "constraint_logic": "brand-introduction homepage_goal → brand-only; conversion-first with strong category presence → brand-plus-category or category-supporting; editorial-discovery → brand-plus-category; catalog-navigation → category-supporting or hybrid. Focused keyword_targeting from pattern-manifest → focused homepage role.",
+              "schema_enum": ["brand-only", "brand-plus-category", "category-supporting", "hybrid"]
+            },
+            "content_depth": {
+              "source": "LLM synthesis from seo_direction.content_depth from pattern-manifest + homepage_goal",
+              "type": "LLM-selected enum",
+              "constraint_logic": "homepage is rarely deep for SEO — conversion-first → light; brand-introduction → light or balanced; editorial-discovery → balanced or deep. Cannot exceed pattern-manifest.seo_direction.content_depth.",
+              "schema_enum": ["light", "balanced", "deep"]
+            }
+          },
+          "media_role": {
+            "video_role": {
+              "source": "CEILING from design_system.media_strategy.video_usage",
+              "type": "directly-constrained enum",
+              "constraint_logic": "design_system.video_usage = none → video_role = none. supporting-only → supporting. balanced → balanced. hero-driven → hero-driven (only if hero_strategy.hero_type = video-hero).",
+              "schema_enum": ["none", "supporting", "balanced", "hero-driven"]
+            },
+            "image_role": {
+              "source": "LLM synthesis from design_system.media_strategy.image_intensity + homepage_goal",
+              "type": "LLM-selected enum",
+              "constraint_logic": "image_intensity = light → supporting; balanced → balanced; rich → dominant. editorial-discovery or brand-introduction → image_role is typically dominant or balanced.",
+              "schema_enum": ["supporting", "balanced", "dominant"]
+            },
+            "motion_role": {
+              "source": "CEILING from design_system.motion_strategy.motion_level",
+              "type": "directly-constrained enum",
+              "constraint_logic": "motion_level = none → motion_role = none. subtle → subtle. moderate → balanced. cinematic → cinematic.",
+              "schema_enum": ["none", "subtle", "balanced", "cinematic"]
+            }
+          },
+          "cta_strategy": {
+            "primary_cta_focus": {
+              "source": "DIRECT mapping from brand_positioning.conversion_style.cta_style + homepage_goal",
+              "type": "constrained enum",
+              "constraint_logic": "subtle CTA + brand-introduction → learn-more or explore-collections; subtle CTA + editorial-discovery → explore-collections; balanced CTA + conversion-first → view-flagship or mixed; balanced CTA + catalog-navigation → explore-collections; assertive CTA + conversion-first → shop-now.",
+              "schema_enum": ["shop-now", "explore-collections", "view-flagship", "learn-more", "mixed"]
+            },
+            "cta_repetition": {
+              "source": "DIRECT mapping from brand_positioning.conversion_style.cta_style",
+              "type": "direct-mapped enum",
+              "mapping": { "subtle": "low", "balanced": "balanced", "assertive": "high" },
+              "schema_enum": ["low", "balanced", "high"]
+            }
+          },
+          "forbidden_homepage_patterns": {
+            "source": "pattern_manifest.forbidden_patterns (homepage-relevant subset) + brand_positioning.forbidden_impressions + intake.must_not_feel_like + LLM-inferred homepage-specific forbidden behaviors",
+            "type": "array of strings — hybrid direct + LLM-inferred",
+            "note": "Not all forbidden patterns from pattern-manifest apply to the homepage — the LLM filters for homepage-relevant ones. LLM may add homepage-specific forbidden patterns (e.g. 'auto-playing sound with hero video', 'countdown timer on hero', 'pop-up on page load') based on brand role and trust style constraints. Array may be empty if no homepage-specific forbidden patterns apply, but this is unlikely.",
+            "schema_note": "forbidden_homepage_patterns is an optional array field in the schema. If the LLM cannot identify any homepage-specific forbidden patterns, it may return an empty array."
+          },
+          "notes": {
+            "source": "workflow-generated synthesis metadata",
+            "type": "machine-generated",
+            "note": "Must include: synthesis timestamp, upstream artifact paths consumed, evidence boundary label, list of hard-constraint fields vs synthesized fields, a reminder that section_sequence is a planning hypothesis (not a final section configuration), and the downstream workflow that will consume this artifact (build-section-plan)."
+          }
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-store-profile",
+        "provides": ["store-profile.json"],
+        "required": true,
+        "note": "Provides store_type, catalog_type, brand_maturity, and business_model as framing context for homepage_goal selection."
+      },
+      {
+        "workflow": "build-market-intelligence",
+        "provides": ["market-intelligence.json"],
+        "required": true,
+        "note": "Provides audience_segments, core_problems, purchase_motivators, and trust_factors that shape section sequence logic and trust placement."
+      },
+      {
+        "workflow": "build-brand-positioning",
+        "provides": ["brand-positioning.json"],
+        "required": true,
+        "note": "Primary constraint source for homepage_goal, cta_strategy, and trust_strategy. brand_role and conversion_style are hard constraints."
+      },
+      {
+        "workflow": "build-pattern-manifest",
+        "provides": ["pattern-manifest.json"],
+        "required": true,
+        "note": "Provides approved_patterns, forbidden_patterns, layout_direction.section_flow, and trust_direction as structural constraints on the section sequence."
+      },
+      {
+        "workflow": "build-design-system",
+        "provides": ["design-system.json"],
+        "required": true,
+        "note": "Provides definitive media and motion ceilings for the homepage. hero_strategy.fallback_required is propagated directly from design-system. motion_allowed and media_allowed per section are governed by design-system values."
+      },
+      {
+        "workflow": "intake-store-input",
+        "provides": ["normalized_intake_payload"],
+        "required": true,
+        "note": "Provides style hints (desired_style_hints, must_feel_like, must_not_feel_like) as secondary synthesis signals. Direct motion and video constraints are consumed via design-system — not re-applied from raw intake here."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-section-plan",
+        "receives": ["homepage-strategy.json"],
+        "note": "Out of scope for Phase 3. The section plan translates the strategy's section_sequence into executable section instances with configured content slots. Documented for future reference."
+      },
+      {
+        "workflow": "build-media-plan",
+        "receives": ["homepage-strategy.json"],
+        "note": "Out of scope for Phase 3. The media plan consumes hero media_intensity, media_role, and section media_allowed flags. Documented for future reference."
+      },
+      {
+        "workflow": "build-motion-media-strategy",
+        "receives": ["homepage-strategy.json"],
+        "note": "Out of scope for Phase 3. The motion-media strategy consumes media_role.motion_role and per-section motion_allowed flags. Documented for future reference."
+      }
+    ],
+
+    "schema_alignment": {
+      "homepage-strategy.schema.json": {
+        "required_fields_covered": [
+          "homepage_goal",
+          "hero_strategy",
+          "section_sequence",
+          "trust_strategy",
+          "storytelling_intensity",
+          "seo_role",
+          "media_role",
+          "cta_strategy"
+        ],
+        "optional_fields_covered": [
+          "forbidden_homepage_patterns",
+          "notes"
+        ],
+        "section_sequence_note": "section_sequence requires minItems: 3. The LLM must always produce at least 3 sections. hero is always section_type = hero and is always the first item. section_type must use values from the schema enum only.",
+        "hero_strategy_note": "hero_strategy.fallback_required is an optional field in the schema but should always be populated — default to true unless design-system explicitly allows hero media without fallback.",
+        "media_role_note": "media_role.video_role schema enum is ['none', 'supporting', 'balanced', 'hero-driven'] — note that 'supporting' (not 'supporting-only') is the schema enum value. The constraint mapping from design-system must use the correct schema enum value.",
+        "validation_note": "Output must be validated against schemas/homepage-strategy.schema.json before persisting. section_sequence must have at least 3 items. All section_type values must be from the schema enum. All direction and strategy fields must use valid schema enum values."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: store_profile (or path), market_intelligence (or path), brand_positioning (or path), pattern_manifest (or path), design_system (or path), and normalized_intake_payload. All six inputs must be present before this workflow begins.",
+        "input": "store_profile + market_intelligence + brand_positioning + pattern_manifest + design_system + normalized_intake_payload",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present and structurally valid. brand_positioning must have: brand_role, conversion_style.cta_style, trust_style.proof_mode, forbidden_impressions. pattern_manifest must have: approved_patterns (non-empty), forbidden_patterns, layout_direction.section_flow, trust_direction.trust_visibility. design_system must have: motion_strategy.motion_level, media_strategy.video_usage, media_strategy.fallback_required, performance_guardrails. market_intelligence must have: audience_segments (non-empty), purchase_motivators (non-empty), trust_factors. store_profile must have: store_id, store_type, brand_maturity. Halt with a descriptive error if any required input is missing.",
+        "input": "all upstream inputs",
+        "output": "validated inputs or error"
+      },
+      {
+        "step": 3,
+        "name": "Extract Constraint Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Extract and classify all constraint signals. Produce a constraint_signals object containing: (1) HOMEPAGE GOAL CONSTRAINTS: brand_role → homepage_goal candidates; store_type + brand_maturity → adjustments. (2) CTA CONSTRAINTS: conversion_style.cta_style → cta_repetition (direct mapping) and primary_cta_focus (constrained selection). (3) TRUST CONSTRAINTS: trust_style.proof_mode → trust_placement and review_usage constraints. trust_direction.trust_visibility → proof_intensity (direct mapping). (4) MEDIA AND MOTION CEILINGS from design_system: motion_level → ceiling for section motion_allowed and media_role.motion_role. video_usage → ceiling for media_role.video_role and hero_type. fallback_required → hero_strategy.fallback_required propagation. heavy_media_control → constraint on how many sections may have media_allowed = true. (5) SECTION SEQUENCE CONSTRAINTS: section_flow → sequence length guidance. approved_patterns → allowed section type palette. forbidden_patterns → excluded section types. (6) NEGATIVE CONSTRAINTS: forbidden_impressions + must_not_feel_like → forbidden_homepage_patterns seeds. Log all signals with source labels.",
+        "input": "validated brand_positioning + pattern_manifest + design_system + store_profile + intake style hints",
+        "output": "constraint_signals object with provenance annotations"
+      },
+      {
+        "step": 4,
+        "name": "Build LLM Homepage Strategy Prompt",
+        "type": "Code node (JavaScript)",
+        "description": "Assemble the structured LLM prompt for homepage strategy synthesis. The prompt must: (1) Present all CONSTRAINT signals as non-negotiable — the LLM must respect them. (2) Present all CEILING values for motion and media — the LLM must not exceed them. (3) Provide the list of approved_patterns (for section type inspiration) and forbidden_patterns (as exclusions). (4) Provide store context: store_type, catalog_type, brand_maturity, vertical. (5) Provide audience context: audience_segments summary, core_problems, purchase_motivators, trust_factors. (6) Request output as valid JSON matching schemas/homepage-strategy.schema.json. (7) Include the full schema enum values for all fields. (8) Instruct the model to produce section_sequence with at least 3 sections, starting with hero, and to assign motion_allowed and media_allowed boolean values per section according to design-system ceilings. (9) Instruct the model to explain each section's purpose in the purpose field. (10) Remind the model that homepage strategy is a planning artifact — section types are recommendations, not final configurations. The model must not invent section designs, specific copy, or content details.",
+        "input": "constraint_signals + audience context + store context + style hints",
+        "output": "assembled LLM prompt string",
+        "prompt_safety_note": "Prompt must explicitly state: 'CONSTRAINT values are non-negotiable. CEILING values are absolute upper limits for motion and media. section_sequence is a strategic planning recommendation — not a final section implementation. Do not invent section content, copy, or design details. Do not recommend section types that require forbidden patterns.'"
+      },
+      {
+        "step": 5,
+        "name": "LLM Synthesis: Homepage Strategy",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API. Request JSON output mode if supported. Temperature: 0.3. Max tokens: 3000 (higher allocation due to section_sequence array and per-section fields).",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt",
+        "output": "raw LLM response string (expected to be JSON)"
+      },
+      {
+        "step": 6,
+        "name": "Parse and Enforce Hard Constraints",
+        "type": "Code node (JavaScript)",
+        "description": "Parse the raw LLM response as JSON. Then enforce constraint integrity: (1) HOMEPAGE GOAL: Verify homepage_goal is consistent with brand_role constraint — overwrite if not. (2) CTA STRATEGY: Overwrite cta_strategy.cta_repetition with direct mapping from conversion_style.cta_style. Validate primary_cta_focus is consistent with cta_style constraint. (3) TRUST STRATEGY: Overwrite trust_strategy.proof_intensity with direct mapping from trust_direction.trust_visibility. Validate trust_placement is consistent with trust_style.proof_mode constraint. (4) HERO FALLBACK: Overwrite hero_strategy.fallback_required with design_system.media_strategy.fallback_required (direct propagation). (5) MEDIA ROLE CEILINGS: Overwrite media_role.video_role if it exceeds design_system.media_strategy.video_usage ceiling. Overwrite media_role.motion_role if it exceeds design_system.motion_strategy.motion_level ceiling. (6) SECTION SEQUENCE VALIDATION: Verify first section is hero. Verify all section_type values are in schema enum. Enforce motion_allowed = false for any section where design_system motion_level = none. Remove any section_type that would require a forbidden pattern. Verify minimum 3 sections. (7) FORBIDDEN PATTERNS: Verify all seeds from forbidden_impressions and must_not_feel_like are present in forbidden_homepage_patterns. (8) Inject synthesis metadata into notes field.",
+        "input": "raw LLM response + constraint_signals (for enforcement)",
+        "output": "parsed and constrained homepage_strategy object (pre-validation)"
+      },
+      {
+        "step": 7,
+        "name": "Validate Against Schema",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate the homepage_strategy object against schemas/homepage-strategy.schema.json using ajv. Key validations: homepage_goal in enum, hero_strategy.hero_type in enum, hero_strategy.primary_focus in enum, hero_strategy.media_intensity in enum, section_sequence minItems = 3 and each item has section_type in enum and purpose non-empty, trust_strategy required fields present and in enum, storytelling_intensity in enum, seo_role required fields present, media_role required fields present, cta_strategy required fields present. Halt on any validation failure and report the exact field and constraint violated.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/homepage-strategy.schema.json",
+        "failure_behavior": "Halt workflow. Report exact schema violation. Do not persist an invalid artifact.",
+        "input": "parsed and constrained homepage_strategy object",
+        "output": "validated homepage_strategy object or validation error"
+      },
+      {
+        "step": 8,
+        "name": "Persist homepage-strategy.json",
+        "type": "GitHub node or Write File node",
+        "description": "Write the validated homepage-strategy.json to the project artifacts path: projects/{project_id}/homepage-strategy.json. Commit with a message such as 'chore: generate homepage-strategy for {store_id} — Phase 3 draft'. This artifact concludes the Phase 3 planning workflows.",
+        "artifact_path": "projects/{project_id}/homepage-strategy.json",
+        "git_note": "homepage-strategy.json must be committed to Git. It is the primary planning input for the future build-section-plan, build-media-plan, and build-motion-media-strategy workflows.",
+        "input": "validated homepage_strategy object",
+        "output": "confirmation of write + artifact path"
+      },
+      {
+        "step": 9,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the artifact path and a reference to the validated homepage_strategy object to the master orchestrator. Phase 3 is complete at this point — no further workflows are triggered within this phase.",
+        "input": "artifact_path + validated homepage_strategy object",
+        "output": "workflow output payload"
+      }
+    ],
+
+    "assumptions": [
+      "brand-positioning.json is the primary constraint source for homepage_goal and cta_strategy. If brand_role was user-provided, it has maximum authority over homepage_goal selection.",
+      "design-system.json is the definitive motion and media ceiling. This workflow does not re-read raw intake motion/video fields — it trusts design-system to have applied those ceilings correctly. If design-system.motion_strategy.motion_level = none, all sections have motion_allowed = false.",
+      "hero_strategy.fallback_required is always propagated from design-system.media_strategy.fallback_required. It is not re-derived from raw inputs.",
+      "section_sequence is a strategic planning artifact — it is a recommendation, not a final section configuration. Section types recommended here do not guarantee those sections exist in the final theme. A future build-section-plan workflow will determine which sections are executable within the available theme section library.",
+      "The minimum section_sequence length is 3 (schema minItems). In practice, a homepage strategy with only 3 sections is extremely minimal. The LLM should produce 4–8 sections for most stores, with tight section_flow producing fewer and story-led producing more.",
+      "forbidden_homepage_patterns may include entries that are homepage-specific (not present in pattern-manifest.forbidden_patterns) — e.g. 'auto-playing video with sound in hero', 'full-screen pop-up on page load'. The LLM is instructed to add these where brand_role and trust_style suggest they would be inappropriate.",
+      "seo_role is a directional signal only — it is not a substitute for the seo-strategy workflow, which is out of scope for Phase 3.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "This workflow is the final workflow of Phase 3. Its output (homepage-strategy.json) concludes the experience planning layer and unlocks the section planning and content generation phases."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should homepage-strategy.json include a 'minimum_section_count' and 'maximum_section_count' recommendation to guide the future build-section-plan workflow?",
+        "impact": "Without explicit bounds, section plan could expand or contract the sequence beyond what the strategy intends.",
+        "recommended_default": "Yes — add these as optional fields in a future schema iteration. For now, include the recommended bounds in the notes field based on section_flow (tight: 3-5 sections, balanced: 5-8, story-led: 6-10)."
+      },
+      {
+        "question": "How should the section_sequence handle conditional sections? (e.g. 'include review-section only if the store has sufficient reviews')",
+        "impact": "The strategy cannot know at planning time whether the store has reviews — that is runtime Shopify data.",
+        "recommended_default": "Use priority = optional for sections that depend on runtime data availability (reviews, user-generated content, etc.). The build-section-plan workflow will resolve optionality against actual Shopify data."
+      },
+      {
+        "question": "Should the homepage strategy include a secondary CTA recommendation (e.g. scroll-anchor or secondary navigation) in addition to the primary CTA?",
+        "impact": "A single CTA focus may be too rigid for complex homepages.",
+        "recommended_default": "Not in Phase 3 — cta_strategy.primary_cta_focus covers the primary direction. Secondary CTAs are handled at the section-plan and content-generation layer. Add a note to open_questions if this becomes a blocker in Phase 4."
+      },
+      {
+        "question": "What happens if brand_role = editorial-guide but performance_priority = maximum and motion_level = none? These produce a contradictory strategy (editorial brand with no visual dynamism).",
+        "impact": "The strategy may produce a technically valid but strategically weak artifact.",
+        "recommended_default": "Proceed and flag the tension in the notes field: 'Editorial brand direction conflicts with maximum performance constraint — human review recommended before finalizing visual experience strategy.' Do not treat this as a workflow error."
+      }
+    ],
+
+    "evidence_boundaries": {
+      "direct_from_user": [
+        "brand_role (if user-provided in intake — drives homepage_goal)",
+        "conversion_style.cta_style (if user-provided — drives cta_strategy)",
+        "trust_style.proof_mode (if user-provided — drives trust_strategy)",
+        "motion_level_preference (applied via design-system ceiling — indirectly constrains section motion_allowed and media_role.motion_role)",
+        "hero_video_allowed (applied via design-system ceiling — constrains hero_type and media_role.video_role)",
+        "performance_priority (applied via design-system — constrains heavy media sections)"
+      ],
+      "derived_from_synthesized_upstream_artifacts": [
+        "homepage_goal (synthesized from brand_role + store_type + brand_maturity — all may be LLM-synthesized)",
+        "hero_strategy.hero_type and primary_focus (synthesized from homepage_goal + value_proposition + catalog_type — all LLM-synthesized)",
+        "section_sequence (fully synthesized from audience context + approved patterns + section_flow — all LLM-synthesized upstream)",
+        "trust_strategy.trust_placement and review_usage (synthesized from trust_style + trust_factors — both LLM-synthesized)",
+        "storytelling_intensity (synthesized from brand_role + section_flow)",
+        "seo_role (synthesized from positioning_goals + keyword_targeting direction — directional only)",
+        "forbidden_homepage_patterns (partially synthesized — homepage-specific additions are LLM-inferred)"
+      ],
+      "not_available_in_this_phase": [
+        "Real user journey data or heatmaps",
+        "Conversion rate data for section types",
+        "Live site performance benchmarks",
+        "A/B testing results on homepage structures",
+        "Real Shopify review counts or UGC availability",
+        "Competitor homepage analysis from live sites",
+        "Theme section library capabilities"
+      ],
+      "labeling_requirement": "The notes field must include: 'HOMEPAGE STRATEGY — SYNTHESIS ARTIFACT: This artifact is derived from prior-phase LLM-synthesized artifacts (store profile, market intelligence, brand positioning, pattern manifest, design system) and user intake preferences. All section sequence recommendations are planning hypotheses — not validated UX decisions. Hard-constraint fields (homepage_goal, cta_strategy, trust_strategy.proof_intensity) reflect user or brand decisions. The section_sequence is a strategic recommendation — the future build-section-plan workflow will translate it into executable section instances, which may differ based on theme capabilities and real store data. Human review is required before this artifact informs content generation or theme configuration.'"
+    },
+
+    "runtime_dependencies": [
+      "n8n Execute Workflow Trigger node — receives subworkflow call from master orchestrator",
+      "n8n Code node (JavaScript) — for input validation, constraint extraction, prompt building, response parsing, hard-constraint enforcement, and schema validation",
+      "n8n OpenAI node OR HTTP Request node (OpenAI API) — for LLM homepage strategy synthesis",
+      "n8n GitHub node OR Write File node — for persisting homepage-strategy.json",
+      "ajv (Ajv JSON Schema Validator) — for schema validation inside Code node",
+      "schemas/homepage-strategy.schema.json — must be accessible to the validation step",
+      "OpenAI API credential — stored in n8n, never in Git",
+      "build-store-profile, build-market-intelligence, build-brand-positioning, build-pattern-manifest, and build-design-system must all complete successfully before this workflow runs"
+    ]
+  }
+}

@@ -1,0 +1,183 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "runtime-checkpoint.schema.json",
+  "title": "Runtime Checkpoint",
+  "description": "Schema for the runtime checkpoint file (.runtime/checkpoint.json) that tracks execution progress across the store-os workflow chain. This schema is used by the Phase 11 runtime layer to enable resumability. It is NOT a planning artifact schema — it is operational state metadata.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "project_id",
+    "execution_run_id",
+    "chain_start_timestamp",
+    "last_updated_timestamp",
+    "chain_status",
+    "completed_workflows",
+    "next_workflow",
+    "review_gate_status",
+    "env"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Version of the checkpoint schema. Must be '1.0' for Phase 11 initial implementation.",
+      "const": "1.0"
+    },
+    "project_id": {
+      "type": "string",
+      "description": "Project identifier. Must match the project folder name and the project_id field in all planning artifacts.",
+      "minLength": 1
+    },
+    "execution_run_id": {
+      "type": "string",
+      "description": "Unique identifier for this execution run. Format: run-{YYYYMMDD}-{HHMMSS}. Used to correlate checkpoint with execution log entries.",
+      "pattern": "^run-[0-9]{8}-[0-9]{6}$"
+    },
+    "chain_start_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 datetime when the execution chain started (when resolve-runtime-config began)."
+    },
+    "last_updated_timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 datetime when the checkpoint was last written. Updated after each workflow completes or fails."
+    },
+    "chain_status": {
+      "type": "string",
+      "description": "Current overall status of the execution chain.",
+      "enum": [
+        "IN_PROGRESS",
+        "AWAITING_REVIEW",
+        "HALTED",
+        "COMPLETE"
+      ]
+    },
+    "completed_workflows": {
+      "type": "array",
+      "description": "Ordered list of workflows that have completed successfully in this run. Only SUCCESS entries are included here.",
+      "items": {
+        "type": "object",
+        "required": ["workflow_id", "completed_at", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "workflow_id": {
+            "type": "string",
+            "description": "The workflow identifier matching the id field in the workflow draft JSON.",
+            "minLength": 1
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 datetime when this workflow completed successfully."
+          },
+          "output_artifact": {
+            "type": ["string", "null"],
+            "description": "The primary artifact file name produced by this workflow. Null if the workflow produced no artifact file (e.g., resolve-runtime-config, intake-store-input)."
+          },
+          "status": {
+            "type": "string",
+            "description": "Always SUCCESS for completed workflows. Failed workflows are recorded in failed_at, not here.",
+            "const": "SUCCESS"
+          }
+        }
+      }
+    },
+    "failed_at": {
+      "description": "Details of the workflow that caused a HALT. Null if chain_status is not HALTED.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["workflow_id", "failed_at", "error_code", "error_message"],
+          "additionalProperties": false,
+          "properties": {
+            "workflow_id": {
+              "type": "string",
+              "description": "The workflow_id of the workflow that failed.",
+              "minLength": 1
+            },
+            "failed_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "ISO 8601 datetime when the failure occurred."
+            },
+            "error_code": {
+              "type": "string",
+              "description": "The error category code from the error taxonomy.",
+              "enum": [
+                "CONFIG_MISSING",
+                "CREDENTIAL_NOT_FOUND",
+                "CREDENTIAL_AUTH_FAILURE",
+                "MISSING_ARTIFACT",
+                "PARSE_ERROR",
+                "SCHEMA_VIOLATION",
+                "LLM_SYNTHESIS_FAILURE",
+                "SHOPIFY_API_ERROR",
+                "WRITE_ERROR",
+                "PROJECT_ID_MISMATCH",
+                "CHECKPOINT_INCONSISTENCY",
+                "UNKNOWN_ERROR"
+              ]
+            },
+            "error_message": {
+              "type": "string",
+              "description": "Human-readable description of the error.",
+              "minLength": 1
+            },
+            "output_artifact": {
+              "type": "null",
+              "description": "Always null for failed workflows — no artifact was successfully written."
+            },
+            "retry_count": {
+              "type": "integer",
+              "description": "Number of retries attempted before the halt. 0 if no retries were allowed for this error type.",
+              "minimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "next_workflow": {
+      "type": ["string", "null"],
+      "description": "The workflow_id of the next workflow to execute. Null when chain_status is COMPLETE. Set to the workflow to re-run when chain_status is HALTED."
+    },
+    "review_gate_status": {
+      "type": "string",
+      "description": "Status of the manual review gate. The gate is the pause point after all Phase 1-9 artifacts are produced when manual_review_required is true.",
+      "enum": [
+        "NOT_REACHED",
+        "WAITING",
+        "APPROVED",
+        "REJECTED",
+        "NOT_APPLICABLE"
+      ]
+    },
+    "review_gate_approved_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO 8601 datetime when the review gate was approved. Null if not yet approved."
+    },
+    "env": {
+      "type": "string",
+      "description": "The STORE_OS_ENV value at the time of chain start.",
+      "enum": ["dev", "staging", "production"]
+    },
+    "llm_model_used": {
+      "type": ["string", "null"],
+      "description": "The STORE_OS_LLM_MODEL value at chain start. Records which LLM model was used for audit and reproducibility."
+    },
+    "shopify_api_version_used": {
+      "type": ["string", "null"],
+      "description": "The STORE_OS_SHOPIFY_API_VERSION value at chain start."
+    },
+    "notes": {
+      "type": "array",
+      "description": "Human-readable notes appended during the run. May be empty. Used for non-error observations.",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    }
+  }
+}

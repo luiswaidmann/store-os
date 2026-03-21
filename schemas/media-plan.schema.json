@@ -1,0 +1,328 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/media-plan.schema.json",
+  "title": "Media Plan Schema",
+  "description": "Schema for a store-level media asset planning artifact in store-os. This plan defines what media assets are needed, by page type and section role, at what priority, and what sourcing work remains. It is a planning artifact only — not an asset inventory, not a confirmed asset availability report, and not a production-ready asset manifest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "plan_name",
+    "media_goal",
+    "page_type_coverage",
+    "planned_asset_slots",
+    "asset_gap_policy"
+  ],
+  "properties": {
+    "plan_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable name for this store's media plan. Recommended pattern: '[Store Vertical] Media Plan — [Primary Goal]'."
+    },
+    "media_goal": {
+      "type": "string",
+      "enum": [
+        "conversion-support",
+        "trust-building",
+        "storytelling-support",
+        "product-demonstration",
+        "brand-experience",
+        "hybrid"
+      ],
+      "description": "Primary strategic intent driving this media plan. Derived from homepage-strategy, brand-positioning, and design-system media_strategy."
+    },
+    "page_type_coverage": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Per-page-type media coverage plan. Each entry defines what asset types are required vs optional, and at what priority.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "page_type",
+          "required_asset_types",
+          "optional_asset_types",
+          "media_priority"
+        ],
+        "properties": {
+          "page_type": {
+            "type": "string",
+            "enum": [
+              "homepage",
+              "product-page",
+              "collection-page",
+              "guide-page",
+              "faq-page",
+              "article",
+              "generic-page",
+              "cart"
+            ]
+          },
+          "required_asset_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "hero-image",
+                "product-image",
+                "collection-image",
+                "editorial-image",
+                "trust-visual",
+                "comparison-visual",
+                "explainer-graphic",
+                "supporting-graphic",
+                "icon-set",
+                "background-image",
+                "poster-image"
+              ]
+            },
+            "description": "Asset types that are functionally required for this page type to render correctly and meet strategic goals."
+          },
+          "optional_asset_types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "hero-image",
+                "product-image",
+                "collection-image",
+                "editorial-image",
+                "trust-visual",
+                "comparison-visual",
+                "explainer-graphic",
+                "supporting-graphic",
+                "icon-set",
+                "background-image",
+                "poster-image"
+              ]
+            },
+            "description": "Asset types that enhance this page type but are not required for baseline rendering or strategic goals."
+          },
+          "media_priority": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low",
+              "deferred"
+            ],
+            "description": "Implementation priority for media on this page type. Derived from homepage-strategy, section roles, and brand-positioning."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Any additional notes about media requirements, constraints, or open questions for this page type."
+          }
+        }
+      }
+    },
+    "planned_asset_slots": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Individual planned asset slot definitions. Each slot represents one needed asset in the store's media plan — its role, sourcing status, and constraints. These are planning slots, not confirmed available assets.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slot_id",
+          "asset_type",
+          "page_type",
+          "section_role",
+          "media_role",
+          "availability_status",
+          "performance_risk"
+        ],
+        "properties": {
+          "slot_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Unique identifier for this asset slot within the plan. Recommended pattern: '{page_type}-{media_role}-{index}'."
+          },
+          "asset_type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "icon",
+              "graphic",
+              "poster",
+              "mixed-media"
+            ],
+            "description": "Broad category of the asset type for this slot."
+          },
+          "page_type": {
+            "type": "string",
+            "enum": [
+              "homepage",
+              "product-page",
+              "collection-page",
+              "guide-page",
+              "faq-page",
+              "article",
+              "generic-page",
+              "cart"
+            ]
+          },
+          "section_role": {
+            "type": "string",
+            "enum": [
+              "hero",
+              "feature-block",
+              "product-grid",
+              "collection-banner",
+              "trust-bar",
+              "editorial",
+              "storytelling",
+              "comparison",
+              "faq",
+              "footer",
+              "background",
+              "other"
+            ],
+            "description": "The section role this asset serves. Derived from section-plan and homepage-strategy section_sequence."
+          },
+          "media_role": {
+            "type": "string",
+            "enum": [
+              "hero",
+              "product-gallery",
+              "collection-support",
+              "storytelling",
+              "comparison",
+              "trust-support",
+              "editorial",
+              "background",
+              "iconography",
+              "explainer",
+              "other"
+            ],
+            "description": "Functional media role for this asset slot."
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Whether this slot represents a required asset (true) or an optional enhancement (false). Defaults to false when absent."
+          },
+          "availability_status": {
+            "type": "string",
+            "enum": [
+              "planned",
+              "requires-sourcing",
+              "requires-creation",
+              "placeholder",
+              "unavailable",
+              "requires-review"
+            ],
+            "description": "Current availability status of this asset slot. 'planned' = asset is expected to be available from known source. 'requires-sourcing' = asset must be actively sourced. 'requires-creation' = asset must be created (photography, design). 'placeholder' = temporary placeholder exists. 'unavailable' = no known path to asset availability. 'requires-review' = source exists but requires review before use."
+          },
+          "seo_role": {
+            "type": "string",
+            "enum": [
+              "decorative",
+              "supporting",
+              "index-relevant",
+              "answer-supporting"
+            ],
+            "description": "SEO role of this asset slot. Decorative assets do not need alt text optimization. Index-relevant and answer-supporting assets require careful alt text and schema planning."
+          },
+          "performance_risk": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "description": "Performance risk classification for this asset slot. High-risk slots require review before production deployment."
+          },
+          "mobile_fallback_required": {
+            "type": "boolean",
+            "description": "Whether this asset slot requires a separate mobile-optimized fallback asset."
+          },
+          "alt_text_guidance": {
+            "type": "string",
+            "description": "Planning-level guidance on alt text direction for this asset slot. Not a finalized alt text value."
+          },
+          "sourcing_notes": {
+            "type": "string",
+            "description": "Notes on expected sourcing path, constraints, or open questions for this asset slot."
+          }
+        }
+      }
+    },
+    "asset_gap_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "missing_source_handling",
+        "placeholder_allowed",
+        "unavailable_asset_escalation"
+      ],
+      "description": "Policy for handling missing or unavailable assets throughout implementation. Defines conservative defaults for gap situations.",
+      "properties": {
+        "missing_source_handling": {
+          "type": "string",
+          "enum": [
+            "block-slot",
+            "use-placeholder",
+            "defer-section",
+            "flag-for-review"
+          ],
+          "description": "Default handling when an asset source is missing. Conservative default: flag-for-review."
+        },
+        "placeholder_allowed": {
+          "type": "boolean",
+          "description": "Whether temporary placeholder images are allowed during development and staging. Must be false for production."
+        },
+        "unavailable_asset_escalation": {
+          "type": "string",
+          "enum": [
+            "remove-section",
+            "use-text-only",
+            "defer-to-human",
+            "flag-in-manifest"
+          ],
+          "description": "What happens when an asset is marked unavailable and no fallback exists."
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "sourcing_requirements_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Summary of sourcing work required to fulfill this media plan. Not an asset inventory — a planning-level summary of effort and gaps.",
+      "properties": {
+        "assets_requiring_photography": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Estimated number of asset slots requiring original photography."
+        },
+        "assets_requiring_design": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Estimated number of asset slots requiring custom design or graphic creation."
+        },
+        "assets_requiring_supplier_sourcing": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Estimated number of asset slots that can be fulfilled from supplier-provided materials."
+        },
+        "assets_with_no_known_source": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Estimated number of asset slots with no known sourcing path — these are blocking gaps."
+        },
+        "high_performance_risk_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of planned asset slots with performance_risk = high. Requires review before deployment."
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "General notes about this media plan, open questions, or assumptions made during synthesis."
+    }
+  }
+}

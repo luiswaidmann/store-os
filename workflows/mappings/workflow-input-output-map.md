@@ -217,6 +217,7 @@ Primary inputs:
 	•	market-intelligence.json
 	•	brand-positioning.json
 	•	competitor-cluster.json
+	•	store-profile.json
 
 Primary output:
 	•	pattern-manifest.json
@@ -239,6 +240,7 @@ Define visual, media, motion, and performance rules.
 Primary inputs:
 	•	brand-positioning.json
 	•	pattern-manifest.json
+	•	store-profile.json
 
 Primary output:
 	•	design-system.json
@@ -262,6 +264,7 @@ Define homepage role, hero logic, section flow, trust, and CTA logic.
 Primary inputs:
 	•	store-profile.json
 	•	market-intelligence.json
+	•	brand-positioning.json
 	•	pattern-manifest.json
 	•	design-system.json
 
@@ -630,62 +633,74 @@ Main downstream consumers:
 25. build-media-plan
 
 Purpose:
-Plan general media asset needs.
+Synthesize a store-level media asset plan covering still images, graphics, icons, trust visuals, comparison visuals, explainer graphics, and editorial imagery. Defines planned asset slots with availability status, performance risk, and sourcing requirements. Does not plan video assets (see build-video-plan) or motion strategy (see build-motion-media-strategy).
 
 Primary inputs:
-	•	imported media
-	•	design-system.json
 	•	homepage-strategy.json
-	•	section plans
-	•	product/collection/page content
+	•	section-instances (array)
+	•	product-content artifacts (array)
+	•	collection-content artifacts (array)
+	•	page-content artifacts (array)
+	•	design-system.json
+	•	brand-positioning.json
+	•	store-profile.json
+	•	market-intelligence.json (optional)
 
 Primary output:
-	•	media-asset.json
+	•	media-plan.json
 
 Primary schema:
-	•	schemas/media-asset.schema.json
+	•	schemas/media-plan.schema.json
+
+Note: schemas/media-asset.schema.json defines individual reusable asset records (separate concern). media-plan.schema.json defines the store-level planning artifact produced by this workflow.
 
 Main downstream consumers:
 	•	build-video-plan
 	•	build-motion-media-strategy
 	•	run-validation
+	•	build-deployment-manifest
 
 ⸻
 
 26. build-video-plan
 
 Purpose:
-Plan video-specific asset usage.
+Synthesize a store-level video asset plan defining planned video slots by role (hero-video, product-loop, explainer-clip, testimonial-style-clip, ambient-motion), availability status, autoplay/muted/loop configuration, poster and mobile fallback requirements, degradation policy, and missing asset policy. Does not plan static media (see build-media-plan) or motion strategy (see build-motion-media-strategy).
 
 Primary inputs:
-	•	media-asset.json
-	•	intake media preferences
+	•	media-plan.json
 	•	homepage-strategy.json
-	•	product content/use case relevance
+	•	design-system.json
+	•	brand-positioning.json
+	•	store-profile.json
+	•	seo-strategy.json (optional — for performance ceiling reinforcement)
 
 Primary output:
-	•	video-asset.json
+	•	video-plan.json
 
 Primary schema:
-	•	schemas/video-asset.schema.json
+	•	schemas/video-plan.schema.json
+
+Note: schemas/video-asset.schema.json defines individual reusable video asset records (separate concern). video-plan.schema.json defines the store-level planning artifact produced by this workflow.
 
 Main downstream consumers:
 	•	build-motion-media-strategy
 	•	run-validation
+	•	build-deployment-manifest
 
 ⸻
 
 27. build-motion-media-strategy
 
 Purpose:
-Define store-wide motion/video/embed usage constraints.
+Synthesize a store-wide motion and media execution strategy that unifies design-system motion ceilings, media-plan static asset context, and video-plan video context into a single governing strategy artifact. Defines motion policy (global, scroll, interaction, mobile, reduced-motion), video policy, embed policy, fallback policy, performance policy, and per-page-type motion/video/embed rules.
 
 Primary inputs:
 	•	design-system.json
 	•	homepage-strategy.json
-	•	media-asset.json
-	•	video-asset.json
-	•	intake motion/media preferences
+	•	section-instances (array)
+	•	media-plan.json
+	•	video-plan.json
 
 Primary output:
 	•	motion-media-strategy.json
@@ -694,8 +709,9 @@ Primary schema:
 	•	schemas/motion-media-strategy.schema.json
 
 Main downstream consumers:
-	•	theme/section behavior later
 	•	run-validation
+	•	build-deployment-manifest
+	•	developer/theme-implementor (authoritative implementation guide)
 
 ⸻
 

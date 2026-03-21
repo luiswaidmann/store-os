@@ -1,0 +1,574 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. Product content outputs are planning artifacts — not final published product page copy. All synthesized content (benefit bullets, use cases, objection handling, trust elements, FAQ items) is planning-level content that requires human review before use in a live store. Shopify product data enters this workflow as operational truth for factual fields (product title, raw description, variants, price). All synthesized content that goes beyond the literal Shopify data must be clearly distinguished from verified product facts.",
+    "evidence_boundary_note": "Shopify product data (titles, descriptions, variants, images, pricing) is operational truth — real data from the live store. Brand positioning, market intelligence, and design system are LLM-synthesized planning artifacts. All content generated in this workflow that extends beyond literal Shopify data is a synthesis artifact informed by LLM-synthesized upstream context. This workflow must not present synthesized content as verified product claims. Benefit statements, use case descriptions, and objection responses are editorial framings of available product information — not verified test results, certifications, or guaranteed outcomes unless explicitly stated in the Shopify product data.",
+    "sparse_data_safety_note": "If imported Shopify product data is sparse (short descriptions, no tags, no metafields, minimal variant info), this workflow must fall back to safe, minimal content planning rather than inventing product details. Sparse data triggers are documented in the nodes below. Content synthesized from sparse data must be marked as REQUIRES-ENRICHMENT in the notes field.",
+    "claim_safety_note": "This workflow must not generate: unsupported health or performance claims, fabricated specifications, invented certifications, exaggerated before-after outcomes, or any claims that are not inferable from the actual Shopify product data. The LLM prompt must explicitly prohibit these behaviors. If a content plan field cannot be meaningfully populated from available data, it should be populated with a PLACEHOLDER-REQUIRES-REVIEW string rather than invented content.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/product-content.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+  "workflow": {
+    "id": "build-product-content",
+    "name": "build-product-content",
+    "category": "planning",
+    "phase": "Phase 4 — Commerce Content Planning",
+    "purpose": "Synthesize schema-validated product content plans for each imported Shopify product. Shopify product data is the operational truth layer — factual fields (title, raw description, variants, price, tags) enter this workflow as real data and must not be altered or misrepresented. Brand positioning, market intelligence, and design system provide strategic and stylistic constraints that shape how the content plan frames the product. The output is a structured product-content.json per product: a planning artifact that defines benefit framing, use cases, objection handling, trust elements, FAQ seeds, and CTA direction. Raw Shopify descriptions are distinguished from synthesized planning content at every step. Content that goes beyond verified Shopify product data is explicitly marked as synthesized planning content. Sparse product data triggers safe fallback behavior. Claims that cannot be supported by available data are never fabricated.",
+
+    "inputs": {
+      "from_shopify_import": {
+        "source": "import-shopify-data → raw product dataset",
+        "artifact_path": "projects/{project_id}/shopify-import/products.json",
+        "data_treatment": "OPERATIONAL TRUTH — Shopify product data is real store data. It is not a planning artifact.",
+        "fields_used_per_product": [
+          {
+            "field": "title",
+            "treatment": "OPERATIONAL TRUTH — product_title in the content plan is the exact Shopify title (may be lightly cleaned for formatting but never reworded for SEO without explicit flag)",
+            "note": "Do not rename products in the content plan. The Shopify title is the canonical product name."
+          },
+          {
+            "field": "body_html / description",
+            "treatment": "OPERATIONAL TRUTH REFERENCE — the raw Shopify description is the factual baseline. Synthesized content must not contradict it. It is passed to the LLM as 'raw product description — treat as factual input'.",
+            "note": "The raw description may be poor quality, short, or missing. Sparse description is a trigger for fallback behavior. Do not treat a missing Shopify description as license to invent product claims."
+          },
+          {
+            "field": "tags",
+            "treatment": "HINT — product tags from Shopify provide category, attribute, and audience signals. Used as synthesis hints only — not hard constraints.",
+            "note": "Tags may be absent or inconsistently applied. Do not rely on tags as the sole signal for any content decision."
+          },
+          {
+            "field": "variants",
+            "treatment": "OPERATIONAL TRUTH — variant titles, option names (size, color, material), and pricing are factual. Use cases and benefit bullets may reference variants but must not invent variant attributes not present in the data.",
+            "note": "Variants inform choose-variant CTA direction and may influence use case examples."
+          },
+          {
+            "field": "images",
+            "treatment": "CONTEXT — presence and count of product images inform trust_elements (e.g. 'product photography available') and media_config planning. Image content itself is not analyzed in this text-based workflow.",
+            "note": "Image count > 0 is a positive trust signal. Image count = 0 is a sparse data flag."
+          },
+          {
+            "field": "metafields",
+            "treatment": "OPTIONAL ENRICHMENT — if metafields are present, they may contain specifications, certifications, materials, or care instructions that are factual enrichment data. These must be treated as operational truth if present.",
+            "note": "Metafields may be absent. Do not depend on them."
+          },
+          {
+            "field": "product_type",
+            "treatment": "CONTEXT — product type provides category context that orients use case synthesis and section section planning.",
+            "note": "Used as a hint for use_cases and benefit_bullets framing."
+          },
+          {
+            "field": "vendor",
+            "treatment": "CONTEXT — vendor/brand name is relevant for brand_relation_clear in the downstream product-seo workflow.",
+            "note": "Available as an optional context signal."
+          }
+        ],
+        "sparse_data_thresholds": {
+          "description_length_minimum": "Body HTML length < 100 characters is considered sparse. Flag as SPARSE-DESCRIPTION.",
+          "image_count_minimum": "Image count = 0 is SPARSE-IMAGES.",
+          "tag_count_minimum": "Tag count = 0 with no metafields is SPARSE-METADATA.",
+          "action_on_sparse": "Any sparse trigger activates safe fallback mode for that product. In safe fallback mode: benefit_bullets are limited to 3 generic framing bullets (not product-specific claims), use_cases are limited to 1 generic use case framing, and all fields that cannot be supported by available data are populated with PLACEHOLDER-REQUIRES-REVIEW. The notes field must include: 'SPARSE DATA: content plan is minimal due to limited Shopify product data. Human enrichment required before this plan is usable.'"
+        }
+      },
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "fields_used_as_hard_constraints": [
+          {
+            "field": "tone_of_voice.style",
+            "treatment": "HARD CONSTRAINT — the synthesized content plan must reflect the brand's tone of voice. editorial-smart → benefit bullets and descriptions are articulate and insight-led. technical-trustworthy → spec-aware, precision-oriented language. clear-direct → plain language, outcome-first. premium-confident → elevated, benefit-forward without overselling. warm-helpful → approachable, problem-solving framing. playful-bold → energetic, differentiating language.",
+            "note": "Tone is enforced in the LLM prompt as a non-negotiable style constraint."
+          },
+          {
+            "field": "conversion_style.cta_style",
+            "treatment": "HARD CONSTRAINT — maps to product-content cta_direction.cta_tone. subtle → cta_tone = subtle, primary_cta lean toward learn-more or choose-variant. balanced → cta_tone = balanced. assertive → cta_tone = assertive, primary_cta = buy-now or add-to-cart.",
+            "note": "Direct mapping — no LLM synthesis needed for cta_tone."
+          },
+          {
+            "field": "trust_style.proof_mode",
+            "treatment": "HARD CONSTRAINT — shapes trust_elements framing. social-proof-led → trust elements emphasize review counts, testimonials, community signals. evidence-led → trust elements emphasize specs, certifications, results. authority-led → trust elements emphasize credentials, partnerships, expert backing. guarantee-led → trust elements emphasize returns, warranties, risk-free framing. mixed → balanced trust element set.",
+            "note": "trust_elements in the schema is a string array — the trust_style drives which type of trust signals are prioritized in the array."
+          },
+          {
+            "field": "value_proposition",
+            "treatment": "SYNTHESIS HINT — the brand's value proposition orients the primary_promise field. primary_promise should be consistent with the brand's stated value proposition, applied to the specific product.",
+            "note": "primary_promise is product-specific — it is not just a restatement of the brand value_proposition. The brand value proposition provides the framing direction."
+          },
+          {
+            "field": "differentiators",
+            "treatment": "SYNTHESIS HINT — brand differentiators orient benefit_bullets and feature_blocks. Benefit bullets should reflect the brand's core differentiators where they apply to the specific product.",
+            "note": "Only use differentiators that are genuinely applicable to the specific product. Do not apply all brand differentiators to every product if they are not relevant."
+          },
+          {
+            "field": "objection_handling_style",
+            "treatment": "CONSTRAINT — shapes how objection_handling is framed. detailed → 3-5 objections with substantive responses. minimal → 1-2 objections with brief responses. The objection topics are informed by market_intelligence.core_problems.",
+            "note": "Objection responses must be honest framings — they must not make claims the product cannot support."
+          },
+          {
+            "field": "forbidden_impressions",
+            "treatment": "NEGATIVE CONSTRAINT — content plan must not create any of the forbidden impressions. If a forbidden impression is 'cheap', benefit bullets must not use cheap-signaling language. If 'corporate', copy must avoid stiff corporate phrasing.",
+            "note": "Pass forbidden_impressions into the LLM prompt as explicit prohibitions."
+          }
+        ],
+        "fields_used_as_synthesis_hints": [
+          {
+            "field": "brand_traits",
+            "treatment": "HINT — brand traits inform the voice and character of synthesized content. They are style signals, not structural constraints.",
+            "note": "Secondary signal — tone_of_voice.style is the primary style constraint."
+          },
+          {
+            "field": "positioning_statement",
+            "treatment": "HINT — provides overall brand framing context for the LLM when synthesizing product-level content.",
+            "note": "Do not treat positioning_statement as a product description. It provides brand context only."
+          }
+        ]
+      },
+      "from_market_intelligence": {
+        "source": "build-market-intelligence → market-intelligence.json",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "fields_used_as_synthesis_context": [
+          {
+            "field": "audience_segments",
+            "treatment": "SYNTHESIS CONTEXT — audience segment descriptions and purchase_drivers orient use_cases. Use cases should resonate with the primary audience segments' specific needs or goals.",
+            "note": "Use cases are editorial framings of product application scenarios — they must be plausible given available product data and audience segment descriptions."
+          },
+          {
+            "field": "core_problems",
+            "treatment": "SYNTHESIS CONTEXT — the problems the market has that the store addresses. Objection handling and benefit bullets should speak to these problems where the product genuinely addresses them.",
+            "note": "Do not fabricate problem-solution connections that the Shopify product data does not support."
+          },
+          {
+            "field": "purchase_motivators",
+            "treatment": "SYNTHESIS CONTEXT — what drives purchase decisions in this market. Benefit bullets and primary_promise should align with the market's primary purchase motivators.",
+            "note": "Purchase motivators are market-level signals — apply at product level only where they genuinely apply to the specific product."
+          },
+          {
+            "field": "trust_factors",
+            "treatment": "SYNTHESIS CONTEXT — what builds trust in this market category. trust_elements should reflect the trust factors that matter most to this market's buyers.",
+            "note": "Trust elements must be honest about what trust signals the store can actually provide. Do not invent certifications, awards, or third-party validations not present in Shopify data."
+          }
+        ]
+      },
+      "from_design_system": {
+        "source": "build-design-system → design-system.json",
+        "artifact_path": "projects/{project_id}/design-system.json",
+        "fields_used_as_content_density_constraints": [
+          {
+            "field": "layout_density",
+            "treatment": "CONSTRAINT — constrains body length and text density in synthesized content. dense → longer benefit bullets and feature descriptions acceptable. spacious → shorter, punchier benefit bullets and descriptions. balanced → standard.",
+            "note": "layout_density does not affect the number of content fields — it affects the verbosity of synthesized strings."
+          },
+          {
+            "field": "visual_hierarchy.primary_emphasis",
+            "treatment": "HINT — if primary_emphasis = headline, the primary_promise and product_title must be especially strong and clear. If primary_emphasis = product, the visual context supports detailed feature blocks.",
+            "note": "This is a layout hint — it informs how the content plan should prioritize headline-level vs detail-level content fields."
+          }
+        ]
+      },
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "fields_used_as_context": [
+          {
+            "field": "vertical",
+            "treatment": "CONTEXT — the store's vertical (e.g. apparel, electronics, health, beauty) orients appropriate use case scenarios and objection types.",
+            "note": "Vertical is a contextualizing signal, not a structural constraint on product content."
+          },
+          {
+            "field": "price_positioning",
+            "treatment": "CONTEXT — premium price → benefit bullets should emphasize quality, craftsmanship, and exclusivity where applicable. Budget → emphasis on value and practicality.",
+            "note": "Do not fabricate premium claims if the Shopify product data does not support them."
+          },
+          {
+            "field": "primary_market",
+            "treatment": "CONTEXT — the target geographic and cultural market may inform language register and use case framing.",
+            "note": "Optional context — primary_market is not a hard content constraint."
+          }
+        ]
+      }
+    },
+
+    "outputs": {
+      "product_content_set": {
+        "description": "A set of product-content.json artifacts, one per imported Shopify product. Each artifact conforms to schemas/product-content.schema.json. These are planning artifacts — not final published copy. They define benefit framing, use cases, objection handling, trust elements, FAQ seeds, and CTA direction for each product page.",
+        "artifact_path": "projects/{project_id}/product-content/{product_handle}.json",
+        "schema": "schemas/product-content.schema.json",
+        "field_mapping": {
+          "product_title": {
+            "source": "DIRECT from Shopify product.title — lightly cleaned (strip excess whitespace, normalize capitalization) but not reworded",
+            "type": "direct operational truth",
+            "note": "Never rename or reframe the product title in this workflow."
+          },
+          "product_subtitle": {
+            "source": "LLM synthesis — a short secondary headline that supplements the product title with a benefit or differentiating framing. Derived from the primary_promise direction and tone_of_voice.",
+            "type": "LLM-synthesized planning content",
+            "constraint": "Must be honest — no unsupported claims. If data is sparse, populate with PLACEHOLDER-REQUIRES-REVIEW.",
+            "note": "Product subtitle is planning-level copy — not final publishable text."
+          },
+          "primary_promise": {
+            "source": "LLM synthesis — the core outcome or benefit the product delivers, framed through the brand value_proposition direction and tone_of_voice. Grounded in what the product actually does per Shopify data.",
+            "type": "LLM-synthesized planning content",
+            "constraint": "Must not make claims not inferable from available Shopify product data. If sparse data, populate with PLACEHOLDER-REQUIRES-REVIEW.",
+            "note": "primary_promise is the most important synthesized content field — it sets the framing for all downstream content."
+          },
+          "short_description": {
+            "source": "LLM synthesis — a rewritten, brand-voice-aligned short description. Based on the Shopify body_html content. Must not add claims not present in the original description.",
+            "type": "LLM-synthesized editorial reframe of operational truth",
+            "constraint": "If Shopify description is sparse (< 100 chars), do not expand with invented content — instead, write a minimal factual description from available data and mark as SPARSE-REQUIRES-ENRICHMENT.",
+            "note": "short_description is NOT a copy of the Shopify body_html — it is a brand-voice reframe. But it must remain factually honest."
+          },
+          "benefit_bullets": {
+            "source": "LLM synthesis — 3-6 benefit bullets derived from Shopify product features, tags, metafields, and brand differentiators applicable to this product. Framed through tone_of_voice and purchase_motivators.",
+            "type": "LLM-synthesized planning content",
+            "constraint": "Minimum 3 required by schema. Bullets must not claim attributes not supported by available product data. Premium claims must be grounded in product data. In sparse data mode, limit to 3 generic framing bullets marked as PLACEHOLDER.",
+            "framing_direction": "Bullets should be outcome-oriented (what the customer gets), not just feature lists. 'Designed for X' is acceptable if X is a plausible use case. 'Clinically proven' is PROHIBITED unless explicitly in Shopify data."
+          },
+          "feature_blocks": {
+            "source": "LLM synthesis — 1-4 feature blocks, each with feature_name, feature_description, and customer_benefit. Derived from Shopify product attributes, variants, metafields, and applicable brand differentiators.",
+            "type": "LLM-synthesized planning content",
+            "constraint": "Minimum 1 required by schema. feature_description must not invent specifications. customer_benefit must be a plausible editorial framing of available product information.",
+            "note": "feature_blocks are more detailed than benefit_bullets — they pair a feature with its 'so what' for the customer."
+          },
+          "use_cases": {
+            "source": "LLM synthesis — 1-4 use case scenarios derived from audience_segments, product type, tags, and applicable purchase_motivators. Each use case describes a plausible customer scenario where this product solves a problem or fulfills a need.",
+            "type": "LLM-synthesized planning content",
+            "constraint": "Use cases must be plausible given available product data. Do not invent use cases that require product capabilities not indicated in Shopify data. In sparse data mode, limit to 1 generic use case.",
+            "note": "Use cases orient downstream product SEO and FAQ planning — they should be specific enough to be useful."
+          },
+          "objection_handling": {
+            "source": "LLM synthesis — 1-4 objection/response pairs. Objections are derived from market_intelligence.core_problems and trust_factors. Responses are derived from available product data, brand positioning, and trust_style.",
+            "type": "LLM-synthesized planning content",
+            "constraint": "Responses must be honest framings of the product's actual attributes. Do not fabricate responses that claim capabilities the product cannot support. If no strong response is available from product data, use: 'RESPONSE-REQUIRES-HUMAN-INPUT'.",
+            "objection_handling_style_mapping": {
+              "detailed": "3-4 objections with substantive, multi-sentence responses",
+              "minimal": "1-2 objections with brief, direct responses"
+            }
+          },
+          "trust_elements": {
+            "source": "LLM synthesis — 1-5 trust element strings. Type of trust elements constrained by trust_style.proof_mode and trust_factors. Trust elements must reflect signals the store can actually provide.",
+            "type": "LLM-synthesized planning content — constrained by trust_style",
+            "constraint": "Do not include trust elements the store cannot support (e.g. 'award-winning' without Shopify data confirming it, 'certified' without metafield confirmation, '10,000+ reviews' without review count data from Shopify).",
+            "examples_by_trust_style": {
+              "social-proof-led": "Review count mentions, customer testimonial framing, community usage signals",
+              "evidence-led": "Specification references, material quality notes, process transparency",
+              "authority-led": "Expert backing, professional use cases, industry recognition (only if verifiable)",
+              "guarantee-led": "Return policy signals, warranty mentions, risk-free trial framing"
+            }
+          },
+          "faq_items": {
+            "source": "LLM synthesis — 1-4 FAQ item seeds (question/answer pairs). FAQ items are derived from purchase_motivators, objection_handling topics, and common product category questions. These are seeds for the future build-product-faq workflow.",
+            "type": "LLM-synthesized planning content",
+            "constraint": "Answers must be grounded in available Shopify product data. Do not fabricate detailed technical answers. If data does not support a complete answer, write: 'ANSWER-REQUIRES-ENRICHMENT'.",
+            "note": "faq_items in product-content are planning seeds — not the final FAQ artifact. build-product-faq (out of Phase 4 scope) will produce the finalized FAQ artifact."
+          },
+          "cta_direction": {
+            "primary_cta": {
+              "source": "Derived from conversion_style.cta_style + product variant count + catalog_type",
+              "type": "constrained enum",
+              "constraint_logic": "assertive cta_style → buy-now; balanced cta_style + single variant → add-to-cart; balanced cta_style + multiple variants → choose-variant; subtle cta_style → learn-more; multiple complex variants → mixed",
+              "schema_enum": ["buy-now", "add-to-cart", "learn-more", "choose-variant", "mixed"]
+            },
+            "cta_tone": {
+              "source": "DIRECT mapping from conversion_style.cta_style",
+              "type": "direct-mapped enum",
+              "mapping": {"subtle": "subtle", "balanced": "balanced", "assertive": "assertive"},
+              "schema_enum": ["subtle", "balanced", "assertive"]
+            }
+          },
+          "comparison_notes": {
+            "source": "Optional — LLM synthesis from competitor_cluster context (if available) and brand differentiators. Points of competitive differentiation relevant to product page comparison framing.",
+            "type": "optional LLM-synthesized planning content",
+            "note": "Only populate if competitor data is available and applicable. Do not fabricate competitive comparisons."
+          },
+          "care_instructions": {
+            "source": "DIRECT from Shopify metafields or tags if present. Otherwise PLACEHOLDER-REQUIRES-HUMAN-INPUT.",
+            "type": "operational truth if available, otherwise placeholder",
+            "note": "Do not invent care instructions."
+          },
+          "shipping_notes": {
+            "source": "CONTEXT from store-profile.json business_model and any Shopify shipping data available. Generic framing only if no specific data.",
+            "type": "derived context — not invented",
+            "note": "Do not make specific shipping time promises not grounded in store data."
+          },
+          "returns_notes": {
+            "source": "CONTEXT from brand-positioning trust_style.proof_mode (guarantee-led → emphasize return policy). Generic framing only if no specific returns data.",
+            "type": "derived context — not invented",
+            "note": "Do not invent return policies."
+          },
+          "notes": {
+            "source": "Workflow-generated synthesis metadata per product",
+            "type": "machine-generated string",
+            "note": "Must include: synthesis timestamp, Shopify product handle and ID, sparse data flags if applicable, list of fields that are direct operational truth vs synthesized planning content, any PLACEHOLDER-REQUIRES-REVIEW fields, evidence boundary label, and downstream workflows (build-product-seo, build-product-faq) that will consume this artifact."
+          }
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "import-shopify-data",
+        "provides": ["raw product dataset"],
+        "required": true,
+        "note": "Shopify product data is the operational truth layer for all product content plans. At least one product must be present in the import. If the import is empty, this workflow halts."
+      },
+      {
+        "workflow": "build-store-profile",
+        "provides": ["store-profile.json"],
+        "required": true,
+        "note": "Provides vertical, price_positioning, and primary_market as contextual signals for content framing."
+      },
+      {
+        "workflow": "build-market-intelligence",
+        "provides": ["market-intelligence.json"],
+        "required": true,
+        "note": "Provides audience_segments, core_problems, purchase_motivators, and trust_factors that orient use cases, objection handling, and trust elements."
+      },
+      {
+        "workflow": "build-brand-positioning",
+        "provides": ["brand-positioning.json"],
+        "required": true,
+        "note": "Primary constraint source for tone_of_voice, cta_direction, trust_elements framing, and content style. tone_of_voice.style and conversion_style.cta_style are hard constraints."
+      },
+      {
+        "workflow": "build-design-system",
+        "provides": ["design-system.json"],
+        "required": true,
+        "note": "Provides layout_density and visual_hierarchy as content density constraints."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-product-seo",
+        "receives": ["product-content.json"],
+        "note": "Consumes primary_promise, benefit_bullets, use_cases, and faq_items to inform product keyword strategy, search intent classification, entity clarity, and answer targets."
+      },
+      {
+        "workflow": "build-product-faq",
+        "receives": ["product-content.json"],
+        "note": "Out of Phase 4 scope. Consumes faq_items seeds to produce the finalized product FAQ artifact."
+      },
+      {
+        "workflow": "build-product-structured-data",
+        "receives": ["product-content.json"],
+        "note": "Out of Phase 4 scope. Consumes product_title, benefit_bullets, feature_blocks, and trust_elements for structured data planning."
+      },
+      {
+        "workflow": "build-media-plan",
+        "receives": ["product-content.json"],
+        "note": "Out of Phase 4 scope. Consumes use_cases and feature_blocks to inform product media asset planning."
+      }
+    ],
+
+    "schema_alignment": {
+      "product-content.schema.json": {
+        "required_fields_covered": [
+          "product_title",
+          "product_subtitle",
+          "primary_promise",
+          "short_description",
+          "benefit_bullets",
+          "feature_blocks",
+          "use_cases",
+          "objection_handling",
+          "trust_elements",
+          "faq_items",
+          "cta_direction"
+        ],
+        "optional_fields_covered": [
+          "comparison_notes",
+          "care_instructions",
+          "shipping_notes",
+          "returns_notes",
+          "notes"
+        ],
+        "benefit_bullets_note": "Schema requires minItems: 3. In sparse data mode, exactly 3 minimal bullets must be produced (not fewer). All bullets must be strings of minLength: 1.",
+        "feature_blocks_note": "Schema requires minItems: 1 with required feature_name, feature_description, customer_benefit per item. At least one feature block must be produced even in sparse data mode — use product_title as feature_name fallback if no feature data is available.",
+        "objection_handling_note": "Schema requires minItems: 1 with required objection and response per item. At least one objection/response pair must be produced. If data is too sparse to support a real response, use 'RESPONSE-REQUIRES-HUMAN-INPUT'.",
+        "faq_items_note": "Schema requires minItems: 1 with required question and answer. At least one FAQ seed must be produced.",
+        "cta_direction_note": "cta_direction requires primary_cta (enum) and cta_tone (enum). Both are constrained — not freely synthesized.",
+        "validation_note": "Each product-content object must be validated against schemas/product-content.schema.json using ajv before persisting. cta_direction.primary_cta must be one of the schema enum values. benefit_bullets must have at least 3 items."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: shopify_products (array), store_profile, market_intelligence, brand_positioning, design_system. All inputs must be present before this workflow begins.",
+        "input": "shopify_products + store_profile + market_intelligence + brand_positioning + design_system",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present and structurally valid. shopify_products must be a non-empty array. brand_positioning must have: tone_of_voice.style, conversion_style.cta_style, trust_style.proof_mode, value_proposition, forbidden_impressions. market_intelligence must have: audience_segments (non-empty), core_problems, purchase_motivators, trust_factors. design_system must have: layout_density. store_profile must have: store_id, vertical, price_positioning. Halt if shopify_products is empty — this workflow requires at least one product.",
+        "input": "all upstream inputs",
+        "output": "validated inputs or halt error"
+      },
+      {
+        "step": 3,
+        "name": "Extract Global Constraint Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Extract the global constraint signals that apply to ALL product content plans (not product-specific). Produce a content_constraints object: (1) TONE CONSTRAINT: tone_of_voice.style → writing tone instruction for LLM prompt. (2) CTA CONSTRAINTS: cta_style → cta_tone (direct mapping) and primary_cta logic. (3) TRUST FRAMING CONSTRAINT: trust_style.proof_mode → trust element type priorities. (4) OBJECTION DEPTH CONSTRAINT: objection_handling_style → number of objections and response depth. (5) CONTENT DENSITY CONSTRAINT: layout_density → verbosity guidance for benefit bullets and descriptions. (6) NEGATIVE CONSTRAINTS: forbidden_impressions → prohibited content behaviors for LLM prompt. (7) AUDIENCE CONTEXT: audience_segments summary + purchase_motivators + core_problems for use case and objection orientation. (8) TRUST CONTEXT: trust_factors for trust_elements guidance. Log all constraints with source labels.",
+        "input": "validated brand_positioning + design_system + market_intelligence",
+        "output": "content_constraints object with provenance annotations"
+      },
+      {
+        "step": 4,
+        "name": "Assess Product Data Quality Per Product",
+        "type": "Code node (JavaScript)",
+        "description": "For each product in shopify_products, assess data quality and set sparse flags. Check: (1) description_sparse: body_html length < 100 characters or null/empty. (2) images_sparse: images array count = 0. (3) tags_sparse: tags array is empty AND metafields is empty. (4) variants_simple: variants array has exactly 1 item (influences cta_direction). (5) has_metafields: metafields array is non-empty. Set product.data_quality = { description_sparse, images_sparse, tags_sparse, variants_simple, has_metafields, is_sparse_overall } where is_sparse_overall = true if description_sparse OR (images_sparse AND tags_sparse). Append data_quality to each product object in the working product list.",
+        "input": "shopify_products array",
+        "output": "products_with_quality_flags array"
+      },
+      {
+        "step": 5,
+        "name": "Build LLM Product Content Prompt (per product)",
+        "type": "Code node (JavaScript)",
+        "description": "For each product in products_with_quality_flags, assemble a structured LLM prompt for product content synthesis. The prompt must: (1) Present the Shopify product data (title, description, tags, variants, metafields) as 'OPERATIONAL TRUTH — do not alter or contradict this data'. (2) Present content_constraints as non-negotiable — tone, CTA direction, trust framing, and forbidden behaviors must be respected. (3) If is_sparse_overall = true, include a SPARSE DATA instruction: 'Product data is sparse. Generate minimal, conservative content. Use PLACEHOLDER-REQUIRES-REVIEW for fields that cannot be supported by available data. Do not invent product capabilities or claims.' (4) Request output as valid JSON conforming to schemas/product-content.schema.json. (5) Include the full schema enum values for cta_direction fields. (6) Explicitly prohibit: unsupported health/performance claims, fabricated certifications, exaggerated outcomes, invented specifications, competitive comparisons without data. (7) Instruct that product_title must be the exact Shopify title (lightly cleaned only). (8) Remind the model that all synthesized fields are planning content — not final published copy.",
+        "input": "single product with data_quality flags + content_constraints",
+        "output": "assembled LLM prompt string per product",
+        "iteration_note": "This step iterates over each product. For stores with many products, this workflow may need to batch products to avoid token and rate limit issues. Batching strategy: process products sequentially or in small batches (5-10 products per execution). Large catalogs (100+ products) will require pagination logic."
+      },
+      {
+        "step": 6,
+        "name": "LLM Synthesis: Product Content Plan (per product)",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API for each product. Request JSON output mode. Temperature: 0.3. Max tokens: 2500 per product (sufficient for full product-content schema). Process products iteratively.",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt per product",
+        "output": "raw LLM response string per product (expected to be JSON)"
+      },
+      {
+        "step": 7,
+        "name": "Parse and Enforce Hard Constraints (per product)",
+        "type": "Code node (JavaScript)",
+        "description": "For each product, parse the raw LLM response as JSON. Then enforce constraint integrity: (1) PRODUCT TITLE: Verify product_title matches Shopify title (modulo light cleaning). Overwrite if altered. (2) CTA TONE: Overwrite cta_direction.cta_tone with direct mapping from conversion_style.cta_style. (3) CTA PRIMARY: Validate cta_direction.primary_cta is consistent with cta_style + variant count constraint logic. Overwrite if inconsistent. (4) CLAIM SAFETY: Scan benefit_bullets, feature_blocks, trust_elements, and objection_handling responses for prohibited claim patterns (keywords like 'clinically proven', 'guaranteed to', 'certified' — unless present in Shopify product data). Flag or replace with PLACEHOLDER-REQUIRES-REVIEW. (5) SPARSE FLAG ENFORCEMENT: If is_sparse_overall = true, verify the content plan reflects the sparse mode constraints (limited bullets, PLACEHOLDER fields). (6) FORBIDDEN IMPRESSION CHECK: Scan all synthesized text fields for language that creates any of the forbidden_impressions. Flag for human review if detected. (7) MINIMUM SCHEMA COUNTS: Verify benefit_bullets >= 3, feature_blocks >= 1, use_cases >= 1, objection_handling >= 1, faq_items >= 1. Add minimal placeholder entries if any minimum is unmet. (8) Inject synthesis metadata and evidence boundary label into notes field.",
+        "input": "raw LLM response per product + content_constraints + product data_quality flags",
+        "output": "parsed and constrained product_content object per product (pre-validation)"
+      },
+      {
+        "step": 8,
+        "name": "Validate Against Schema (per product)",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate each product_content object against schemas/product-content.schema.json using ajv. Key validations: all required top-level fields present, benefit_bullets minItems = 3, feature_blocks minItems = 1 with all required sub-fields, use_cases minItems = 1, objection_handling minItems = 1 with objection and response, trust_elements minItems = 1, faq_items minItems = 1 with question and answer, cta_direction primary_cta in enum and cta_tone in enum. Halt on validation failure per product — report exact field violation and product handle.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/product-content.schema.json",
+        "failure_behavior": "Log validation failure for the specific product. Do not halt the entire workflow for one product's failure — continue processing remaining products. At the end, report all products that failed validation as requiring manual review.",
+        "input": "constrained product_content object per product",
+        "output": "validated product_content objects or per-product validation errors"
+      },
+      {
+        "step": 9,
+        "name": "Persist product-content.json (per product)",
+        "type": "GitHub node or Write File node",
+        "description": "Write each validated product-content.json to projects/{project_id}/product-content/{product_handle}.json. Commit with a message such as 'chore: generate product-content for {store_id} — Phase 4 draft'. Products that failed validation are logged to a review-required manifest at projects/{project_id}/product-content/_review-required.json.",
+        "artifact_path": "projects/{project_id}/product-content/{product_handle}.json",
+        "review_manifest_path": "projects/{project_id}/product-content/_review-required.json",
+        "git_note": "Each product-content.json must be committed to Git. These artifacts are consumed by build-product-seo (Phase 4) and future build-product-faq and build-product-structured-data workflows.",
+        "input": "validated product_content object per product",
+        "output": "confirmation of write per product + list of persisted artifact paths"
+      },
+      {
+        "step": 10,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the list of persisted product-content artifact paths and the review-required manifest path to the master orchestrator.",
+        "input": "artifact_paths list + review_required manifest path",
+        "output": "workflow output payload"
+      }
+    ],
+
+    "assumptions": [
+      "Shopify product data is the single source of operational truth for factual product information. This workflow does not invent, infer, or extend product facts beyond what is available in the Shopify import.",
+      "brand-positioning.json is the primary constraint source for content tone and CTA direction. tone_of_voice.style and conversion_style.cta_style are hard constraints applied to all products.",
+      "Sparse Shopify product data is handled conservatively — sparse products receive minimal, placeholder-heavy content plans that require human enrichment before use. Sparse is not a workflow error — it is a data quality signal that triggers documented fallback behavior.",
+      "Content synthesized by the LLM is planning-level content, not final publishable copy. All synthesized fields should be treated as editorial directions requiring human review.",
+      "faq_items in this workflow are planning seeds, not the final FAQ artifact. The dedicated build-product-faq workflow (out of Phase 4 scope) will produce the finalized FAQ set.",
+      "cta_direction.cta_tone is a direct mapping from brand-positioning.conversion_style.cta_style — it is not LLM-synthesized.",
+      "This workflow processes one product at a time (sequential or batched). Large catalogs require batching — the workflow does not attempt to process all products in a single LLM call.",
+      "Products that fail schema validation are not halted globally — they are logged to a review-required manifest and the workflow continues. A complete run may produce some persisted artifacts and some review-required flags.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should this workflow produce a single product-content.json per product (current design) or a combined product-content-set.json containing all products?",
+        "impact": "Individual files are more modular and easier to update per-product. A combined file is simpler for downstream workflows to consume but becomes large for big catalogs.",
+        "recommended_default": "Individual files per product, indexed by product handle. A combined index file at projects/{project_id}/product-content/_index.json listing all artifact paths is a reasonable addition for downstream workflow discovery."
+      },
+      {
+        "question": "How should this workflow handle product variants that are functionally different products (e.g. a base and a pro version sold as variants)?",
+        "impact": "A single product-content.json cannot differentiate meaningfully between very different variants.",
+        "recommended_default": "In Phase 4, treat each Shopify product as one content plan regardless of variant count. Note variant complexity in the notes field. If a product has strongly differentiated variants (>3 option names or >6 variants), flag it as VARIANT-COMPLEXITY-REVIEW in the notes field."
+      },
+      {
+        "question": "What is the recommended batch size for processing large product catalogs?",
+        "impact": "Processing 200+ products sequentially at ~2500 tokens each will hit OpenAI rate limits and cost significant tokens.",
+        "recommended_default": "Sequential processing with rate-limit-aware delays. For large catalogs (>50 products), consider a priority-ordered approach: process core/featured products first (identified from homepage-strategy or intake priority hints), then expand to the full catalog. This is a runtime concern — document it here but implement the batching logic in the Code node at implementation time."
+      },
+      {
+        "question": "Should comparison_notes be populated from competitor cluster data if available?",
+        "impact": "Competitor clusters from build-competitor-clusters could inform competitive differentiation framing in product content.",
+        "recommended_default": "competitor-cluster.json is not a required input for this workflow in Phase 4. If it is available (passed in by the orchestrator), it can be used as an optional hint for comparison_notes. If not available, comparison_notes remains empty or is omitted. Document this as an optional enhancement."
+      }
+    ],
+
+    "evidence_boundaries": {
+      "direct_operational_truth_from_shopify": [
+        "product_title (Shopify title — direct)",
+        "care_instructions (Shopify metafield — direct if present)",
+        "All factual product specifications (Shopify metafields — direct if present)",
+        "Variant titles and option names (Shopify variants — direct)",
+        "Image availability (Shopify images array count — direct)"
+      ],
+      "synthesized_from_operational_truth_plus_strategy": [
+        "product_subtitle (LLM reframe of product title + brand positioning direction)",
+        "primary_promise (LLM synthesis from Shopify data + brand value_proposition framing)",
+        "short_description (LLM brand-voice reframe of Shopify body_html)",
+        "benefit_bullets (LLM synthesis from Shopify features + purchase_motivators + differentiators)",
+        "feature_blocks (LLM synthesis from Shopify attributes + brand differentiators)",
+        "use_cases (LLM synthesis from Shopify product type + audience_segments + purchase_motivators)",
+        "objection_handling (LLM synthesis from core_problems + Shopify product capabilities)",
+        "trust_elements (LLM synthesis from trust_style + trust_factors — constrained to available signals)",
+        "faq_items (LLM synthesis from purchase_motivators + objection topics)"
+      ],
+      "direct_from_constraints_no_synthesis": [
+        "cta_direction.cta_tone (direct mapping from conversion_style.cta_style)",
+        "cta_direction.primary_cta (constrained enum — derived from cta_style + variant count)"
+      ],
+      "not_available_in_this_phase": [
+        "Verified product certifications or awards (unless in Shopify metafields)",
+        "Customer review data or testimonials (not consumed in this workflow)",
+        "Real product performance test results",
+        "User research or customer feedback on product perception",
+        "Competitor product specifications for comparison",
+        "Real conversion data or purchase intent data"
+      ],
+      "labeling_requirement": "The notes field per product must include: 'PRODUCT CONTENT — SYNTHESIS ARTIFACT: Content fields marked as LLM-synthesized are planning-level editorial framings, not verified product claims. product_title reflects the exact Shopify product title. Synthesized content (benefit_bullets, use_cases, objection_handling, trust_elements, faq_items) is derived from available Shopify product data and LLM-synthesized upstream strategic artifacts. Fields marked PLACEHOLDER-REQUIRES-REVIEW require human enrichment before use. Human review is required before any synthesized content is published to a live store.'"
+    },
+
+    "runtime_dependencies": [
+      "n8n Execute Workflow Trigger node — receives subworkflow call from master orchestrator",
+      "n8n Code node (JavaScript) — for input validation, constraint extraction, data quality assessment, prompt building, response parsing, hard-constraint enforcement, and schema validation",
+      "n8n OpenAI node OR HTTP Request node (OpenAI API) — for LLM product content synthesis (iterates per product)",
+      "n8n GitHub node OR Write File node — for persisting product-content.json files",
+      "ajv (Ajv JSON Schema Validator) — for schema validation inside Code node",
+      "schemas/product-content.schema.json — must be accessible to the validation step",
+      "OpenAI API credential — stored in n8n, never in Git",
+      "import-shopify-data, build-store-profile, build-market-intelligence, build-brand-positioning, and build-design-system must all complete successfully before this workflow runs"
+    ]
+  }
+}

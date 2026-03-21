@@ -1,145 +1,145 @@
 {
-“$schema”: “https://json-schema.org/draft/2020-12/schema”,
-“$id”: “https://example.com/schemas/collection-navigation.schema.json”,
-“title”: “Collection Navigation Schema”,
-“description”: “Schema for collection-level navigation logic inside store-os”,
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“collection_id”,
-“navigation_role”,
-“visibility_level”,
-“parent_relation”,
-“homepage_support”,
-“cross_links”
+"$schema": "https://json-schema.org/draft/2020-12/schema",
+"$id": "https://example.com/schemas/collection-navigation.schema.json",
+"title": "Collection Navigation Schema",
+"description": "Schema for collection-level navigation logic inside store-os",
+"type": "object",
+"additionalProperties": false,
+"required": [
+"collection_id",
+"navigation_role",
+"visibility_level",
+"parent_relation",
+"homepage_support",
+"cross_links"
 ],
-“properties”: {
-“collection_id”: {
-“type”: “string”,
-“minLength”: 1,
-“pattern”: “^[a-z0-9-]+$”
+"properties": {
+"collection_id": {
+"type": "string",
+"minLength": 1,
+"pattern": "^[a-z0-9-]+$"
 },
-“navigation_role”: {
-“type”: “string”,
-“enum”: [
-“primary-navigation”,
-“secondary-navigation”,
-“supporting-navigation”,
-“landing-page”,
-“hybrid”
+"navigation_role": {
+"type": "string",
+"enum": [
+"primary-navigation",
+"secondary-navigation",
+"supporting-navigation",
+"landing-page",
+"hybrid"
 ]
 },
-“visibility_level”: {
-“type”: “string”,
-“enum”: [
-“high”,
-“medium”,
-“low”
+"visibility_level": {
+"type": "string",
+"enum": [
+"high",
+"medium",
+"low"
 ]
 },
-“parent_relation”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“has_parent”,
-“has_children”
+"parent_relation": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"has_parent",
+"has_children"
 ],
-“properties”: {
-“has_parent”: {
-“type”: “boolean”
+"properties": {
+"has_parent": {
+"type": "boolean"
 },
-“parent_collection_id”: {
-“type”: “string”,
-“pattern”: “^[a-z0-9-]+$”
+"parent_collection_id": {
+"type": "string",
+"pattern": "^[a-z0-9-]+$"
 },
-“has_children”: {
-“type”: “boolean”
+"has_children": {
+"type": "boolean"
 },
-“child_collection_ids”: {
-“type”: “array”,
-“items”: {
-“type”: “string”,
-“pattern”: “^[a-z0-9-]+$”
+"child_collection_ids": {
+"type": "array",
+"items": {
+"type": "string",
+"pattern": "^[a-z0-9-]+$"
 }
 }
 }
 },
-“homepage_support”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“featured_on_homepage”,
-“homepage_priority”
+"homepage_support": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"featured_on_homepage",
+"homepage_priority"
 ],
-“properties”: {
-“featured_on_homepage”: {
-“type”: “boolean”
+"properties": {
+"featured_on_homepage": {
+"type": "boolean"
 },
-“homepage_priority”: {
-“type”: “string”,
-“enum”: [
-“none”,
-“low”,
-“medium”,
-“high”
+"homepage_priority": {
+"type": "string",
+"enum": [
+"none",
+"low",
+"medium",
+"high"
 ]
 }
 }
 },
-“cross_links”: {
-“type”: “array”,
-“items”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“target_type”,
-“reason”
+"cross_links": {
+"type": "array",
+"items": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"target_type",
+"reason"
 ],
-“properties”: {
-“target_type”: {
-“type”: “string”,
-“enum”: [
-“homepage”,
-“collection”,
-“product”,
-“guide-page”,
-“faq-page”,
-“blog-article”,
-“page”
+"properties": {
+"target_type": {
+"type": "string",
+"enum": [
+"homepage",
+"collection",
+"product",
+"guide-page",
+"faq-page",
+"blog-article",
+"page"
 ]
 },
-“target_id”: {
-“type”: “string”,
-“pattern”: “^[a-z0-9-]+$”
+"target_id": {
+"type": "string",
+"pattern": "^[a-z0-9-]+$"
 },
-“reason”: {
-“type”: “string”,
-“minLength”: 1
+"reason": {
+"type": "string",
+"minLength": 1
 },
-“priority”: {
-“type”: “string”,
-“enum”: [
-“low”,
-“medium”,
-“high”
+"priority": {
+"type": "string",
+"enum": [
+"low",
+"medium",
+"high"
 ]
 }
 }
 }
 },
-“menu_group”: {
-“type”: “string”
+"menu_group": {
+"type": "string"
 },
-“footer_visibility”: {
-“type”: “string”,
-“enum”: [
-“none”,
-“supporting”,
-“visible”
+"footer_visibility": {
+"type": "string",
+"enum": [
+"none",
+"supporting",
+"visible"
 ]
 },
-“notes”: {
-“type”: “string”
+"notes": {
+"type": "string"
 }
 }
 }

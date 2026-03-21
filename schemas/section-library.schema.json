@@ -1,194 +1,194 @@
 {
-“$schema”: “https://json-schema.org/draft/2020-12/schema”,
-“$id”: “https://example.com/schemas/section-library.schema.json”,
-“title”: “Section Library Schema”,
-“description”: “Schema for allowed reusable storefront section types inside store-os”,
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“section_type”,
-“section_role”,
-“description”,
-“allowed_pages”,
-“content_requirements”,
-“media_capabilities”,
-“motion_capabilities”,
-“seo_role”,
-“conversion_role”
+"$schema": "https://json-schema.org/draft/2020-12/schema",
+"$id": "https://example.com/schemas/section-library.schema.json",
+"title": "Section Library Schema",
+"description": "Schema for allowed reusable storefront section types inside store-os",
+"type": "object",
+"additionalProperties": false,
+"required": [
+"section_type",
+"section_role",
+"description",
+"allowed_pages",
+"content_requirements",
+"media_capabilities",
+"motion_capabilities",
+"seo_role",
+"conversion_role"
 ],
-“properties”: {
-“section_type”: {
-“type”: “string”,
-“enum”: [
-“hero”,
-“featured-products”,
-“featured-collections”,
-“usp-strip”,
-“trust-proof”,
-“review-section”,
-“comparison-section”,
-“problem-solution”,
-“how-it-works”,
-“video-section”,
-“storytelling-section”,
-“benefit-grid”,
-“faq-preview”,
-“editorial-content”,
-“newsletter”,
-“category-navigation”,
-“social-proof”,
-“brand-story”,
-“cta-banner”,
-“spec-grid”,
-“media-gallery”,
-“before-after”,
-“icon-grid”
+"properties": {
+"section_type": {
+"type": "string",
+"enum": [
+"hero",
+"featured-products",
+"featured-collections",
+"usp-strip",
+"trust-proof",
+"review-section",
+"comparison-section",
+"problem-solution",
+"how-it-works",
+"video-section",
+"storytelling-section",
+"benefit-grid",
+"faq-preview",
+"editorial-content",
+"newsletter",
+"category-navigation",
+"social-proof",
+"brand-story",
+"cta-banner",
+"spec-grid",
+"media-gallery",
+"before-after",
+"icon-grid"
 ]
 },
-“section_role”: {
-“type”: “string”,
-“enum”: [
-“awareness”,
-“conversion”,
-“trust”,
-“navigation”,
-“education”,
-“retention”,
-“storytelling”,
-“hybrid”
+"section_role": {
+"type": "string",
+"enum": [
+"awareness",
+"conversion",
+"trust",
+"navigation",
+"education",
+"retention",
+"storytelling",
+"hybrid"
 ]
 },
-“description”: {
-“type”: “string”,
-“minLength”: 1
+"description": {
+"type": "string",
+"minLength": 1
 },
-“allowed_pages”: {
-“type”: “array”,
-“minItems”: 1,
-“items”: {
-“type”: “string”,
-“enum”: [
-“homepage”,
-“product-page”,
-“collection-page”,
-“page”,
-“article”,
-“blog-index”,
-“cart”
+"allowed_pages": {
+"type": "array",
+"minItems": 1,
+"items": {
+"type": "string",
+"enum": [
+"homepage",
+"product-page",
+"collection-page",
+"page",
+"article",
+"blog-index",
+"cart"
 ]
 }
 },
-“content_requirements”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“headline_required”,
-“body_required”,
-“cta_allowed”
+"content_requirements": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"headline_required",
+"body_required",
+"cta_allowed"
 ],
-“properties”: {
-“headline_required”: {
-“type”: “boolean”
+"properties": {
+"headline_required": {
+"type": "boolean"
 },
-“body_required”: {
-“type”: “boolean”
+"body_required": {
+"type": "boolean"
 },
-“cta_allowed”: {
-“type”: “boolean”
+"cta_allowed": {
+"type": "boolean"
 },
-“faq_allowed”: {
-“type”: “boolean”
+"faq_allowed": {
+"type": "boolean"
 },
-“structured_content_required”: {
-“type”: “boolean”
+"structured_content_required": {
+"type": "boolean"
 }
 }
 },
-“media_capabilities”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“images_allowed”,
-“video_allowed”,
-“embeds_allowed”,
-“fallback_required_if_media_used”
+"media_capabilities": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"images_allowed",
+"video_allowed",
+"embeds_allowed",
+"fallback_required_if_media_used"
 ],
-“properties”: {
-“images_allowed”: {
-“type”: “boolean”
+"properties": {
+"images_allowed": {
+"type": "boolean"
 },
-“video_allowed”: {
-“type”: “boolean”
+"video_allowed": {
+"type": "boolean"
 },
-“embeds_allowed”: {
-“type”: “boolean”
+"embeds_allowed": {
+"type": "boolean"
 },
-“fallback_required_if_media_used”: {
-“type”: “boolean”
+"fallback_required_if_media_used": {
+"type": "boolean"
 }
 }
 },
-“motion_capabilities”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“scroll_motion_allowed”,
-“interaction_motion_allowed”,
-“motion_should_be_subtle”
+"motion_capabilities": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"scroll_motion_allowed",
+"interaction_motion_allowed",
+"motion_should_be_subtle"
 ],
-“properties”: {
-“scroll_motion_allowed”: {
-“type”: “boolean”
+"properties": {
+"scroll_motion_allowed": {
+"type": "boolean"
 },
-“interaction_motion_allowed”: {
-“type”: “boolean”
+"interaction_motion_allowed": {
+"type": "boolean"
 },
-“motion_should_be_subtle”: {
-“type”: “boolean”
+"motion_should_be_subtle": {
+"type": "boolean"
 }
 }
 },
-“seo_role”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“supports_indexable_text”,
-“supports_internal_linking”
+"seo_role": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"supports_indexable_text",
+"supports_internal_linking"
 ],
-“properties”: {
-“supports_indexable_text”: {
-“type”: “boolean”
+"properties": {
+"supports_indexable_text": {
+"type": "boolean"
 },
-“supports_internal_linking”: {
-“type”: “boolean”
+"supports_internal_linking": {
+"type": "boolean"
 },
-“supports_keyword_targeting”: {
-“type”: “boolean”
+"supports_keyword_targeting": {
+"type": "boolean"
 }
 }
 },
-“conversion_role”: {
-“type”: “object”,
-“additionalProperties”: false,
-“required”: [
-“supports_cta”,
-“supports_trust”,
-“supports_objection_handling”
+"conversion_role": {
+"type": "object",
+"additionalProperties": false,
+"required": [
+"supports_cta",
+"supports_trust",
+"supports_objection_handling"
 ],
-“properties”: {
-“supports_cta”: {
-“type”: “boolean”
+"properties": {
+"supports_cta": {
+"type": "boolean"
 },
-“supports_trust”: {
-“type”: “boolean”
+"supports_trust": {
+"type": "boolean"
 },
-“supports_objection_handling”: {
-“type”: “boolean”
+"supports_objection_handling": {
+"type": "boolean"
 }
 }
 },
-“notes”: {
-“type”: “string”
+"notes": {
+"type": "string"
 }
 }
 }

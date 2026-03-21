@@ -1,0 +1,636 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. The AEO strategy output is a planning artifact — not validated answer-engine analytics, not a confirmed featured-snippet performance baseline, and not a finalized answer optimization plan. All strategic directions produced here are planning-level hypotheses informed by available store context, market intelligence, and provisional SEO and FAQ artifacts. Human review is required before any AEO strategy artifact is used to make production content decisions.",
+    "ordering_context_note": "IMPORTANT — ORDERING CONTEXT: In the intended workflow chain, build-aeo-strategy is step 12 — designed to run immediately after build-seo-strategy (step 11) and before product-seo (step 14), collection-seo (step 18), and page-seo (step 21). However, Phase 8 implements build-aeo-strategy after Phases 4-7 have already produced provisional product-seo, collection-seo, page-seo, faq-page, and seo-strategy artifacts. As a result, this workflow has access to richer upstream context than it would have had in ideal chain order. This is a documented architecture constraint — not a workflow error. The richer input set means the AEO strategy can be more precisely calibrated to the actual artifact landscape, but the output must still be explicitly provisional and must not claim to reflect real answer-engine analytics.",
+    "aeo_boundary_note": "IMPORTANT — AEO IS NOT SEO: This workflow intentionally does not redefine SEO strategy. build-seo-strategy (step 11, Phase 7) already produced seo-strategy.json. AEO strategy (this workflow) builds on top of the SEO foundation and defines how the store targets answer engine visibility — question taxonomy, answer format strategy, entity clarity direction, and FAQ schema prioritization. These are complementary but distinct from SEO strategy. This workflow must not contradict or override seo-strategy.json decisions. If a conflict is detected, the AEO strategy must flag it and defer to the SEO strategy as the foundational layer.",
+    "answer_engine_uncertainty_note": "IMPORTANT — NO REAL ANSWER-ENGINE ANALYTICS: This workflow has no access to real answer-engine impression data, LLM referral analytics, featured snippet performance data, or Google Search Console query reports. All AEO direction is a planning hypothesis derived from: available question signals in faq-page artifacts, market intelligence buyer question patterns, and SEO strategy direction. The output must not claim certainty about which content will surface in answer engines. All directions are planning-level hypotheses.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/aeo-strategy.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-aeo-strategy",
+    "name": "build-aeo-strategy",
+    "category": "planning",
+    "phase": "Phase 8 — AEO Strategy, Internal Linking, and Structured Data Planning",
+    "purpose": "Synthesize a schema-validated store-level AEO (Answer Engine Optimization) strategy artifact from the available SEO strategy, FAQ content, market intelligence, brand positioning, and provisional SEO artifacts. The aeo-strategy.json output defines: primary AEO goal (product-understanding, category-understanding, comparison-readiness, trust-and-reassurance, or hybrid), answer style (clarity level, length, semantic directness), FAQ strategy (intensity, distribution, schema priority), entity clarity direction (brand, product, and category entity clarity levels), question coverage strategy (what/why/how/comparison question intensity), page priority for AEO investment, and structured answer block priorities. This strategy is the store-level AEO planning framework that enables: (1) consistent question-answer planning across all page types, (2) FAQ schema prioritization decisions, (3) entity clarity improvement direction, and (4) answer format guidance for content creation. All outputs are planning-level hypotheses — not validated answer-engine analytics, not featured snippet performance predictions, not confirmed AEO plans.",
+
+    "aeo_vs_seo_boundary": "AEO strategy (this workflow) defines how the store targets answer engine visibility — question taxonomy, answer format, entity clarity, and FAQ schema priority. SEO strategy (build-seo-strategy, step 11, Phase 7) defines how the store targets search engine discovery through keyword families, content roles, and linking posture. AEO builds on top of SEO: the seo-strategy.json output is a required input that this workflow must not contradict. Where SEO strategy defines content depth and page priority, AEO strategy defines how that content should be structured and phrased to support answer engine surfacing.",
+
+    "inputs": {
+      "from_seo_strategy": {
+        "source": "build-seo-strategy → seo-strategy.json",
+        "artifact_path": "projects/{project_id}/seo-strategy.json",
+        "data_treatment": "FOUNDATIONAL SEO LAYER — seo-strategy.json provides the SEO foundation that AEO strategy must build upon and must not contradict. AEO page_priority should align with seo-strategy page_priority unless a specific AEO rationale justifies divergence.",
+        "fields_used": [
+          {
+            "field": "primary_seo_goal",
+            "treatment": "AEO GOAL CALIBRATION — the SEO goal informs which AEO goal is most coherent. transactional-growth → product-understanding or comparison-readiness. category-discovery → category-understanding. knowledge-plus-commerce → trust-and-reassurance or hybrid. brand-plus-category-growth → hybrid.",
+            "note": "AEO goal should be coherent with, not identical to, the SEO goal. They serve different discovery mechanisms."
+          },
+          {
+            "field": "knowledge_seo_role",
+            "treatment": "FAQ AND CONTENT DEPTH SIGNAL — knowledge_seo_role from SEO strategy directly constrains faq_strategy.faq_intensity. none → light AEO investment. supporting → balanced faq_intensity. balanced or major → strong faq_intensity.",
+            "note": "This is the most direct seo-strategy → aeo-strategy signal. Do not set faq_intensity higher than knowledge_seo_role supports."
+          },
+          {
+            "field": "page_priority",
+            "treatment": "AEO PAGE PRIORITY ALIGNMENT — AEO page_priority should default to the same ordering as seo-strategy page_priority unless AEO-specific reasoning justifies a reordering. FAQ pages may rank higher in AEO priority than in SEO priority if the market has high question-based search behavior.",
+            "note": "Reordering is allowed with explicit justification in the notes field. Silent deviation from seo-strategy page_priority is not permitted."
+          },
+          {
+            "field": "structured_data_priority",
+            "treatment": "STRUCTURED ANSWER SEED — seo-strategy structured_data_priority list (if present) seeds the AEO structured_answer_priority. faq in seo-strategy structured_data_priority → faq-blocks in AEO structured_answer_priority.",
+            "note": "structured_data_priority in seo-strategy is a planning direction signal — detailed structured data decisions are made in build-structured-data-plan (step 24)."
+          },
+          {
+            "field": "internal_linking_strategy.knowledge_to_commerce_links",
+            "treatment": "KNOWLEDGE LINK SIGNAL — if knowledge_to_commerce_links = true in seo-strategy, AEO strategy should reflect this in contextual_linking direction for the downstream build-internal-linking workflow.",
+            "note": "AEO strategy does not define internal linking — that is build-internal-linking scope. But AEO strategy notes should flag this direction for the linking workflow."
+          }
+        ]
+      },
+
+      "from_faq_page": {
+        "source": "build-faq-page → faq-page.json",
+        "artifact_path": "projects/{project_id}/faq-page.json",
+        "data_treatment": "PRIMARY QUESTION TAXONOMY LAYER — the faq-page artifact provides the richest available signal for what question families exist in this store's market and how they should be answered. It is the most direct input for AEO question coverage strategy.",
+        "fields_used": [
+          {
+            "field": "questions",
+            "treatment": "QUESTION FAMILY ANALYSIS — analyze the question set for: (1) dominant question type distribution (what / why / how / comparison questions). (2) Question complexity distribution (simple factual vs nuanced explanatory). (3) Topic distribution across product, trust, process, and comparison topics. This analysis directly informs question_coverage_strategy.",
+            "note": "faq-page questions are planning-level question hypotheses — not validated search query data. They represent the content author's best planning intent, not confirmed buyer question volume."
+          },
+          {
+            "field": "faq_intensity",
+            "treatment": "DIRECT AEO INTENSITY INPUT — faq-page.faq_intensity is the strongest single signal for aeo-strategy.faq_strategy.faq_intensity. The AEO strategy should not set faq_intensity lower than what faq-page already demonstrates as implemented.",
+            "note": "If faq-page.faq_intensity = strong and seo-strategy knowledge_seo_role = none, this is a strategy conflict. Flag it in the notes field rather than silently resolving it."
+          },
+          {
+            "field": "answer_style",
+            "treatment": "ANSWER STYLE ALIGNMENT — if faq-page includes answer style or tone guidance, the AEO answer_style should be consistent with it. AEO strategy defines the store-level answer style norm that individual FAQ pages should follow.",
+            "note": "Answer style is the AEO equivalent of brand voice for content — it constrains how answers are written, not what topics they cover."
+          },
+          {
+            "field": "schema_markup_intent",
+            "treatment": "FAQ SCHEMA SIGNAL — if faq-page indicates schema markup intent (e.g. faq_schema_priority = high), AEO strategy should align faq_strategy.faq_schema_priority accordingly.",
+            "note": "Optional field — may be absent from some faq-page artifacts. Default to medium if absent and faq_intensity is strong."
+          }
+        ]
+      },
+
+      "from_market_intelligence": {
+        "source": "build-market-intelligence → market-intelligence.json",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "data_treatment": "BUYER QUESTION PATTERN LAYER — market intelligence provides the best available planning proxy for what question types buyers ask in this market, in the absence of real search-console or LLM referral query data.",
+        "fields_used": [
+          {
+            "field": "search_intents",
+            "treatment": "QUESTION TYPE SIGNAL — informational intents with example queries → what/how questions are likely buyer patterns. Comparison intents → comparison question coverage. Trust/review considerations → why and reassurance questions. The distribution of intent types informs question_coverage_strategy intensity levels.",
+            "note": "search_intents are the primary planning proxy for buyer question patterns. They are not confirmed question volume data. Use as directional planning signals."
+          },
+          {
+            "field": "search_intents[].example_queries",
+            "treatment": "QUESTION VOCABULARY SIGNAL — example queries within informational intents reveal the actual vocabulary buyers use when asking questions. These inform what_questions and how_questions coverage intensity.",
+            "note": "Example queries are illustrative planning proxies — not confirmed search volume data."
+          },
+          {
+            "field": "trust_factors",
+            "treatment": "TRUST ANSWER PRIORITY SIGNAL — markets where trust is a primary purchase driver require strong trust answer coverage. High trust_factors → trust_answer_priority = strong. Low trust_factors → trust_answer_priority = light.",
+            "note": "trust_answer_priority is an optional schema field but is important for high-consideration purchase markets."
+          },
+          {
+            "field": "content_opportunities",
+            "treatment": "ANSWER DEPTH SIGNAL — rich content opportunities indicate that buyers want detailed explanatory content, not just product specs. This informs answer_style.answer_length and question_coverage_strategy depth.",
+            "note": "content_opportunities richness correlates with answer_length = detailed in markets where buyers value education."
+          }
+        ]
+      },
+
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "data_treatment": "BRAND VOICE AND CLARITY LAYER — brand positioning constrains how answers should be written (tone, semantic directness, clarity level) and which entity clarity priorities are most strategically important.",
+        "fields_used": [
+          {
+            "field": "brand_role",
+            "treatment": "ANSWER STYLE SHAPE — brand_role informs semantic_directness and clarity_level. specialist or problem-solver → high semantic_directness, very-clear. editorial-guide → balanced or more-expressive. value-leader → very-clear, short answers.",
+            "note": "answer_style should be consistent with brand voice — AEO is not a license to diverge from brand personality."
+          },
+          {
+            "field": "tone_of_voice",
+            "treatment": "ANSWER TONE CONSTRAINT — brand tone of voice constrains clarity_level and semantic_directness. A formal, authoritative tone → very-clear + high semantic directness. A warm, conversational tone → balanced or more-expressive.",
+            "note": "Tone of voice is a hard constraint — AEO answer style must stay within brand voice guardrails."
+          },
+          {
+            "field": "differentiators",
+            "treatment": "ENTITY CLARITY SIGNAL — brand differentiators that depend on clear product or category understanding drive entity clarity requirements up. If a differentiator requires the buyer to understand what makes this product category special → category_entity_clarity = high or critical.",
+            "note": "Entity clarity strategy determines how much effort should go into clearly defining brand, product, and category entities in content — not just schema markup."
+          },
+          {
+            "field": "forbidden_impressions",
+            "treatment": "ANSWER CONTENT EXCLUSION — any impressions the brand explicitly forbids must not appear in AEO answer framing. Strategy must not propose answer formats or question types that would create forbidden impressions.",
+            "note": "Hard exclusion — applies to answer style and question type framing."
+          }
+        ]
+      },
+
+      "from_product_seo_artifacts": {
+        "source": "build-product-seo → product-seo.json (per product, provisional)",
+        "artifact_path": "projects/{project_id}/product-seo/{product_handle}.json",
+        "data_treatment": "ENTITY CLARITY GAP ANALYSIS — provisional product-seo artifacts are analyzed as a pattern set to understand entity clarity gaps. High entity clarity gap rates in product-seo artifacts → product_entity_clarity should be set to high or critical in AEO strategy.",
+        "availability": "AVAILABLE FROM PHASE 5 — product-seo artifacts were generated provisionally in Phase 5. When available, they provide the most direct signal for entity clarity gaps at the product level.",
+        "pattern_analysis": {
+          "entity_clarity_gap_rate": "What percentage of product-seo artifacts have entity_clarity gaps (product_type_clear = false OR brand_relation_clear = false)? High gap rate → product_entity_clarity = critical in AEO strategy.",
+          "primary_aeo_intent_signal": "Do product-seo artifacts show predominantly transactional intent (→ product-understanding primary AEO goal) or commercial/comparison intent (→ comparison-readiness)?"
+        },
+        "note": "Product-seo pattern analysis is used to calibrate entity clarity and AEO goal direction only. Individual product-seo decisions are not changed in this workflow."
+      },
+
+      "from_collection_seo_artifacts": {
+        "source": "build-collection-seo → collection-seo.json (per collection, provisional)",
+        "artifact_path": "projects/{project_id}/collection-seo/{collection_handle}.json",
+        "data_treatment": "CATEGORY ENTITY CLARITY ANALYSIS — provisional collection-seo artifacts are analyzed to understand category-level entity clarity. High sparse collection rate → category_entity_clarity may need to be high to compensate for thin category definition.",
+        "availability": "AVAILABLE FROM PHASE 6 — collection-seo artifacts were generated provisionally in Phase 6.",
+        "pattern_analysis": {
+          "category_entity_clarity_gap_rate": "What percentage of collection-seo artifacts have category entity clarity flags? Informs category_entity_clarity in AEO strategy.",
+          "page_role_distribution": "Predominance of category-entry-page → category-understanding AEO goal is supported."
+        },
+        "note": "Collection-seo pattern analysis is a calibration input only. Individual collection-seo decisions are not changed in this workflow."
+      },
+
+      "from_page_seo_artifacts": {
+        "source": "build-page-seo → page-seo.json (per page, provisional)",
+        "artifact_path": "projects/{project_id}/page-seo/{page_handle}.json",
+        "data_treatment": "PAGE-LEVEL AEO CONTEXT — page-seo artifacts may include informational pages (guides, about, policy pages) that have direct AEO relevance. Guide pages with strong content depth → AEO structured_answer_priority should include how-it-works-blocks and problem-solution-blocks.",
+        "availability": "AVAILABLE FROM PHASE 7 — page-seo artifacts were generated in Phase 7.",
+        "note": "Page-seo pattern analysis is a secondary signal for structured_answer_priority calibration. Not all page-seo artifacts are AEO-relevant."
+      }
+    },
+
+    "outputs": {
+      "primary_output": "aeo-strategy.json",
+      "artifact_path": "projects/{project_id}/aeo-strategy.json",
+      "schema": "schemas/aeo-strategy.schema.json",
+      "output_fields": {
+        "strategy_name": {
+          "source": "LLM synthesis — a human-readable name for this store's AEO strategy",
+          "type": "LLM-synthesized string",
+          "format_guidance": "Recommended pattern: '[Store Vertical] AEO Strategy — [Primary Goal]'. Example: 'Sustainable Apparel AEO Strategy — Trust and Reassurance'. Should reflect the actual store type and AEO direction — not a generic template name.",
+          "note": "strategy_name is a planning label for human orientation — it is not used computationally downstream."
+        },
+        "primary_aeo_goal": {
+          "source": "Derived from seo-strategy.primary_seo_goal + faq-page question taxonomy + market_intelligence.search_intents + product-seo entity clarity gaps",
+          "type": "constrained enum",
+          "schema_enum": ["product-understanding", "category-understanding", "comparison-readiness", "trust-and-reassurance", "hybrid"],
+          "derivation_logic": {
+            "product-understanding": "Store's primary AEO opportunity is to help buyers understand what its products are and how they work. Appropriate when: transactional-growth SEO goal + product-type keyword focus + low product entity clarity in provisional artifacts.",
+            "category-understanding": "Store's primary AEO opportunity is to help buyers understand the product category — what it is, why it matters, how to choose. Appropriate when: category-discovery SEO goal + informational search intent dominance + weak category entity clarity.",
+            "comparison-readiness": "Store's primary AEO opportunity is to help buyers who are comparing options choose this store's products. Appropriate when: comparison keyword focus in SEO strategy + high comparison intent in market intelligence + strong brand differentiators.",
+            "trust-and-reassurance": "Store's primary AEO opportunity is to answer trust and credibility questions. Appropriate when: high trust_factors in market + premium price positioning + knowledge-plus-commerce SEO goal.",
+            "hybrid": "Multiple AEO goals are meaningfully present and cannot be reduced to a single primary. Use when two or more goals are closely balanced."
+          },
+          "note": "primary_aeo_goal is the most important output field — it anchors all downstream AEO decisions. Choose honestly based on available signals."
+        },
+        "answer_style": {
+          "clarity_level": {
+            "source": "Derived from brand_positioning.brand_role + brand_positioning.tone_of_voice",
+            "type": "constrained enum",
+            "schema_enum": ["very-clear", "balanced", "more-expressive"],
+            "derivation_logic": {
+              "very-clear": "Specialist, problem-solver, or value-leader brand role. Buyers want direct, unambiguous answers. Appropriate for technical products, value-focused stores, or high-consideration purchases where clarity is trust.",
+              "balanced": "Most stores. A mix of clear information and brand personality. Appropriate for brands with a defined but not extreme voice.",
+              "more-expressive": "Editorial-guide or curated-collection brand role. Brand voice is a meaningful differentiator. Appropriate when buyers value storytelling and style alongside information."
+            }
+          },
+          "answer_length": {
+            "source": "Derived from market_intelligence.content_opportunities richness + market_intelligence.trust_factors + primary_aeo_goal",
+            "type": "constrained enum",
+            "schema_enum": ["short", "balanced", "detailed"],
+            "derivation_logic": {
+              "short": "Transactional market with high commercial or transactional intent. Buyers know what they want and need brief, direct answers. Verbose content would not serve the buyer journey.",
+              "balanced": "Most stores. A mix of factual and explanatory content. Direct answers with enough context to build confidence.",
+              "detailed": "High-consideration purchase markets, editorial brands, or trust-driven markets. Buyers want thorough answers before committing. Appropriate when trust_factors are high or content_opportunities are rich."
+            }
+          },
+          "semantic_directness": {
+            "source": "Derived from brand_positioning.tone_of_voice + primary_aeo_goal",
+            "type": "constrained enum",
+            "schema_enum": ["high", "balanced", "soft"],
+            "derivation_logic": {
+              "high": "Answers lead with the direct fact or recommendation. Appropriate for comparison-readiness or product-understanding goals where buyers want immediate clarity.",
+              "balanced": "Answers lead with context before the conclusion. Appropriate for most stores.",
+              "soft": "Answers build context before reaching a conclusion. Appropriate for trust-and-reassurance goals where reassurance requires nuance and warmth."
+            }
+          }
+        },
+        "faq_strategy": {
+          "faq_intensity": {
+            "source": "Derived from seo-strategy.knowledge_seo_role + faq-page.faq_intensity",
+            "type": "constrained enum",
+            "schema_enum": ["light", "balanced", "strong"],
+            "derivation_logic": {
+              "light": "knowledge_seo_role = none or faq-page faq_intensity = light. Minimal FAQ investment. A few core buyer questions are addressed but FAQ is not a strategic AEO channel.",
+              "balanced": "knowledge_seo_role = supporting or balanced. FAQ content is a meaningful AEO investment but is secondary to commerce pages.",
+              "strong": "knowledge_seo_role = major or faq_intensity = strong in faq-page. FAQ content is a primary AEO channel. Schema markup and question coverage are high priorities."
+            }
+          },
+          "faq_distribution": {
+            "source": "Derived from seo-strategy.page_priority + product_seo entity clarity gap analysis + collection_seo pattern analysis",
+            "type": "constrained enum",
+            "schema_enum": ["product-heavy", "collection-heavy", "knowledge-heavy", "balanced"],
+            "derivation_logic": {
+              "product-heavy": "product-pages are the highest page_priority in seo-strategy. Product entity clarity gaps are present. FAQ content should concentrate on product-level questions.",
+              "collection-heavy": "collection-pages are the highest page_priority in seo-strategy. Category understanding gaps are present. FAQ should concentrate on category-level questions.",
+              "knowledge-heavy": "guide-pages or faq-pages are primary in seo-strategy. knowledge_seo_role = major. Standalone FAQ and guide content is the primary AEO investment.",
+              "balanced": "Multiple page types share AEO importance. FAQ content is spread across product, collection, and knowledge pages."
+            }
+          },
+          "faq_schema_priority": {
+            "source": "Derived from faq-page schema markup intent + seo-strategy.structured_data_priority",
+            "type": "constrained enum",
+            "schema_enum": ["low", "medium", "high"],
+            "derivation_logic": {
+              "high": "faq is in seo-strategy.structured_data_priority AND faq-page signals strong schema intent. FAQ schema markup is a high-priority implementation target.",
+              "medium": "faq intent is moderate. FAQ schema markup is planned but not the highest priority.",
+              "low": "knowledge_seo_role = none or faq_intensity = light. FAQ schema markup is a low-priority or deferred implementation item."
+            }
+          }
+        },
+        "entity_clarity_strategy": {
+          "brand_entity_clarity": {
+            "source": "Derived from brand_positioning.brand_role + market_intelligence (brand awareness signals) + seo-strategy primary_seo_goal",
+            "type": "constrained enum",
+            "schema_enum": ["medium", "high", "critical"],
+            "derivation_logic": {
+              "critical": "New or growing brand with low search footprint. Buyers may not know the brand exists or what it stands for. Brand entity must be clearly established in all content and structured data.",
+              "high": "Growing or established brand with some search presence. Brand entity clarity is an important AEO priority but not the most critical gap.",
+              "medium": "Established or mature brand with strong brand entity in search. Brand clarity is maintained, not urgently built."
+            }
+          },
+          "product_entity_clarity": {
+            "source": "Derived from product_seo entity clarity gap rate + primary_aeo_goal",
+            "type": "constrained enum",
+            "schema_enum": ["medium", "high", "critical"],
+            "derivation_logic": {
+              "critical": "High entity clarity gap rate in product-seo artifacts. Many products have unclear product_type or brand_relation. product-understanding AEO goal is set.",
+              "high": "Moderate entity clarity gaps. Product-level clarity is important but gaps are not widespread.",
+              "medium": "Low entity clarity gap rate. Products are generally well-defined in their provisional SEO artifacts."
+            }
+          },
+          "category_entity_clarity": {
+            "source": "Derived from collection_seo pattern analysis + primary_aeo_goal + market_intelligence content_opportunities",
+            "type": "constrained enum",
+            "schema_enum": ["medium", "high", "critical"],
+            "derivation_logic": {
+              "critical": "category-understanding primary AEO goal. Significant category entity gaps in collection-seo artifacts. Buyers need clear category definitions to understand the store's offer.",
+              "high": "Category-discovery SEO goal. Some category clarity gaps. Category entity work is a meaningful AEO investment.",
+              "medium": "Category entities are reasonably clear from available artifacts. No significant gaps detected."
+            }
+          }
+        },
+        "question_coverage_strategy": {
+          "what_questions": {
+            "source": "Derived from primary_aeo_goal + product entity clarity + faq-page question taxonomy",
+            "type": "constrained enum",
+            "schema_enum": ["light", "balanced", "strong"],
+            "derivation_logic": {
+              "strong": "product-understanding or category-understanding AEO goal. High entity clarity gaps. What-is, what-does, what-type questions are the primary AEO opportunity.",
+              "balanced": "Most stores. What questions are a meaningful but not dominant AEO investment.",
+              "light": "trust-and-reassurance AEO goal where buyers already understand what the product is and primarily need reassurance."
+            }
+          },
+          "why_questions": {
+            "source": "Derived from trust_answer_priority + brand differentiators + market trust_factors",
+            "type": "constrained enum",
+            "schema_enum": ["light", "balanced", "strong"],
+            "derivation_logic": {
+              "strong": "trust-and-reassurance AEO goal OR high trust_factors in market. Why-choose, why-this-brand, why-this-price questions are primary trust and differentiation signals.",
+              "balanced": "Standard investment. Why questions reinforce differentiators and trust.",
+              "light": "Simple transactional market. Buyers do not typically question the why before buying in this category."
+            }
+          },
+          "how_questions": {
+            "source": "Derived from brand_positioning.brand_role + market content_opportunities + faq-page how-to question presence",
+            "type": "constrained enum",
+            "schema_enum": ["light", "balanced", "strong"],
+            "derivation_logic": {
+              "strong": "problem-solver or editorial-guide brand role. Rich content_opportunities signal in market intelligence. How-to, how-does-it-work, how-do-I questions are primary AEO opportunities.",
+              "balanced": "Some how-to or process content is meaningful. Standard investment.",
+              "light": "Product is simple or self-explanatory. How questions are a minor AEO investment."
+            }
+          },
+          "comparison_questions": {
+            "source": "Derived from primary_aeo_goal + market_intelligence comparison intent + seo-strategy keyword_focus.primary_keyword_type",
+            "type": "constrained enum",
+            "schema_enum": ["light", "balanced", "strong"],
+            "derivation_logic": {
+              "strong": "comparison-readiness AEO goal OR comparison intent dominant in market_intelligence OR comparison is primary keyword type in seo-strategy. vs-competitor, which-is-better, compare-X-to-Y questions are primary AEO opportunities.",
+              "balanced": "Some comparison behavior in the market but not dominant.",
+              "light": "Market shows minimal comparison behavior. Buyers are loyal or trust-driven, not comparison shoppers."
+            }
+          }
+        },
+        "page_priority": {
+          "source": "Derived from seo-strategy.page_priority (primary alignment) + primary_aeo_goal (adjustment signal)",
+          "type": "ordered array (minItems: 1) of constrained enum values",
+          "schema_enum": ["homepage", "product-pages", "collection-pages", "guide-pages", "faq-pages", "blog-articles"],
+          "ordering_logic": "Default to the same ordering as seo-strategy.page_priority. Adjust only when a specific AEO rationale exists: e.g. if primary_aeo_goal = trust-and-reassurance, faq-pages may rank higher in AEO priority than in SEO priority. If an adjustment is made, document the rationale in the notes field.",
+          "note": "AEO page priority determines where AEO content investment (question coverage, schema markup, answer format) should be concentrated first."
+        },
+        "structured_answer_priority": {
+          "source": "Derived from primary_aeo_goal + question_coverage_strategy + page_priority + faq-page artifact",
+          "type": "array of constrained enum values",
+          "schema_enum": ["faq-blocks", "comparison-blocks", "how-it-works-blocks", "problem-solution-blocks", "entity-definitions", "spec-summaries"],
+          "derivation_logic": {
+            "faq-blocks": "Include when faq_strategy.faq_intensity = balanced or strong. FAQ blocks are the primary structured answer format.",
+            "comparison-blocks": "Include when primary_aeo_goal = comparison-readiness OR comparison_questions = strong.",
+            "how-it-works-blocks": "Include when how_questions = strong OR brand_role = problem-solver OR editorial-guide.",
+            "problem-solution-blocks": "Include when primary_aeo_goal = trust-and-reassurance OR how_questions = strong AND trust_factors high.",
+            "entity-definitions": "Include when entity_clarity_strategy has any entity at critical level. Defining what products, categories, or the brand ARE is the entity clarity mechanism.",
+            "spec-summaries": "Include when product_entity_clarity = critical or high AND primary_aeo_goal = product-understanding. Spec summaries help answer what-is questions about product attributes."
+          },
+          "note": "structured_answer_priority is an ordered array — the first item is the highest-priority answer block type for AEO investment. Order should reflect where the store has the greatest answer-engine opportunity."
+        },
+        "trust_answer_priority": {
+          "source": "Derived from market_intelligence.trust_factors + primary_aeo_goal + brand_positioning brand_role",
+          "type": "optional constrained enum",
+          "schema_enum": ["light", "balanced", "strong"],
+          "derivation_logic": {
+            "strong": "High trust_factors in market OR primary_aeo_goal = trust-and-reassurance OR high-consideration purchase vertical.",
+            "balanced": "Standard trust level. Trust answers are part of AEO investment but not the primary focus.",
+            "light": "Low trust_factors in market. Transactional category where trust content has limited AEO value."
+          }
+        },
+        "notes": {
+          "source": "Workflow-generated synthesis metadata",
+          "type": "machine-generated string",
+          "required_content": "Must include: synthesis timestamp, strategy version label (e.g. Phase-8-draft), list of inputs used (seo-strategy, faq-page, market-intelligence, brand-positioning, product-seo pattern summary if available, collection-seo pattern summary if available, page-seo pattern summary if available), provisional flag (PROVISIONAL-AEO-STRATEGY: This artifact was synthesized from planning inputs without real answer-engine analytics, featured snippet data, or LLM referral query data. All strategic directions are planning hypotheses and require human review before production content decisions.), answer engine uncertainty note (AEO-NO-ANALYTICS: This strategy does not reflect real answer engine impression data. All AEO directions are planning-level hypotheses based on available buyer signal proxies.), and seo-strategy alignment note (SEO-STRATEGY-ALIGNMENT: This AEO strategy was built on top of seo-strategy.json. Any conflicts between this artifact and seo-strategy.json must be resolved in favor of the SEO strategy unless explicitly justified in this notes field.)."
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-seo-strategy",
+        "provides": ["seo-strategy.json"],
+        "required": true,
+        "note": "seo-strategy.json (step 11, Phase 7) is the foundational SEO context layer required by AEO strategy. Without it, AEO strategy lacks the SEO baseline it must build upon. This workflow cannot run without seo-strategy.json."
+      },
+      {
+        "workflow": "build-faq-page",
+        "provides": ["faq-page.json"],
+        "required": true,
+        "note": "faq-page.json (step 22, Phase 7) provides the primary question taxonomy and FAQ intensity signal. Without it, question_coverage_strategy and faq_strategy cannot be derived with adequate specificity."
+      },
+      {
+        "workflow": "build-market-intelligence",
+        "provides": ["market-intelligence.json"],
+        "required": true,
+        "note": "market-intelligence.json (step 4) provides search intent signals, buyer question patterns, trust factors, and content opportunity richness — all of which are primary AEO calibration inputs."
+      },
+      {
+        "workflow": "build-brand-positioning",
+        "provides": ["brand-positioning.json"],
+        "required": true,
+        "note": "brand-positioning.json (step 5) provides brand role, tone of voice, differentiators, and forbidden impressions — all of which constrain AEO answer style and entity clarity direction."
+      },
+      {
+        "workflow": "build-product-seo",
+        "provides": ["product-seo.json artifacts (per product)"],
+        "required": false,
+        "note": "PHASE 8 CONTEXT: product-seo artifacts from Phase 5 are available as optional pattern inputs for entity clarity gap analysis. When absent, entity clarity levels are derived from market intelligence and brand positioning signals alone."
+      },
+      {
+        "workflow": "build-collection-seo",
+        "provides": ["collection-seo.json artifacts (per collection)"],
+        "required": false,
+        "note": "PHASE 8 CONTEXT: collection-seo artifacts from Phase 6 are available as optional pattern inputs for category entity clarity analysis. When absent, category entity clarity is derived from market intelligence and seo-strategy signals alone."
+      },
+      {
+        "workflow": "build-page-seo",
+        "provides": ["page-seo.json artifacts (per page)"],
+        "required": false,
+        "note": "PHASE 8 CONTEXT: page-seo artifacts from Phase 7 are available as optional inputs for structured_answer_priority calibration. When absent, structured answer priorities are derived from primary_aeo_goal and faq-page artifact alone."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-internal-linking",
+        "receives": ["aeo-strategy.json"],
+        "note": "Workflow step 23 (Phase 8). build-internal-linking uses aeo-strategy entity clarity direction and faq_strategy to inform knowledge-to-commerce contextual linking intensity and faq-to-product and faq-to-collection link rules."
+      },
+      {
+        "workflow": "build-structured-data-plan",
+        "receives": ["aeo-strategy.json"],
+        "note": "Workflow step 24 (Phase 8). build-structured-data-plan uses aeo-strategy.faq_strategy.faq_schema_priority, entity_clarity_strategy, and structured_answer_priority to inform structured data type prioritization and page-type schema mapping."
+      },
+      {
+        "workflow": "run-validation",
+        "receives": ["aeo-strategy.json"],
+        "note": "Out of Phase 8 scope (workflow step 28). Validates aeo-strategy.json against schema and cross-validates AEO strategy alignment with seo-strategy.json and faq-page.json."
+      }
+    ],
+
+    "schema_alignment": {
+      "aeo-strategy.schema.json": {
+        "required_fields_covered": [
+          "strategy_name",
+          "primary_aeo_goal",
+          "answer_style",
+          "faq_strategy",
+          "entity_clarity_strategy",
+          "question_coverage_strategy",
+          "page_priority",
+          "structured_answer_priority"
+        ],
+        "optional_fields_covered": [
+          "trust_answer_priority",
+          "notes"
+        ],
+        "schema_enum_notes": {
+          "primary_aeo_goal": "enum: product-understanding | category-understanding | comparison-readiness | trust-and-reassurance | hybrid",
+          "answer_style.clarity_level": "enum: very-clear | balanced | more-expressive",
+          "answer_style.answer_length": "enum: short | balanced | detailed",
+          "answer_style.semantic_directness": "enum: high | balanced | soft",
+          "faq_strategy.faq_intensity": "enum: light | balanced | strong",
+          "faq_strategy.faq_distribution": "enum: product-heavy | collection-heavy | knowledge-heavy | balanced",
+          "faq_strategy.faq_schema_priority": "enum: low | medium | high",
+          "entity_clarity_strategy.brand_entity_clarity": "enum: medium | high | critical",
+          "entity_clarity_strategy.product_entity_clarity": "enum: medium | high | critical",
+          "entity_clarity_strategy.category_entity_clarity": "enum: medium | high | critical",
+          "question_coverage_strategy.what_questions": "enum: light | balanced | strong",
+          "question_coverage_strategy.why_questions": "enum: light | balanced | strong",
+          "question_coverage_strategy.how_questions": "enum: light | balanced | strong",
+          "question_coverage_strategy.comparison_questions": "enum: light | balanced | strong",
+          "page_priority items": "enum: homepage | product-pages | collection-pages | guide-pages | faq-pages | blog-articles",
+          "structured_answer_priority items": "enum: faq-blocks | comparison-blocks | how-it-works-blocks | problem-solution-blocks | entity-definitions | spec-summaries",
+          "trust_answer_priority": "enum: light | balanced | strong (optional field)"
+        },
+        "validation_note": "aeo-strategy.json is a single-instance artifact (one per store, not per product or collection). All required fields must be present. All enum values must be validated before writing. The schema does not permit additionalProperties."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: seo_strategy (object), faq_page (object), market_intelligence (object), brand_positioning (object). Optional: product_seo_artifacts (array of product-seo.json objects or paths), collection_seo_artifacts (array of collection-seo.json objects or paths), page_seo_artifacts (array of page-seo.json objects or paths). Logs which optional inputs are present — absence is handled gracefully.",
+        "input": "seo_strategy + faq_page + market_intelligence + brand_positioning + optional product_seo_artifacts + optional collection_seo_artifacts + optional page_seo_artifacts",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present and minimally complete. seo_strategy must have: primary_seo_goal, knowledge_seo_role, page_priority, internal_linking_strategy. faq_page must have: questions (non-empty array) or faq_intensity. market_intelligence must have: search_intents. brand_positioning must have: brand_role, tone_of_voice. Set availability flags: has_product_seo_patterns, has_collection_seo_patterns, has_page_seo_patterns. Fail with clear error if required inputs are missing or malformed.",
+        "input": "all inputs",
+        "output": "validated inputs + availability flags or halt error"
+      },
+      {
+        "step": 3,
+        "name": "Extract AEO Context",
+        "type": "Code node (JavaScript)",
+        "description": "Extract and organize the AEO context signals. Produce an aeo_context object containing: (1) SEO FOUNDATION: primary_seo_goal, knowledge_seo_role, page_priority, structured_data_priority, internal_linking_strategy.knowledge_to_commerce_links from seo_strategy. (2) FAQ SIGNALS: question count, faq_intensity, dominant question types, answer style hints from faq_page. (3) MARKET SIGNALS: search_intents array with intent types and example_queries, trust_factors, content_opportunities richness from market_intelligence. (4) BRAND SIGNALS: brand_role, tone_of_voice, differentiators, forbidden_impressions from brand_positioning.",
+        "input": "validated seo_strategy + faq_page + market_intelligence + brand_positioning",
+        "output": "aeo_context object"
+      },
+      {
+        "step": 4,
+        "name": "Analyze Product SEO Entity Clarity Patterns (if available)",
+        "type": "Code node (JavaScript)",
+        "description": "If has_product_seo_patterns = true: load all product-seo artifacts. Compute: entity_clarity_gap_rate (percentage with product_type_clear = false OR brand_relation_clear = false), dominant_search_intent_type (transactional vs commercial vs informational), sparse_rate. If has_product_seo_patterns = false: set product_entity_analysis = null and log absence.",
+        "input": "product_seo_artifacts (if available)",
+        "output": "product_entity_analysis object or null"
+      },
+      {
+        "step": 5,
+        "name": "Analyze Collection SEO Category Clarity Patterns (if available)",
+        "type": "Code node (JavaScript)",
+        "description": "If has_collection_seo_patterns = true: load all collection-seo artifacts. Compute: page_role_distribution, empty_sparse_rate, category_entity_clarity_gaps (any flags indicating unclear category definition). If has_collection_seo_patterns = false: set collection_entity_analysis = null and log absence.",
+        "input": "collection_seo_artifacts (if available)",
+        "output": "collection_entity_analysis object or null"
+      },
+      {
+        "step": 6,
+        "name": "Analyze FAQ Question Taxonomy",
+        "type": "Code node (JavaScript)",
+        "description": "Analyze the faq_page questions array to classify questions by type: (1) what_question_count: count questions starting with 'what' or 'which'. (2) why_question_count: count questions starting with 'why'. (3) how_question_count: count questions starting with 'how'. (4) comparison_question_count: count questions containing 'vs', 'compare', 'difference', 'better'. (5) total_question_count. Compute dominant_question_type (the question type with highest relative share). Compute question_type_distribution as percentages. If faq_page.questions is absent: set question_taxonomy = null and log absence.",
+        "input": "faq_page.questions",
+        "output": "question_taxonomy object with counts, percentages, and dominant type"
+      },
+      {
+        "step": 7,
+        "name": "Derive AEO Strategy Direction (Pre-LLM)",
+        "type": "Code node (JavaScript)",
+        "description": "Compute deterministic pre-LLM AEO strategy derivations that constrain the LLM output: (1) CANDIDATE primary_aeo_goal: apply derivation logic from the output fields specification — use seo_strategy.primary_seo_goal, question_taxonomy dominant type, market search_intents, product entity clarity gaps. (2) CANDIDATE answer_style: apply brand_role + tone_of_voice derivation. (3) CANDIDATE faq_strategy: apply knowledge_seo_role + faq_intensity derivation. (4) CANDIDATE entity_clarity_strategy: apply entity gap rates from pattern analyses. (5) CANDIDATE question_coverage_strategy: apply question_taxonomy distribution + trust_factors. (6) CANDIDATE structured_answer_priority: apply primary_aeo_goal + question coverage derivations. Include reasoning notes for each candidate decision — these will be included in the LLM prompt as grounding context.",
+        "input": "aeo_context + question_taxonomy + product_entity_analysis + collection_entity_analysis",
+        "output": "pre_llm_aeo_candidates object with candidate values and reasoning notes"
+      },
+      {
+        "step": 8,
+        "name": "Build LLM AEO Strategy Prompt",
+        "type": "Code node (JavaScript)",
+        "description": "Assemble the structured LLM prompt for AEO strategy synthesis. The prompt must: (1) Present the SEO foundation layer: primary_seo_goal, knowledge_seo_role, page_priority from seo_strategy. (2) Present FAQ signals: question count, faq_intensity, dominant question types from faq_page analysis. (3) Present market intelligence signals: search_intent types and example queries, trust_factors, content_opportunities. (4) Present brand positioning signals: brand_role, tone_of_voice, differentiators, forbidden_impressions. (5) Present entity clarity gap findings from pattern analyses if available. (6) Present pre-LLM AEO candidate reasoning as grounding context — instruct the LLM to use this reasoning or explicitly justify any deviation. (7) Request output as valid JSON conforming to schemas/aeo-strategy.schema.json. Include all enum values. (8) Instruct explicitly: 'Do not claim certainty about which content will surface in answer engines. Do not invent featured snippet performance data, LLM referral analytics, or answer engine impression data. All AEO directions are planning hypotheses.' (9) Include schema field requirements: required fields list, enum values, nested object requirements.",
+        "input": "aeo_context + pre_llm_aeo_candidates + question_taxonomy + product_entity_analysis + collection_entity_analysis",
+        "output": "assembled LLM prompt string",
+        "prompt_safety_note": "Prompt must explicitly state: 'This AEO strategy is a planning artifact — not validated answer-engine analytics. Do not claim certainty about featured snippet eligibility, LLM surfacing likelihood, or answer-engine impression data. All strategy fields are planning hypotheses requiring human review before production use.'"
+      },
+      {
+        "step": 9,
+        "name": "LLM Synthesis: AEO Strategy",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API. Request JSON output mode. Temperature: 0.1 (AEO strategy synthesis should be highly deterministic — the pre-LLM candidates already narrow the decision space). Max tokens: 3000.",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt",
+        "output": "raw LLM response string (expected to be JSON conforming to aeo-strategy schema)"
+      },
+      {
+        "step": 10,
+        "name": "Parse and Enforce AEO Strategy Constraints",
+        "type": "Code node (JavaScript)",
+        "description": "Parse the raw LLM response as JSON. Enforce constraint integrity: (1) ENUM VALIDATION: All enum fields must match allowed schema values. Any unrecognized enum value → reject and substitute the pre-LLM candidate value. Log substitutions. (2) REQUIRED FIELD COMPLETENESS: All required schema fields must be present. If missing, attempt to derive from pre-LLM candidates. If cannot derive, halt and report. (3) ARRAY MINIMUM: page_priority minItems = 1. structured_answer_priority may be empty array if no structured answers are applicable. (4) FORBIDDEN IMPRESSION CHECK: Scan strategy_name and notes for any forbidden_impressions strings. Replace with REQUIRES-REVIEW-COPY-VIOLATION if found. (5) PROVISIONAL FLAG INJECTION: Inject 'PROVISIONAL-AEO-STRATEGY' and 'AEO-NO-ANALYTICS' flags into notes if not already present. (6) SEO ALIGNMENT CHECK: Verify that page_priority does not silently contradict seo-strategy.page_priority. If it does, inject a SEO-PRIORITY-DIVERGENCE note.",
+        "input": "raw LLM response + pre_llm_aeo_candidates + aeo_context",
+        "output": "parsed and constrained aeo_strategy object (pre-validation)"
+      },
+      {
+        "step": 11,
+        "name": "Validate Against Schema",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate the aeo_strategy object against schemas/aeo-strategy.schema.json using ajv. Key validations: strategy_name non-empty string, primary_aeo_goal in enum, answer_style is object with all three required fields in enum, faq_strategy is object with faq_intensity and faq_distribution in enum, entity_clarity_strategy is object with all three entity clarity fields in enum, question_coverage_strategy is object with all four question type fields in enum, page_priority is non-empty array with items in enum, structured_answer_priority is array with items in enum. Halt workflow on validation failure — log exact field violation.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/aeo-strategy.schema.json",
+        "failure_behavior": "Halt workflow on any validation failure. Log the exact field and value causing the failure. Do not write a partially valid AEO strategy artifact.",
+        "input": "constrained aeo_strategy object",
+        "output": "validated aeo_strategy object or halt error"
+      },
+      {
+        "step": 12,
+        "name": "Persist aeo-strategy.json",
+        "type": "GitHub node or Write File node",
+        "description": "Write aeo-strategy.json to projects/{project_id}/aeo-strategy.json. Commit with a message such as 'chore: generate aeo-strategy for {store_id} — Phase 8 draft (provisional, planning artifact only)'. The provisional and planning-only nature of all AEO strategy decisions must be visible in the commit message.",
+        "artifact_path": "projects/{project_id}/aeo-strategy.json",
+        "git_note": "The provisional nature of AEO strategy must be reflected in the commit message. This artifact is a planning hypothesis — not a production content directive.",
+        "input": "validated aeo_strategy object",
+        "output": "confirmation of write + persisted artifact path"
+      },
+      {
+        "step": 13,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass aeo-strategy.json (as object or path) to the master orchestrator. The orchestrator must make aeo-strategy.json available to: build-internal-linking (step 23) and build-structured-data-plan (step 24).",
+        "input": "aeo-strategy.json path",
+        "output": "workflow output payload with aeo-strategy path"
+      }
+    ],
+
+    "assumptions": [
+      "seo-strategy.json, faq-page.json, market-intelligence.json, and brand-positioning.json are all required inputs. This workflow cannot run without them.",
+      "product-seo, collection-seo, and page-seo artifacts from earlier phases are available as optional pattern inputs. Their absence degrades entity clarity calibration quality but does not halt the workflow.",
+      "This workflow is implemented in Phase 8, after Phases 4-7 have generated seo-strategy, faq-page, page-seo, product-seo, and collection-seo artifacts. The richer input context is a known and documented Phase 8 benefit.",
+      "The AEO strategy produced here is a planning-level artifact — not validated answer-engine analytics. All AEO directions are planning hypotheses requiring human review before production content decisions.",
+      "The AEO strategy must not contradict seo-strategy.json. Where conflicts exist, seo-strategy.json takes precedence and conflicts must be flagged in the AEO strategy notes field.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "A single aeo-strategy.json is produced per store (not per product or collection). It is a store-level singleton artifact.",
+      "FAQ content in the faq-page.json is a planning-level artifact — not validated buyer question data. Questions represent content authoring intent, not confirmed search volume.",
+      "Entity clarity levels (medium, high, critical) are calibration signals for content and schema work — not measurements of actual search entity recognition in Google's Knowledge Graph or any LLM. They are planning priorities, not analytics reports.",
+      "AEO strategy does not define structured data markup implementation — that is the scope of build-structured-data-plan (step 24). AEO strategy informs the schema priority direction only."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should build-aeo-strategy explicitly reference competitor content strategies (from build-competitor-clusters) as an input for comparison_question coverage calibration?",
+        "impact": "Competitor clusters may reveal whether competitors use FAQ/AEO content aggressively, which would raise the strategic value of strong AEO investment for this store.",
+        "recommended_default": "Treat competitor-clusters as an optional input. If build-competitor-clusters output is available and includes content strategy signals, incorporate them. If absent, derive comparison intent from market intelligence alone. This keeps the competitor-clusters dependency optional and does not block the workflow."
+      },
+      {
+        "question": "How should build-aeo-strategy handle a store where faq-page.json has zero questions (empty or skipped FAQ page)?",
+        "impact": "faq-page.json is a required input, but its question set may be empty if the FAQ page was not populated. An empty question set severely degrades question_coverage_strategy and faq_strategy derivations.",
+        "recommended_default": "If faq_page.questions is empty: log AEO-FAQ-EMPTY warning. Set faq_strategy.faq_intensity = light. Derive question_coverage_strategy from market_intelligence.search_intents alone. Inject a prominent note: 'AEO-FAQ-EMPTY: faq-page.json contained no questions. AEO strategy is a minimum viable scaffold. A populated FAQ page is required before AEO strategy can be meaningfully refined.'"
+      },
+      {
+        "question": "Should primary_aeo_goal be allowed to diverge from the direction implied by primary_seo_goal, or should it always be constrained to a subset of compatible AEO goals?",
+        "impact": "An AEO goal that contradicts the SEO goal would create conflicting content direction (e.g. a store with transactional-growth SEO strategy but trust-and-reassurance AEO strategy might invest in deep FAQ content that slows the buyer journey).",
+        "recommended_default": "Soft constraint: the LLM prompt should present compatible AEO goals as preferred candidates, but allow divergence if explicitly justified. The constraint enforcement in step 10 should flag but not block a divergent AEO goal — it should inject a note requiring human review of the divergence rationale."
+      },
+      {
+        "question": "Should entity_clarity_strategy in aeo-strategy.json be cross-validated against the entity_priority field in the upcoming build-structured-data-plan output?",
+        "impact": "If AEO strategy entity clarity priorities and structured data plan entity priorities diverge, the two artifacts may give contradictory direction to content and technical implementation teams.",
+        "recommended_default": "Document the cross-validation requirement here and in the build-structured-data-plan workflow specification. The validation workflow (run-validation, step 28) should include a cross-validation check between aeo-strategy.entity_clarity_strategy and structured-data-plan.entity_priority."
+      }
+    ]
+  }
+}

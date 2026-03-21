@@ -1,0 +1,616 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. Page content outputs are planning artifacts — not final production copy, not legally reviewed policy text, and not published page content. General store page content generated here (About, Contact, Shipping, Returns, Trust, FAQ-preview, Guide pages) provides structured planning direction grounded in strategic context. All factual or policy-specific details that cannot be confirmed from available inputs must use PLACEHOLDER-REQUIRES-REVIEW rather than fabricated specifics. Human review is required before any page content artifact influences live store pages.",
+    "operational_fact_safety_note": "IMPORTANT — DO NOT FABRICATE OPERATIONAL FACTS: General store pages often require specific operational facts: shipping rates, return windows, contact email addresses, business addresses, phone numbers, guarantees with specific terms. This workflow cannot know these facts from strategic planning inputs alone. When specific operational facts are required by a page type but are unavailable from intake preferences or Shopify import data, the output field must use PLACEHOLDER-REQUIRES-REVIEW. Do not invent plausible-sounding shipping rates, return policies, contact details, or legal terms.",
+    "legal_policy_safety_note": "IMPORTANT — POLICY AND LEGAL CONTENT REQUIRES REVIEW: Shipping policy, returns policy, and legal support pages may have legal implications. This workflow produces planning-level page structure and directional copy — not reviewed legal or policy text. All policy content produced here must be clearly marked as requiring legal or operational review before publication.",
+    "page_selection_note": "This workflow determines which general pages are in scope for the store based on store type, brand maturity, and intake preferences. Not all stores need all page types. An empty collection-oriented store may not need a guide page. A new brand may not yet have a formal About page story. Page selection logic is documented in the inputs section.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/page-content.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-page-content",
+    "name": "build-page-content",
+    "category": "planning",
+    "phase": "Phase 6 — Collection SEO and Navigation Planning",
+    "purpose": "Synthesize schema-validated general page content planning artifacts for each general store page type in scope. General pages (About, Contact, Shipping, Returns, Trust, Guide, FAQ-preview, and similar) serve different content purposes than product pages and collection pages. Product pages answer 'Should I buy this product?' Collection pages answer 'Is this the right category?' General pages answer 'Can I trust this store? Who are they? How do logistics work? Where can I learn more?' This workflow determines which general pages are in scope based on store type and intake preferences, then synthesizes page_content.json artifacts for each page. Strategic inputs (brand-positioning, market-intelligence, design-system, homepage-strategy) shape the tone, trust approach, and content direction. Factual or policy-specific operational details that are not available from strategic inputs must use PLACEHOLDER-REQUIRES-REVIEW rather than fabricated specifics. The output is a structured content plan per page, not production-ready copy.",
+
+    "page_vs_product_vs_collection_note": "General page content is categorically different from product and collection content. Product and collection pages are primarily commerce-oriented. General pages primarily serve trust, logistics, identity, and support functions. The brand positioning and tone-of-voice guidelines apply to general pages, but the content priorities are different: an About page must be authentic and specific, not generic brand claims; a Shipping page must be operationally accurate, not aspirationally framed; a Contact page must be honest about how and when the store can be reached. This distinction must be preserved in all synthesized content.",
+
+    "general_pages_in_scope": {
+      "about-page": {
+        "page_type": "about-page",
+        "description": "Brand story, founding context, mission, and values. Audience: potential buyers who want to know who they're buying from. Critical trust page for new and growing brands.",
+        "always_in_scope": true,
+        "factual_dependency": "brand_maturity, value_proposition, positioning_statement, brand_traits from brand-positioning. About page content must be authentic — do not invent founding stories or specific credentials not supported by inputs."
+      },
+      "contact-page": {
+        "page_type": "contact-page",
+        "description": "How buyers can reach the store. Audience: any buyer needing support. Critical for post-purchase trust.",
+        "always_in_scope": true,
+        "factual_dependency": "Contact details (email, phone, address, support hours) — COMMONLY UNAVAILABLE FROM PLANNING INPUTS. All specific contact details must use PLACEHOLDER-REQUIRES-REVIEW unless confirmed in intake preferences."
+      },
+      "shipping-page": {
+        "page_type": "shipping-page",
+        "description": "Shipping options, timeframes, costs, and geographic availability. Audience: buyers evaluating logistics before or after purchase.",
+        "always_in_scope": true,
+        "factual_dependency": "Shipping rates, delivery timeframes, carrier names, free shipping thresholds — COMMONLY UNAVAILABLE FROM PLANNING INPUTS. All specific shipping facts must use PLACEHOLDER-REQUIRES-REVIEW. Only directional framing (fast/standard/international availability) can be inferred from store_profile and intake."
+      },
+      "returns-page": {
+        "page_type": "returns-page",
+        "description": "Return policy, timeframes, conditions, and process. Audience: buyers evaluating purchase risk.",
+        "always_in_scope": true,
+        "factual_dependency": "Return window (days), conditions (unworn/unopened/etc.), refund vs store credit, return shipping cost — COMMONLY UNAVAILABLE FROM PLANNING INPUTS. All specific return policy details must use PLACEHOLDER-REQUIRES-REVIEW."
+      },
+      "trust-page": {
+        "page_type": "trust-page",
+        "description": "A dedicated trust and credibility page (sometimes called 'Why Us', 'Our Promise', 'Guarantee'). Not all stores have this as a standalone page — it depends on brand_maturity and trust_style.",
+        "always_in_scope": false,
+        "selection_condition": "Include if brand-positioning.trust_style.proof_mode = 'guarantee-led' OR brand-positioning.trust_style.reassurance_level = 'strong' OR intake preferences indicate a guarantee page.",
+        "factual_dependency": "Guarantee specifics, certifications, credentials — COMMONLY UNAVAILABLE FROM PLANNING INPUTS. Use PLACEHOLDER-REQUIRES-REVIEW for specific terms."
+      },
+      "guide-page": {
+        "page_type": "guide-page",
+        "description": "A how-to, buyer guide, or educational content page. Relevant for stores in categories where pre-purchase education is important.",
+        "always_in_scope": false,
+        "selection_condition": "Include if market-intelligence.content_opportunities is non-empty AND store type has educational content potential (category-specialist, editorial-commerce-store) OR intake preferences indicate guide content.",
+        "factual_dependency": "Guide content must be category-appropriate and based on market intelligence content opportunities — not invented."
+      },
+      "faq-page": {
+        "page_type": "faq-page",
+        "description": "A standalone FAQ page covering common buyer questions. Not the same as product or collection FAQ items — this is store-level Q&A.",
+        "always_in_scope": false,
+        "selection_condition": "Include if intake preferences indicate FAQ page desired OR market-intelligence.aeo_considerations is non-empty. Note: a dedicated faq-page workflow (build-faq-page, step 22) will generate a more complete FAQ artifact in a later phase. This workflow provides a planning scaffold only.",
+        "factual_dependency": "FAQ answers for operational questions (shipping, returns, contact) depend on operational facts — use PLACEHOLDER-REQUIRES-REVIEW for specifics.",
+        "phase_note": "The page-content.json for faq-page is a planning scaffold. build-faq-page (step 22) will produce the complete FAQ artifact with full AEO alignment when aeo-strategy.json is available."
+      },
+      "legal-support-page": {
+        "page_type": "legal-support-page",
+        "description": "Privacy policy, terms of service, or other required legal pages.",
+        "always_in_scope": false,
+        "selection_condition": "Include only if intake preferences explicitly indicate legal pages are in scope for content planning.",
+        "factual_dependency": "Legal content requires proper legal review. This workflow MUST NOT generate legal text. Output for legal pages = planning structure only with PLACEHOLDER-REQUIRES-LEGAL-REVIEW for all body text.",
+        "safety_warning": "CRITICAL: Do not generate legal text (privacy policies, terms of service) in this workflow. Legal content requires qualified legal review. Only produce a structural scaffold with explicit review placeholders."
+      }
+    },
+
+    "inputs": {
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "data_treatment": "PRIMARY TONE AND IDENTITY LAYER — brand positioning is the main strategic input that shapes how all general pages are written",
+        "fields_used": [
+          {
+            "field": "brand_role",
+            "treatment": "ABOUT PAGE ANCHOR — brand_role (specialist, curator, problem-solver, premium-innovator, editorial-guide, value-leader) defines the core identity framing for the About page and trust-page.",
+            "note": "brand_role is a planning classification — the About page must reflect genuine brand identity, not just the role label."
+          },
+          {
+            "field": "value_proposition",
+            "treatment": "PAGE FRAMING ANCHOR — the value proposition should appear (in substance, not verbatim) in the About page intro and Trust page opening. It orients the store's overall story.",
+            "note": "Use as directional framing — do not simply copy-paste the value_proposition into page copy."
+          },
+          {
+            "field": "positioning_statement",
+            "treatment": "ABOUT PAGE SUBSTANCE — the positioning statement provides the core narrative claim for the About page. About page content must be consistent with it.",
+            "note": "Synthesized content — must not contradict it, but should expand it with authentic brand story elements."
+          },
+          {
+            "field": "brand_traits",
+            "treatment": "TONE ANCHOR — brand traits inform how all page content is voiced. A brand with 'warm' and 'approachable' traits should have Contact and About pages that feel personal. A 'technical' and 'precise' brand should have pages that feel competent and clear.",
+            "note": "Used as tone calibration for all synthesized page copy."
+          },
+          {
+            "field": "tone_of_voice",
+            "treatment": "COPY TONE GUARDRAIL — tone style, clarity level, and emotional intensity are hard guardrails for all page copy. A 'premium-confident' tone must not produce generic or low-quality page text. A 'warm-helpful' tone must not produce cold or transactional page text.",
+            "note": "Hard guardrail — applied during constraint enforcement."
+          },
+          {
+            "field": "trust_style",
+            "treatment": "TRUST PAGE AND RETURNS PAGE FRAMING — proof_mode and reassurance_level determine how trust elements are presented across pages. 'guarantee-led' → include trust-page and emphasize guarantees. 'evidence-led' → emphasize credibility signals. 'social-proof-led' → emphasize review references where relevant.",
+            "note": "Shapes trust_elements content and trust-page scope decision."
+          },
+          {
+            "field": "differentiators",
+            "treatment": "ABOUT AND TRUST PAGE CONTENT — differentiators are substantive claims that the About page and Trust page should reflect honestly.",
+            "note": "Must not invent differentiators not supported by actual store capabilities."
+          },
+          {
+            "field": "forbidden_impressions",
+            "treatment": "HARD EXCLUSION — any impressions listed in forbidden_impressions must never appear in synthesized page copy.",
+            "note": "Hard constraint — applied during constraint enforcement node."
+          }
+        ]
+      },
+
+      "from_market_intelligence": {
+        "source": "build-market-intelligence → market-intelligence.json",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "data_treatment": "AUDIENCE AND TRUST CONTEXT — market intelligence provides audience, trust factor, and content opportunity signals that shape page content for the target buyer",
+        "fields_used": [
+          {
+            "field": "audience_segments",
+            "treatment": "PAGE AUDIENCE FRAMING — audience segments describe who is reading these pages. About page copy should speak to the primary audience segment(s). Shipping and Returns pages should address the concerns of the audience segments most likely to have logistics questions.",
+            "note": "Audience framing is directional — apply the most relevant segments per page type."
+          },
+          {
+            "field": "trust_factors",
+            "treatment": "TRUST ELEMENTS SOURCE — trust factors from market intelligence indicate what buyers in this category rely on for trust. These directly inform the trust_elements arrays in page content artifacts.",
+            "note": "Trust elements must reflect actual store capabilities — not marketing wishlist items."
+          },
+          {
+            "field": "core_problems",
+            "treatment": "ABOUT AND SHIPPING PAGE FRAMING — core buyer problems provide context for what operational pages need to address. Shipping and Returns pages should proactively address relevant concerns.",
+            "note": "Directional signal — used to orient body_sections focus areas."
+          },
+          {
+            "field": "content_opportunities",
+            "treatment": "GUIDE PAGE SCOPE SIGNAL — content opportunities from market intelligence indicate what educational topics buyers are researching. These inform guide page scope when guide pages are in scope.",
+            "note": "Used for guide-page section planning only."
+          },
+          {
+            "field": "aeo_considerations",
+            "treatment": "FAQ PAGE SCOPE SIGNAL — AEO considerations hint at what questions buyers commonly ask at the store level. These inform the faq_items scope for any FAQ-type page content.",
+            "note": "Planning signal — the full AEO strategy is out of Phase 6 scope."
+          }
+        ]
+      },
+
+      "from_design_system": {
+        "source": "build-design-system → design-system.json",
+        "artifact_path": "projects/{project_id}/design-system.json",
+        "data_treatment": "VISUAL AND STRUCTURAL GUARDRAIL — design system provides media and content density guidance that shapes page structure planning",
+        "fields_used": [
+          {
+            "field": "layout_density",
+            "treatment": "PAGE STRUCTURE SIGNAL — layout_density (airy, balanced, dense) informs how many body_sections and how much content depth is appropriate per page. An airy design system suggests fewer, more focused sections. A dense system can support richer multi-section pages.",
+            "note": "Directional signal for body_sections count and depth."
+          },
+          {
+            "field": "trust_visibility.proof_prominence",
+            "treatment": "TRUST ELEMENTS PLACEMENT — proof_prominence (low, medium, high) informs how prominently trust_elements should feature in page content, and whether trust-page is warranted as a standalone page.",
+            "note": "High prominence → trust-page is a stronger candidate for inclusion."
+          },
+          {
+            "field": "media_strategy.image_intensity",
+            "treatment": "MEDIA NOTES SIGNAL — image intensity informs the media_notes field in page content artifacts (how image-heavy should this page be planned?).",
+            "note": "Used to populate media_notes — not to generate image assets."
+          }
+        ]
+      },
+
+      "from_homepage_strategy": {
+        "source": "build-homepage-strategy → homepage-strategy.json",
+        "artifact_path": "projects/{project_id}/homepage-strategy.json",
+        "data_treatment": "STORE NARRATIVE CONTEXT — homepage strategy provides the store's overall tone and narrative direction, which should be consistent across general pages",
+        "fields_used": [
+          {
+            "field": "homepage_goal",
+            "treatment": "STORE NARRATIVE ORIENTATION — homepage_goal (brand-introduction, conversion-first, editorial-discovery, etc.) indicates the overall store narrative mode. About and Trust pages should be consistent with the homepage goal. A brand-introduction homepage warrants a rich About page. A conversion-first homepage warrants concise, action-oriented support pages.",
+            "note": "Narrative consistency signal — general pages should feel like part of the same store experience as the homepage."
+          },
+          {
+            "field": "trust_strategy.trust_placement",
+            "treatment": "TRUST PAGE TIMING SIGNAL — early trust placement → trust-page may be in primary navigation. Late trust placement → trust-page may be a supporting page. Balanced → standard placement.",
+            "note": "Used for internal_navigation_hints in trust-related pages."
+          },
+          {
+            "field": "storytelling_intensity",
+            "treatment": "ABOUT PAGE DEPTH SIGNAL — storytelling_intensity (minimal, balanced, strong) informs how much narrative depth the About page should have. Strong storytelling → multi-section About page with founding story, mission, and team elements. Minimal → concise identity statement.",
+            "note": "Directly influences About page body_sections planning."
+          }
+        ]
+      },
+
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "data_treatment": "STORE CONTEXT — store profile provides store type, market, and maturity signals that determine which pages are in scope and what operational context is available",
+        "fields_used": [
+          {
+            "field": "store_type",
+            "treatment": "PAGE SCOPE SIGNAL — store type influences which general pages are relevant. category-specialist → guide-page strongly recommended. editorial-commerce-store → guide-page and About page particularly important. single-brand-store → About and Trust pages are high priority.",
+            "note": "Used in page selection logic."
+          },
+          {
+            "field": "brand_maturity",
+            "treatment": "ABOUT PAGE DEPTH SIGNAL — new brands need more substantive About pages to establish credibility. Established or legacy brands may have richer history to draw from. New brands must use PLACEHOLDER-REQUIRES-REVIEW for specific founding details not confirmed in inputs.",
+            "note": "Calibrates About page depth expectations."
+          },
+          {
+            "field": "primary_market",
+            "treatment": "SHIPPING AND LEGAL CONTEXT — primary market informs what geographic context is relevant for shipping and legal pages (domestic-only vs international shipping, jurisdiction for legal pages).",
+            "note": "IMPORTANT: Never invent market-specific regulatory or legal requirements. Only use primary_market as a framing signal."
+          },
+          {
+            "field": "vertical",
+            "treatment": "GUIDE PAGE SCOPE — the store vertical informs what educational guide topics are relevant if guide-page is in scope.",
+            "note": "Used for guide page topic orientation only."
+          }
+        ]
+      },
+
+      "from_intake_preferences": {
+        "source": "intake-store-input → normalized intake payload",
+        "artifact_path": "projects/{project_id}/intake.json",
+        "data_treatment": "USER INTENT LAYER — intake preferences directly control which pages are in scope and may provide operational details",
+        "fields_used": [
+          {
+            "field": "page_preferences (if present)",
+            "treatment": "SCOPE CONTROL — any explicit page scope preferences from intake (e.g. 'include guide page', 'include trust page', 'FAQ page wanted') directly override default scope decisions.",
+            "note": "Explicit intake preferences take priority over inferred scope decisions."
+          },
+          {
+            "field": "operational_details (if present)",
+            "treatment": "OPERATIONAL TRUTH — if the intake form captured any specific operational details (shipping regions, return window, contact email), treat them as operational truth and use them in the relevant page content. These are the only reliable source of operational facts in this workflow.",
+            "note": "Do not depend on operational details being present — they are optional intake fields."
+          }
+        ]
+      }
+    },
+
+    "page_selection_logic": {
+      "description": "Before synthesis, determine which pages are in scope for this store. Always include: about-page, contact-page, shipping-page, returns-page. Conditionally include: trust-page, guide-page, faq-page, legal-support-page based on the conditions documented in general_pages_in_scope above.",
+      "page_selection_signals": {
+        "trust-page": "Include if trust_style.proof_mode = 'guarantee-led' OR trust_visibility.proof_prominence = 'high' OR homepage_strategy.trust_strategy.proof_intensity = 'strong'",
+        "guide-page": "Include if market_intelligence.content_opportunities is non-empty AND store_type in ['category-specialist', 'editorial-commerce-store']",
+        "faq-page": "Include if market_intelligence.aeo_considerations is non-empty OR intake preferences indicate FAQ page desired",
+        "legal-support-page": "Include only if explicitly requested in intake preferences — and only as a structural scaffold, never with generated legal text"
+      },
+      "default_scope": "Always include: about-page, contact-page, shipping-page, returns-page. Total default: 4 pages minimum."
+    },
+
+    "outputs": {
+      "primary_output": "page-content.json per in-scope page type",
+      "artifact_path": "projects/{project_id}/page-content/{page_type}.json",
+      "review_manifest_path": "projects/{project_id}/page-content/_review-required.json",
+      "schema": "schemas/page-content.schema.json",
+      "output_fields": {
+        "page_title": {
+          "source": "LLM synthesis — a clear, on-brand page title. Must reflect the page_type and be consistent with brand tone.",
+          "type": "LLM-synthesized string",
+          "per_page_defaults": {
+            "about-page": "e.g. 'About Us', 'Our Story', 'Who We Are' — align with brand tone",
+            "contact-page": "e.g. 'Contact Us', 'Get in Touch', 'Talk to Us'",
+            "shipping-page": "e.g. 'Shipping Information', 'Delivery & Shipping'",
+            "returns-page": "e.g. 'Returns & Exchanges', 'Return Policy', 'Our Returns Promise'",
+            "trust-page": "e.g. 'Our Promise', 'Why Choose Us', 'Our Guarantee'",
+            "guide-page": "e.g. 'Your Guide to [Category]', 'How to Choose [Category]'",
+            "faq-page": "e.g. 'Frequently Asked Questions', 'FAQs'",
+            "legal-support-page": "PLACEHOLDER-REQUIRES-REVIEW"
+          }
+        },
+        "page_subtitle": {
+          "source": "Optional LLM synthesis — a supporting subtitle for the page. Particularly useful for About and Trust pages.",
+          "type": "optional LLM-synthesized string",
+          "note": "Only include where a subtitle meaningfully adds to the page framing."
+        },
+        "page_type": {
+          "source": "DIRECT — set to the in-scope page type from page_selection_logic",
+          "type": "constrained enum",
+          "schema_enum": ["about-page", "contact-page", "shipping-page", "returns-page", "faq-page", "guide-page", "trust-page", "landing-page", "legal-support-page", "generic-page"]
+        },
+        "page_goal": {
+          "source": "Derived from page_type — mapped deterministically",
+          "type": "constrained enum",
+          "schema_enum": ["inform", "build-trust", "support-conversion", "educate", "support-navigation", "hybrid"],
+          "per_page_mapping": {
+            "about-page": "build-trust",
+            "contact-page": "build-trust",
+            "shipping-page": "inform",
+            "returns-page": "inform",
+            "trust-page": "build-trust",
+            "guide-page": "educate",
+            "faq-page": "inform",
+            "legal-support-page": "inform"
+          }
+        },
+        "intro_text": {
+          "source": "LLM synthesis — a brand-voice introduction to the page. Must reflect page_goal and brand tone.",
+          "type": "LLM-synthesized string",
+          "per_page_guidance": {
+            "about-page": "Should open with the brand story or mission in an authentic, specific way — not generic 'We are passionate about...' filler. If founding story specifics are unavailable, use directional framing and mark specifics as PLACEHOLDER-REQUIRES-REVIEW.",
+            "contact-page": "Should open with a warm, accessible tone that signals the store is reachable and responsive. Do not invent response time commitments without operational confirmation.",
+            "shipping-page": "Should open with a clear, direct statement about shipping approach. Do not invent specific rates or timeframes.",
+            "returns-page": "Should open with a trust-forward statement about the returns approach. Do not invent specific return windows or conditions.",
+            "trust-page": "Should open with the brand's core promise or guarantee framing — aligned with trust_style and differentiators.",
+            "guide-page": "Should open with an acknowledgment of the buyer's decision context and what the guide will help them accomplish.",
+            "faq-page": "Should open with a brief signal that this page answers common questions — simple and functional."
+          }
+        },
+        "body_sections": {
+          "source": "LLM synthesis — structured sections for each page. Each section has section_title, section_purpose, and section_text.",
+          "type": "array of objects",
+          "schema_fields_per_item": ["section_title", "section_purpose", "section_text"],
+          "per_page_section_guidance": {
+            "about-page": "Typically 3-4 sections: (1) Who we are / our story — PLACEHOLDER for specific founding details if unavailable; (2) Our mission or values; (3) What makes us different — draw from brand differentiators; (4) Optional: the team or the makers — PLACEHOLDER for personnel details.",
+            "contact-page": "Typically 2-3 sections: (1) How to reach us — PLACEHOLDER-REQUIRES-REVIEW for email, phone, address; (2) When to expect a response — PLACEHOLDER-REQUIRES-REVIEW for response times; (3) Optional: FAQ redirect.",
+            "shipping-page": "Typically 3-4 sections: (1) Shipping options overview — PLACEHOLDER for specific rates and carriers; (2) Estimated delivery times — PLACEHOLDER for specific timeframes by region; (3) International shipping (if applicable to primary_market) — PLACEHOLDER; (4) Shipping questions — redirect to contact.",
+            "returns-page": "Typically 3-4 sections: (1) Return eligibility — PLACEHOLDER for specific window and conditions; (2) How to start a return — PLACEHOLDER for process steps; (3) Refund processing — PLACEHOLDER for timeframes and refund vs store credit policy; (4) Questions — redirect to contact.",
+            "trust-page": "Typically 2-4 sections: (1) Our guarantee — based on trust_style.proof_mode with PLACEHOLDER for specific terms; (2) Our credentials or proof — draw from differentiators and trust_factors; (3) Customer satisfaction approach — aligned with reassurance_level.",
+            "guide-page": "Typically 3-5 sections based on market_intelligence.content_opportunities — each section addresses a major educational topic for this category.",
+            "faq-page": "Body sections should contain grouped FAQ topics: (1) Orders and shopping; (2) Shipping and delivery; (3) Returns and refunds; (4) Products and selection — all with PLACEHOLDER-REQUIRES-REVIEW for operational specifics.",
+            "legal-support-page": "ALL SECTIONS: section_text = PLACEHOLDER-REQUIRES-LEGAL-REVIEW. Do not generate legal text."
+          },
+          "placeholder_policy": "Any section_text that requires specific operational facts not confirmed from inputs must use PLACEHOLDER-REQUIRES-REVIEW: [specific detail needed]. This is a hard requirement — do not invent plausible-sounding specifics."
+        },
+        "trust_elements": {
+          "source": "LLM synthesis from market_intelligence.trust_factors + brand-positioning.trust_style + differentiators",
+          "type": "array of strings",
+          "constraint": "Trust elements must reflect actual or plausible store capabilities based on available strategic inputs. Do not invent certifications, review counts, or guarantee terms not supported by inputs.",
+          "guidance": "Typical trust elements for general pages: 'Secure checkout', 'Responsive customer support', 'Quality guarantee', 'Easy returns', 'Satisfaction promise' — adjusted to brand tone. More specific claims require operational confirmation."
+        },
+        "cta_direction": {
+          "primary_cta": {
+            "source": "Derived from page_type + page_goal + brand conversion_style",
+            "type": "constrained enum",
+            "schema_enum_note": "Confirm primary_cta allowed values from schemas/page-content.schema.json — general page CTAs likely differ from product/collection CTAs.",
+            "per_page_guidance": {
+              "about-page": "Explore the store / Shop now — CTA directs to the main catalog or featured collections",
+              "contact-page": "Get in touch — form or email CTA",
+              "shipping-page": "Shop now / Back to shopping — functional closure CTA",
+              "returns-page": "Shop with confidence / Back to shopping — trust-reinforcing closure CTA",
+              "trust-page": "Shop now / See our products — conversion-supporting CTA",
+              "guide-page": "Explore the collection / Start shopping — editorial-to-commerce CTA",
+              "faq-page": "Contact us / Back to shopping — support closure"
+            }
+          },
+          "cta_tone": {
+            "source": "Derived from brand_positioning.conversion_style.cta_style",
+            "type": "constrained enum",
+            "schema_enum_note": "Confirm cta_tone allowed values from schemas/page-content.schema.json"
+          }
+        },
+        "faq_items": {
+          "source": "LLM synthesis for faq-page type; optional for about-page, shipping-page, returns-page",
+          "type": "optional array of Q&A objects",
+          "constraint": "FAQ answers for operational questions (shipping rates, return windows, contact info) must use PLACEHOLDER-REQUIRES-REVIEW for specific facts. FAQ questions should reflect real buyer concerns from market_intelligence.",
+          "note": "faq_items on a page-content artifact are a planning scaffold for that page's FAQ section. The dedicated build-faq-page workflow (step 22) will generate the complete store-level FAQ artifact."
+        },
+        "media_notes": {
+          "source": "Derived from design-system.media_strategy.image_intensity + page_type",
+          "type": "optional string",
+          "guidance": "About page: brand photography or team imagery recommended. Trust page: credibility visuals or guarantee imagery. Guide page: instructional or category imagery. Shipping/Returns: minimal media typically appropriate. These are planning notes — not media asset specifications."
+        },
+        "internal_navigation_hints": {
+          "source": "LLM synthesis — where should this page link to within the store?",
+          "type": "optional string",
+          "guidance": "About page → links to featured collections or product highlight. Trust page → links to main catalog. Guide page → links to relevant collections. Contact/Shipping/Returns → links to each other and back to the main catalog."
+        },
+        "notes": {
+          "source": "Workflow-generated synthesis metadata per page",
+          "type": "machine-generated string",
+          "note": "Must include: synthesis timestamp, page_type, list of inputs used, PLACEHOLDER-REQUIRES-REVIEW count (how many placeholders are present in this artifact), any specific operational facts that are missing and must be confirmed before page can be published, evidence boundary label. Must explicitly state: 'This is a planning artifact — not final production copy. All PLACEHOLDER-REQUIRES-REVIEW fields must be completed with verified operational information before publication.'"
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-brand-positioning",
+        "provides": ["brand-positioning.json"],
+        "required": true,
+        "note": "brand-positioning.json is the primary strategic input for all general page content. This workflow cannot run without it."
+      },
+      {
+        "workflow": "build-market-intelligence",
+        "provides": ["market-intelligence.json"],
+        "required": true,
+        "note": "market-intelligence.json provides audience, trust factor, and content opportunity signals that shape page content."
+      },
+      {
+        "workflow": "build-design-system",
+        "provides": ["design-system.json"],
+        "required": true,
+        "note": "design-system.json provides layout density and media strategy guardrails."
+      },
+      {
+        "workflow": "build-homepage-strategy",
+        "provides": ["homepage-strategy.json"],
+        "required": true,
+        "note": "homepage-strategy.json provides storytelling intensity, trust strategy, and store narrative direction."
+      },
+      {
+        "workflow": "build-store-profile",
+        "provides": ["store-profile.json"],
+        "required": true,
+        "note": "store-profile.json provides store_type, brand_maturity, primary_market, and vertical for page scope decisions."
+      },
+      {
+        "workflow": "intake-store-input",
+        "provides": ["intake.json with page preferences and any available operational details"],
+        "required": false,
+        "note": "OPTIONAL — intake preferences control page scope and may provide operational details. If absent, default page scope applies and all operational fields use PLACEHOLDER-REQUIRES-REVIEW."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-page-seo",
+        "receives": ["page-content.json per page"],
+        "note": "Out of Phase 6 scope (workflow step 21). Consumes page-content artifacts for page-level SEO and AEO planning."
+      },
+      {
+        "workflow": "build-faq-page",
+        "receives": ["page-content.json for faq-page type"],
+        "note": "Out of Phase 6 scope (workflow step 22). The faq-page page-content artifact serves as a planning scaffold for the dedicated FAQ page workflow."
+      },
+      {
+        "workflow": "build-media-plan",
+        "receives": ["page-content.json (media_notes fields)"],
+        "note": "Out of Phase 6 scope (workflow step 25). Consumes media_notes from page content artifacts."
+      },
+      {
+        "workflow": "run-validation",
+        "receives": ["page-content.json"],
+        "note": "Out of Phase 6 scope (workflow step 28). Validates page-content artifacts against schema and placeholder field counts."
+      }
+    ],
+
+    "schema_alignment": {
+      "page-content.schema.json": {
+        "required_fields_covered": [
+          "page_title",
+          "page_type",
+          "page_goal",
+          "intro_text",
+          "body_sections",
+          "trust_elements",
+          "cta_direction"
+        ],
+        "optional_fields_covered": [
+          "page_subtitle",
+          "faq_items",
+          "media_notes",
+          "internal_navigation_hints",
+          "notes"
+        ],
+        "schema_enum_confirmation_required": [
+          "cta_direction.primary_cta — confirm exact enum from schemas/page-content.schema.json before implementation",
+          "cta_direction.cta_tone — confirm exact enum from schemas/page-content.schema.json before implementation"
+        ],
+        "body_sections_note": "Schema requires array with section_title, section_purpose, and section_text per item. Each page must have at least one body_section.",
+        "trust_elements_note": "Schema requires array of strings. At least one trust element must be produced per page.",
+        "page_type_note": "Enum values confirmed from schema — must match exactly.",
+        "validation_note": "Each page-content object must be validated against schemas/page-content.schema.json using ajv. Placeholder values (PLACEHOLDER-REQUIRES-REVIEW) are valid string values — they pass schema validation but must be flagged in the review manifest."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: brand_positioning, market_intelligence, design_system, homepage_strategy, store_profile. Optional: intake_preferences. All required inputs must be present before this workflow begins.",
+        "input": "brand_positioning + market_intelligence + design_system + homepage_strategy + store_profile + optional intake_preferences",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present. brand_positioning must have brand_role, value_proposition, tone_of_voice. market_intelligence must have audience_segments (non-empty) and trust_factors (non-empty). design_system must have layout_density and trust_visibility. homepage_strategy must have homepage_goal and storytelling_intensity. store_profile must have store_type and brand_maturity. Log whether intake_preferences is present and whether it contains page_preferences or operational_details.",
+        "input": "all inputs",
+        "output": "validated inputs or halt error"
+      },
+      {
+        "step": 3,
+        "name": "Determine Page Scope",
+        "type": "Code node (JavaScript)",
+        "description": "Determine which general pages are in scope for this store. Always include: about-page, contact-page, shipping-page, returns-page. Evaluate conditional pages: (1) trust-page: include if trust_style.proof_mode = 'guarantee-led' OR trust_visibility.proof_prominence = 'high' OR homepage_strategy.trust_strategy.proof_intensity = 'strong'. (2) guide-page: include if market_intelligence.content_opportunities is non-empty AND store_type in ['category-specialist', 'editorial-commerce-store', 'editorial-commerce']. (3) faq-page: include if market_intelligence.aeo_considerations is non-empty OR intake_preferences contains FAQ page request. (4) legal-support-page: include ONLY if explicitly in intake_preferences — and ONLY as a structural scaffold. Apply any explicit page_preferences from intake_preferences (these override conditional logic). Log the final page scope list clearly.",
+        "input": "validated inputs",
+        "output": "page_scope list (array of page_type strings to generate)"
+      },
+      {
+        "step": 4,
+        "name": "Extract Page Planning Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Extract and prepare planning signals for page content synthesis. Produce a page_signals object: (1) BRAND IDENTITY SIGNALS: brand_role, value_proposition, positioning_statement, brand_traits, differentiators from brand_positioning. (2) TONE GUARDRAILS: tone_of_voice (style, clarity_level, emotional_intensity), conversion_style.cta_style, forbidden_impressions from brand_positioning. (3) TRUST SIGNALS: trust_factors from market_intelligence + trust_style.proof_mode + trust_style.reassurance_level from brand_positioning. (4) AUDIENCE SIGNALS: audience_segments (top 2-3 most relevant) from market_intelligence. (5) CONTENT OPPORTUNITIES: content_opportunities and aeo_considerations from market_intelligence — used for guide and FAQ page scoping. (6) OPERATIONAL DETAILS: any confirmed operational details from intake_preferences (shipping regions, return window, contact email). Flag any absent operational details as PLACEHOLDER-REQUIRED for shipping, returns, and contact pages. (7) STORYTELLING DIRECTION: homepage_strategy.storytelling_intensity — used for About page depth calibration. (8) LAYOUT GUIDANCE: design_system.layout_density + trust_visibility.proof_prominence.",
+        "input": "validated inputs",
+        "output": "page_signals object with explicit PLACEHOLDER-REQUIRED flags for absent operational details"
+      },
+      {
+        "step": 5,
+        "name": "Build LLM Page Content Prompt (per page)",
+        "type": "Code node (JavaScript)",
+        "description": "For each page in page_scope, assemble a structured LLM prompt for page content synthesis. The prompt must: (1) Present page_signals as the planning context. (2) Specify the page_type, its purpose, and its target audience clearly. (3) Present the page content structure requirements (page_title, intro_text, body_sections, trust_elements, cta_direction per the schema). (4) Provide per-page section guidance from the output_fields documentation above. (5) Enforce PLACEHOLDER policy: 'Any field that requires specific operational facts (shipping rates, return windows, contact details, founding dates, specific legal terms) that are not confirmed in the provided inputs MUST be written as: PLACEHOLDER-REQUIRES-REVIEW: [describe what specific information is needed here]. Do not invent plausible-sounding specifics.' (6) For legal-support-page: 'ALL body_sections section_text fields = PLACEHOLDER-REQUIRES-LEGAL-REVIEW. Do not generate legal text.' (7) Enforce forbidden_impressions: list them explicitly and instruct the LLM never to include them. (8) Request output as valid JSON conforming to schemas/page-content.schema.json. (9) Include schema enum values for all enum fields. (10) Request that the notes field include a count and description of all placeholder fields in the output.",
+        "input": "page_signals + page_type specification",
+        "output": "assembled LLM prompt string per page",
+        "prompt_safety_note": "Prompt must explicitly state: 'Do not invent operational facts. Use PLACEHOLDER-REQUIRES-REVIEW for any specific detail you cannot confirm from the provided inputs. This is a planning artifact — not production copy. The brand tone must be consistent but the content must be honest about what is unknown.'"
+      },
+      {
+        "step": 6,
+        "name": "LLM Synthesis: Page Content (per page)",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API for each page in scope. Request JSON output mode. Temperature: 0.4 (page content synthesis benefits from moderate creativity in tone and narrative framing, but must stay anchored to brand positioning signals). Max tokens: 2500 per page. Legal-support-page, if in scope, uses Temperature: 0.1 and a stricter prompt to prevent any generation of legal content.",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt per page",
+        "output": "raw LLM response string per page (expected to be JSON)"
+      },
+      {
+        "step": 7,
+        "name": "Parse and Enforce Hard Constraints (per page)",
+        "type": "Code node (JavaScript)",
+        "description": "For each page, parse the raw LLM response as JSON. Enforce constraint integrity: (1) PAGE TYPE: Overwrite page_type with the intended value from page_scope — do not allow LLM to change it. (2) PAGE GOAL: Overwrite page_goal with the deterministic mapping (about-page → build-trust, etc.) — do not allow LLM to deviate from the documented mapping. (3) FORBIDDEN IMPRESSIONS: Scan all text fields for any forbidden_impressions strings. If found, replace the offending text with REQUIRES-REVIEW-COPY-VIOLATION and log. (4) LEGAL CONTENT GUARD: For legal-support-page, scan body_sections for any text that reads like generated legal copy rather than a placeholder. If found, replace with PLACEHOLDER-REQUIRES-LEGAL-REVIEW and log a LEGAL-CONTENT-SAFETY-VIOLATION warning. (5) PLACEHOLDER AUDIT: Count all PLACEHOLDER-REQUIRES-REVIEW instances across all text fields. Store the count in a placeholder_count variable. If placeholder_count = 0 for shipping-page, returns-page, or contact-page, flag as MISSING-EXPECTED-PLACEHOLDERS — these pages almost certainly require operational facts that are unavailable. (6) MINIMUM BODY SECTIONS: Verify body_sections >= 1. (7) TRUST ELEMENTS MINIMUM: Verify trust_elements >= 1. (8) CTA DIRECTION: Verify cta_direction has both primary_cta and cta_tone with valid enum values.",
+        "input": "raw LLM response per page + page_signals + page_type",
+        "output": "parsed and constrained page_content object per page (pre-validation)"
+      },
+      {
+        "step": 8,
+        "name": "Validate Against Schema (per page)",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate each page_content object against schemas/page-content.schema.json using ajv. Key validations: page_title non-empty, page_type in enum, page_goal in enum, intro_text non-empty, body_sections array non-empty with each item having section_title, section_purpose, section_text, trust_elements array non-empty, cta_direction object with required sub-fields. Halt per-page on validation failure — log exact field violation and page_type.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/page-content.schema.json",
+        "failure_behavior": "Log validation failure for the specific page. Do not halt the entire workflow for one page's failure — continue processing remaining pages. Report all failed pages in the review-required manifest.",
+        "input": "constrained page_content object per page",
+        "output": "validated page_content objects or per-page validation errors"
+      },
+      {
+        "step": 9,
+        "name": "Persist page-content.json (per page)",
+        "type": "GitHub node or Write File node",
+        "description": "Write each validated page-content.json to projects/{project_id}/page-content/{page_type}.json. Commit with a message such as 'chore: generate page-content for {store_id} — Phase 6 draft (planning, review required)'. Pages that failed validation are logged to a review-required manifest. Include a note in the commit message with the total placeholder count across all pages — this signals how much operational verification is still required before these pages can be published.",
+        "artifact_path": "projects/{project_id}/page-content/{page_type}.json",
+        "review_manifest_path": "projects/{project_id}/page-content/_review-required.json",
+        "git_note": "Each page-content.json must be committed to Git. The commit message must clearly communicate that these are planning artifacts with PLACEHOLDER fields requiring operational verification. Do not treat these artifacts as production-ready.",
+        "input": "validated page_content object per page",
+        "output": "confirmation of write per page + list of persisted artifact paths"
+      },
+      {
+        "step": 10,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the list of persisted page-content artifact paths, the review-required manifest path, the page_scope list, and a summary of placeholder counts per page to the master orchestrator. The orchestrator must be informed that all page-content artifacts require operational fact verification before any page can be published. The placeholder_count summary signals which pages need the most review attention.",
+        "input": "artifact_paths list + review_required manifest path + page_scope list + placeholder_counts summary",
+        "output": "workflow output payload with page content planning metadata"
+      }
+    ],
+
+    "assumptions": [
+      "brand-positioning.json, market-intelligence.json, design-system.json, homepage-strategy.json, and store-profile.json must all be available before this workflow runs. Page content cannot be meaningfully synthesized without brand positioning as the primary input.",
+      "Specific operational facts (shipping rates, return windows, contact email, business address, support hours) are not derivable from strategic planning inputs. All such fields will use PLACEHOLDER-REQUIRES-REVIEW in the output. This is expected behavior, not a workflow failure.",
+      "The default page scope (About, Contact, Shipping, Returns) applies when intake_preferences are absent. Conditional pages (trust, guide, FAQ, legal) are evaluated based on the documented selection logic.",
+      "Legal content (privacy policy, terms of service) must never be generated by this workflow. Legal pages receive structural scaffolds with explicit legal review placeholders only.",
+      "Page content artifacts are planning-level outputs. They establish the structure, tone, purpose, and directional copy for each page. They require human review, operational fact completion, and potentially copywriting refinement before any page is published.",
+      "The faq-page page-content artifact produced here is a planning scaffold. The dedicated build-faq-page workflow (step 22) will produce the complete FAQ artifact with full AEO alignment in a later phase.",
+      "One page-content.json artifact is produced per page type in scope. Page types use the enum values from schemas/page-content.schema.json as file names.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "The exact enum values for cta_direction.primary_cta and cta_direction.cta_tone must be confirmed from schemas/page-content.schema.json before implementation."
+    ],
+
+    "open_questions": [
+      {
+        "question": "What are the exact allowed enum values for cta_direction.primary_cta in schemas/page-content.schema.json? General pages likely use different CTA types than product or collection pages.",
+        "impact": "The LLM prompt and constraint enforcement depend on these exact values.",
+        "recommended_default": "Read schemas/page-content.schema.json directly before implementing. The schema is the authoritative source."
+      },
+      {
+        "question": "Should there be a mechanism for operators to provide operational facts (shipping rates, return policy, contact details) as a structured intake supplement, rather than expecting them all to be filled in post-generation?",
+        "impact": "Without operational facts, shipping-page, returns-page, and contact-page artifacts will have high placeholder counts, making them less useful as planning outputs.",
+        "recommended_default": "Yes — the intake form (intake-store-input) should include an optional 'operational details' section where operators can provide: shipping regions/rates, return window, contact email, business hours. This data, if provided, should be passed to build-page-content as a supplement. Document this as an enhancement request for the intake workflow."
+      },
+      {
+        "question": "Should the About page receive a richer intake form section that captures founding story, team members, or brand origin details?",
+        "impact": "Without specific founding context, About page content defaults to generic brand positioning framing. An authentic About page benefits greatly from specific brand origin and team details.",
+        "recommended_default": "Yes — the intake form should include an optional 'brand story' section. If provided, this should be treated as operational truth and used to populate the About page body_sections with genuine specifics."
+      },
+      {
+        "question": "Should the guide-page scope support multiple guide pages (e.g. one guide per product category) or only a single store-level guide page?",
+        "impact": "A store with multiple categories may benefit from category-specific guide pages. A single store-level guide may be insufficient for editorial-commerce stores.",
+        "recommended_default": "In Phase 6, default to one guide page per store. If multiple category guides are needed, they can be generated by running build-page-content with a specific collection context in a future enhancement. Document this as a scope limitation."
+      }
+    ]
+  }
+}

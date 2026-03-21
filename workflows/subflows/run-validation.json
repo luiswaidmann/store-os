@@ -1,0 +1,913 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. The validation-report.json output is a planning artifact only — not a production-verified compliance report, not a Shopify store health audit, not an automated CI/CD pipeline result, and not a confirmation that any artifact is free of defects. All validation checks defined here are planning-level intent definitions. No real schema validators have been run against live artifacts. No production system has been queried. Human review of all check results is required before any publish decision is made.",
+    "planning_artifact_note": "IMPORTANT — VALIDATION IS PLANNED LOGIC, NOT EXECUTED LOGIC: This workflow defines the validation checks that should be executed when this workflow is eventually implemented in n8n. It does not execute those checks. The check definitions (artifact presence rules, contradiction detection rules, placeholder density thresholds, schema conformance expectations) are planning-level specifications. AJV schema validation, dependency graph traversal, and cross-artifact contradiction detection are described as planned logic — not as code that has been run against any artifact.",
+    "no_production_execution_note": "IMPORTANT — NO PRODUCTION SYSTEMS ARE QUERIED: This workflow does not call Shopify APIs, does not query live stores, does not access production databases, does not read from theme file systems, and does not execute any deployment pipeline checks. Validation is scoped entirely to the planning artifacts in the project folder. Any check that would require access to live production systems is marked as REQUIRES-PRODUCTION-REVIEW and treated as blocked.",
+    "llm_synthesis_boundary_note": "IMPORTANT — LLM IS USED FOR NARRATIVE SYNTHESIS ONLY: The LLM node in this workflow is responsible for synthesizing human-readable check descriptions, severity rationales, and recommended actions from the deterministic check results. The LLM does not perform the validation logic itself. All check pass/fail determinations are made by code nodes using deterministic rules. The LLM may identify nuance and context in check results but cannot override deterministic check outcomes.",
+    "contradiction_detection_scope_note": "IMPORTANT — CONTRADICTIONS ARE PLANNING-LEVEL SIGNAL, NOT PROOF OF DEFECT: Cross-artifact contradiction detection identifies inconsistencies between related planning artifacts that warrant human review. Contradictions do not automatically block publishing — their severity and blocking status depend on the type and extent of the inconsistency, as defined per-check below.",
+    "placeholder_density_scope_note": "IMPORTANT — PLACEHOLDER DENSITY IS A READINESS SIGNAL, NOT A QUALITY METRIC: High placeholder density in planning artifacts indicates that content, data, or operational facts have not yet been resolved. This is expected at the planning stage. Placeholder density thresholds in this workflow are signals for implementation readiness, not judgements about content quality. PLACEHOLDER-REQUIRES-REVIEW items require human authoring. REQUIRES-OPERATIONAL-DATA items require the store operator to supply facts.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/validation-report.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "docs/architecture.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "run-validation",
+    "name": "run-validation",
+    "category": "governance",
+    "phase": "Phase 10 — Validation, Quality Scoring, Deployment Manifest, and Publish Decision",
+    "purpose": "Aggregate all planning artifacts from Phases 1–9 and execute a comprehensive set of planned validation checks to produce a store-level validation-report.json. The validation report defines: the overall validation status of the planning artifact set, the result of each individual check (passed, warning, failed, or skipped), severity classifications (low, medium, high, critical), blocking status, recommended actions, and a summary that informs whether publishing should be blocked. Validation categories covered: (1) required artifact presence by phase, (2) schema conformance expectations for each artifact type, (3) contradiction detection between related artifact pairs, (4) placeholder density and unresolved review flag analysis, (5) REQUIRES-OPERATIONAL-DATA gap detection, (6) empty or sparse artifact conditions that should block publishing, and (7) SEO/AEO strategy re-run recommendation signals. This workflow does not execute real validators against production systems, does not call Shopify APIs, does not run AJV against live data, and does not access theme code or deployment pipelines. All validation logic is planning-level specification. The output is a structured planning artifact that downstream workflows (build-quality-score, build-deployment-manifest, build-publish-decision) consume as their primary governance input.",
+
+    "validation_philosophy": "Validation in this context means: have the planning artifacts been produced with sufficient completeness, internal consistency, and resolution of known gaps to warrant proceeding to implementation? This is not a test of business success, content quality, or SEO performance. It is a readiness gate — a structured signal about what is complete, what is incomplete, what is contradictory, and what must be resolved before a human approves the publish decision. Validation is conservative by design. When in doubt, flag. When a check cannot be performed due to missing dependencies, mark it as skipped — not passed.",
+
+    "upstream_dependency_order": "This is the first Phase 10 workflow. It depends on all Phase 1–9 artifacts: build-store-profile (Phase 1), build-market-intelligence, build-brand-positioning, build-competitor-clusters (Phase 2), build-pattern-manifest, build-design-system, build-homepage-strategy (Phase 3), build-section-plan, build-product-content, build-product-seo (Phase 4), build-product-faq, build-product-structured-data, build-collection-content (Phase 5), build-collection-seo, build-collection-navigation, build-page-content (Phase 6), build-page-seo, build-faq-page, build-seo-strategy (Phase 7), build-aeo-strategy, build-internal-linking, build-structured-data-plan (Phase 8), build-media-plan, build-video-plan, build-motion-media-strategy (Phase 9). All upstream artifacts should be available before this workflow runs. Missing artifacts are detected by presence checks and do not prevent the workflow from running — they are captured as blocking or non-blocking failed checks as defined per-check.",
+
+    "inputs": {
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "data_treatment": "PHASE 1 PRESENCE ANCHOR — store-profile is the root artifact. Its presence is required. Its project_id, store_id, and vertical fields contextualize all validation checks. Missing store-profile is a critical blocker.",
+        "fields_used": [
+          {
+            "field": "project_id",
+            "treatment": "VALIDATION CONTEXT ANCHOR — used to confirm artifact path consistency across all artifacts. Mismatched project_id across artifacts is a critical consistency failure.",
+            "note": "project_id consistency is a structural check, not a content check."
+          },
+          {
+            "field": "vertical",
+            "treatment": "CHECK SCOPE CALIBRATION — vertical informs which artifact types are expected. Does not automatically exempt any artifact from presence requirements.",
+            "note": "Vertical is a planning-level signal."
+          }
+        ]
+      },
+
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "data_treatment": "PHASE 2 CONTRADICTION SOURCE — compared against design-system for brand_role consistency and forbidden_impressions alignment. Absence causes all brand-consistency contradiction checks to be skipped.",
+        "fields_used": [
+          {
+            "field": "brand_role",
+            "treatment": "DESIGN-SYSTEM BRAND ROLE CONTRADICTION CHECK — must be consistent with design-system.brand_role. Refinements (more specific in design-system) are acceptable. Direct contradictions are high-severity check failures.",
+            "note": "Brand role may have been refined during Phase 3 synthesis."
+          },
+          {
+            "field": "forbidden_impressions",
+            "treatment": "DESIGN-SYSTEM ALIGNMENT — brand-positioning.forbidden_impressions must be consistent with design-system.forbidden_impressions. Impressions forbidden in brand-positioning but allowed in design-system are medium-severity contradictions.",
+            "note": "Design-system may extend the forbidden list. Reversals of brand-positioning constraints are contradictions."
+          }
+        ]
+      },
+
+      "from_design_system": {
+        "source": "build-design-system → design-system.json",
+        "artifact_path": "projects/{project_id}/design-system.json",
+        "data_treatment": "PHASE 3 CEILING AUTHORITY — the most constraint-authoritative artifact in the system. Contradiction checks that involve design-system always resolve in its favor. Absence causes all ceiling compliance checks to be skipped.",
+        "fields_used": [
+          {
+            "field": "motion_strategy",
+            "treatment": "MOTION CEILING COMPLIANCE CHECK — motion-media-strategy output motion_policy values must be ≤ design-system.motion_strategy ceilings. Any exceedance is a critical check failure.",
+            "note": "Ceiling enforcement was intended during Phase 9. Violations indicate a Phase 9 enforcement gap."
+          },
+          {
+            "field": "performance_guardrails",
+            "treatment": "PERFORMANCE COMPLIANCE CHECK — media-plan, video-plan, and motion-media-strategy performance_policy must all be consistent with design-system.performance_guardrails. Heavy media or high motion usage levels that exceed ceilings are critical failures.",
+            "note": "Performance guardrails are the strongest constraints in the system."
+          }
+        ]
+      },
+
+      "from_homepage_strategy": {
+        "source": "build-homepage-strategy → homepage-strategy.json",
+        "artifact_path": "projects/{project_id}/homepage-strategy.json",
+        "data_treatment": "PHASE 3 SECTION CONSISTENCY SOURCE — compared against section-plan instances to verify that section types planned in Phase 3 are reflected in Phase 4 instances.",
+        "fields_used": [
+          {
+            "field": "section_sequence",
+            "treatment": "SECTION PLAN ALIGNMENT CHECK — section types in section_sequence must have corresponding section-instance artifacts. Missing instances for homepage-strategy sections are failed checks.",
+            "note": "Section plan may include additional non-homepage sections. The check is directional: homepage-strategy sections → instances, not all instances → homepage-strategy."
+          },
+          {
+            "field": "hero_strategy",
+            "treatment": "HERO CONFIGURATION CONSISTENCY CHECK — hero_strategy.hero_media_type must be consistent with design-system.motion_strategy.hero_video_allowed and video-plan hero slot configurations.",
+            "note": "Inconsistencies between homepage-strategy hero and downstream plans are medium-severity check failures."
+          }
+        ]
+      },
+
+      "from_section_plan": {
+        "source": "build-section-plan → section-instances (array of section-instance.json)",
+        "artifact_path": "projects/{project_id}/section-instances/",
+        "data_treatment": "PHASE 4 INSTANCE COMPLETENESS CHECK — checked for presence, motion_intensity ceiling compliance, and placeholder density contribution.",
+        "fields_used": [
+          {
+            "field": "motion_intensity",
+            "treatment": "MOTION CEILING COMPLIANCE — each section instance motion_intensity must be ≤ design-system.motion_strategy.global_motion_level ceiling.",
+            "note": "Violations indicate a Phase 4 enforcement gap."
+          },
+          {
+            "field": "content_placeholders",
+            "treatment": "PLACEHOLDER DENSITY CONTRIBUTION — PLACEHOLDER-REQUIRES-REVIEW markers contribute to global placeholder density count.",
+            "note": "Section-level placeholders are common in Phase 4."
+          }
+        ]
+      },
+
+      "from_seo_strategy": {
+        "source": "build-seo-strategy → seo-strategy.json",
+        "artifact_path": "projects/{project_id}/seo-strategy.json",
+        "data_treatment": "PHASE 7 SEO CONSISTENCY ANCHOR — authoritative source for keyword targeting strategy, canonical URL strategy, and metadata constraints. All per-page SEO artifacts must be consistent with it. Absence causes all SEO consistency checks to be skipped.",
+        "fields_used": [
+          {
+            "field": "primary_keyword_clusters",
+            "treatment": "SEO ARTIFACT ALIGNMENT CHECK — product-seo, collection-seo, and page-seo primary keywords must fall within or extend the keyword clusters. Keywords that contradict deprioritization decisions are failed checks.",
+            "note": "Coverage gaps (keywords not yet targeted) are warnings. Contradictions (targeting what the strategy excludes) are failures."
+          },
+          {
+            "field": "revision_guidance",
+            "treatment": "RE-RUN RECOMMENDATION SIGNAL — if seo-strategy.revision_guidance signals that downstream SEO artifacts should be regenerated, this is captured as a warning-level check recommending re-run.",
+            "note": "Optional field. If absent, no re-run signal is generated."
+          },
+          {
+            "field": "canonical_strategy",
+            "treatment": "CANONICAL POLICY CONSISTENCY CHECK — canonical URL strategy must be reflected consistently across all per-page SEO artifacts. Contradictions are high-severity blocking checks.",
+            "note": "Canonical policy inconsistencies can cause SEO harm if implemented."
+          }
+        ]
+      },
+
+      "from_aeo_strategy": {
+        "source": "build-aeo-strategy → aeo-strategy.json",
+        "artifact_path": "projects/{project_id}/aeo-strategy.json",
+        "data_treatment": "PHASE 8 AEO CONSISTENCY ANCHOR — defines answer format requirements and FAQ schema hints that must be reflected in faq-page and product-faq. Absence causes all AEO consistency checks to be skipped.",
+        "fields_used": [
+          {
+            "field": "answer_format_requirements",
+            "treatment": "FAQ FORMAT COMPLIANCE CHECK — faq-page and product-faq answer formats must be compatible with aeo-strategy.answer_format_requirements.",
+            "note": "AEO answer format compliance is a planning-level check."
+          },
+          {
+            "field": "structured_data_hints",
+            "treatment": "STRUCTURED DATA PLAN ALIGNMENT — hints must be reflected in structured-data-plan schema type selections. Missing recommended schema types are medium-severity warnings.",
+            "note": "Hints are recommendations, not requirements."
+          }
+        ]
+      },
+
+      "from_structured_data_plan": {
+        "source": "build-structured-data-plan → structured-data-plan.json",
+        "artifact_path": "projects/{project_id}/structured-data-plan.json",
+        "data_treatment": "PHASE 8 STRUCTURED DATA CONSISTENCY SOURCE — schema type selections must be consistent with product-structured-data schema types. Plan-to-artifact type mismatches are medium-to-high severity check failures.",
+        "fields_used": [
+          {
+            "field": "schema_types_planned",
+            "treatment": "PRODUCT STRUCTURED DATA ALIGNMENT — must be present in product-structured-data.schema_type per product. Missing required schema types are failed checks.",
+            "note": "The plan defines intended coverage. The per-product artifacts define actual coverage."
+          },
+          {
+            "field": "required_fields_by_schema_type",
+            "treatment": "REQUIRED FIELDS PRESENCE CHECK — required fields must be present and non-placeholder in product-structured-data artifacts. REQUIRES-OPERATIONAL-DATA values are warnings, not failures.",
+            "note": "REQUIRES-OPERATIONAL-DATA means the plan is correct but the data is pending."
+          }
+        ]
+      },
+
+      "from_media_plan": {
+        "source": "build-media-plan → media-plan.json",
+        "artifact_path": "projects/{project_id}/media-plan.json",
+        "data_treatment": "PHASE 9 MEDIA CONSISTENCY SOURCE — checked for video slot poster image coverage, design-system ceiling compliance, and asset gap policy consistency.",
+        "fields_used": [
+          {
+            "field": "planned_asset_slots",
+            "treatment": "VIDEO POSTER SLOT COVERAGE CHECK — every planned video slot in video-plan must have a corresponding poster/fallback slot in media-plan. Missing fallback slots for video are high-severity warnings.",
+            "note": "Poster image absence for planned video is a real production risk."
+          },
+          {
+            "field": "asset_gap_policy",
+            "treatment": "GAP POLICY CONSISTENCY CHECK — must be consistent with video-plan.missing_asset_policy and motion-media-strategy.fallback_policy. More permissive downstream policies are contradictions.",
+            "note": "Asset gap policies should become more conservative downstream, never more permissive."
+          }
+        ]
+      },
+
+      "from_video_plan": {
+        "source": "build-video-plan → video-plan.json",
+        "artifact_path": "projects/{project_id}/video-plan.json",
+        "data_treatment": "PHASE 9 VIDEO CEILING COMPLIANCE SOURCE — checked against design-system video and performance ceilings. video_usage_level exceedance is a critical check failure. Autoplay/muted inconsistencies are critical failures.",
+        "fields_used": [
+          {
+            "field": "video_usage_level",
+            "treatment": "CEILING COMPLIANCE CHECK — must be ≤ design-system.motion_strategy.video_usage_level. Any exceedance is a critical blocking check failure.",
+            "note": "A violation indicates a Phase 9 enforcement gap."
+          },
+          {
+            "field": "planned_video_slots",
+            "treatment": "AUTOPLAY/MUTED COMPLIANCE — every slot with autoplay = true must have muted = true. autoplay = true AND muted = false is always a critical blocking failure. Above-fold video slots must have poster_required = true.",
+            "note": "Autoplay without muted is a fundamental audio and accessibility violation."
+          }
+        ]
+      },
+
+      "from_motion_media_strategy": {
+        "source": "build-motion-media-strategy → motion-media-strategy.json",
+        "artifact_path": "projects/{project_id}/motion-media-strategy.json",
+        "data_treatment": "PHASE 9 STRATEGY CEILING AND FALLBACK COMPLIANCE — checked for motion policy ceiling compliance against design-system, fallback policy completeness, and reduced-motion compliance.",
+        "fields_used": [
+          {
+            "field": "motion_policy",
+            "treatment": "CEILING COMPLIANCE AND REDUCED-MOTION CHECK — all motion_policy levels must be ≤ design-system ceilings. reduced_motion_respect_required must be true.",
+            "note": "Violations are critical check failures."
+          },
+          {
+            "field": "fallback_policy",
+            "treatment": "FALLBACK COMPLETENESS CHECK — poster_required_for_video, mobile_fallback_required_for_hero_media, and static_fallback_required_for_motion must all be true. Any false value is a high-severity blocking failure.",
+            "note": "Complete fallback policy is a fundamental readiness requirement."
+          }
+        ]
+      },
+
+      "from_product_content": {
+        "source": "build-product-content → product-content.json (per product)",
+        "artifact_path": "projects/{project_id}/product-content/",
+        "data_treatment": "PHASE 4 CONTENT PRESENCE AND DENSITY CHECK — checked for presence, placeholder density, and REQUIRES-OPERATIONAL-DATA markers. The overall product content completeness signal is derived here.",
+        "fields_used": [
+          {
+            "field": "product_description",
+            "treatment": "PLACEHOLDER DENSITY CONTRIBUTION — PLACEHOLDER-REQUIRES-REVIEW markers contribute to global placeholder density count. Dense placeholders in product descriptions are high-severity warnings.",
+            "note": "Product descriptions are high-priority conversion content."
+          },
+          {
+            "field": "pricing",
+            "treatment": "REQUIRES-OPERATIONAL-DATA CHECK — any pricing field marked REQUIRES-OPERATIONAL-DATA is a critical blocking failure. A store cannot publish without real pricing.",
+            "note": "Pricing is an operational fact with zero tolerance for unresolved gaps at publish time."
+          }
+        ]
+      },
+
+      "from_product_seo": {
+        "source": "build-product-seo → product-seo.json (per product)",
+        "artifact_path": "projects/{project_id}/product-seo/",
+        "data_treatment": "PHASE 4 SEO CONSISTENCY CHECK — checked for seo-strategy keyword alignment, canonical URL policy compliance, and placeholder density.",
+        "availability": "Per-product artifacts. Checked for all products in the catalog."
+      },
+
+      "from_product_faq": {
+        "source": "build-product-faq → product-faq.json (per product)",
+        "artifact_path": "projects/{project_id}/product-faq/",
+        "data_treatment": "PHASE 5 AEO ALIGNMENT CHECK — checked for aeo-strategy answer format compliance and FAQ schema markup hint presence consistent with structured-data-plan.",
+        "availability": "Per-product artifacts. Missing product-faq for products with FAQ schema in structured-data-plan is a medium-severity warning."
+      },
+
+      "from_product_structured_data": {
+        "source": "build-product-structured-data → product-structured-data.json (per product)",
+        "artifact_path": "projects/{project_id}/product-structured-data/",
+        "data_treatment": "PHASE 5 STRUCTURED DATA PLAN ALIGNMENT — checked for schema type consistency with structured-data-plan, required field presence, and REQUIRES-OPERATIONAL-DATA markers on required fields.",
+        "availability": "Per-product artifacts. Missing structured data for products listed in structured-data-plan.required_products is a high-severity failed check."
+      },
+
+      "from_collection_content": {
+        "source": "build-collection-content → collection-content.json (per collection)",
+        "artifact_path": "projects/{project_id}/collection-content/",
+        "data_treatment": "PHASE 5 CONTENT PRESENCE AND DENSITY CHECK — checked for presence and placeholder density.",
+        "availability": "Per-collection artifacts. Missing collection-content is a medium-severity warning."
+      },
+
+      "from_collection_seo": {
+        "source": "build-collection-seo → collection-seo.json (per collection)",
+        "artifact_path": "projects/{project_id}/collection-seo/",
+        "data_treatment": "PHASE 6 SEO CONSISTENCY CHECK — checked for seo-strategy keyword alignment and canonical URL policy compliance.",
+        "availability": "Per-collection artifacts."
+      },
+
+      "from_page_content": {
+        "source": "build-page-content → page-content.json (per page)",
+        "artifact_path": "projects/{project_id}/page-content/",
+        "data_treatment": "PHASE 6 POLICY PAGE COMPLETENESS CHECK — policy pages (privacy-policy, terms-of-service, shipping-policy, return-policy) are checked for presence and for REQUIRES-OPERATIONAL-DATA or PLACEHOLDER-REQUIRES-REVIEW markers. Missing or placeholder-only legal pages are critical blocking failures.",
+        "fields_used": [
+          {
+            "field": "content_body",
+            "treatment": "LEGAL PAGE COMPLETENESS — for policy pages, a content_body that is entirely PLACEHOLDER-REQUIRES-REVIEW or REQUIRES-OPERATIONAL-DATA is a critical blocking failure. Legal pages must contain real legal content before any launch mode.",
+            "note": "Legal pages are legal documents, not content. Placeholder legal pages are a compliance risk."
+          }
+        ]
+      },
+
+      "from_page_seo": {
+        "source": "build-page-seo → page-seo.json (per page)",
+        "artifact_path": "projects/{project_id}/page-seo/",
+        "data_treatment": "PHASE 7 SEO CONSISTENCY CHECK — checked for seo-strategy alignment and placeholder density.",
+        "availability": "Per-page artifacts."
+      },
+
+      "from_faq_page": {
+        "source": "build-faq-page → faq-page.json",
+        "artifact_path": "projects/{project_id}/faq-page.json",
+        "data_treatment": "PHASE 7 AEO ALIGNMENT CHECK — checked for aeo-strategy answer format compliance, structured data markup hints, and placeholder density.",
+        "availability": "Single artifact. Missing faq-page is a medium-severity warning if aeo-strategy specifies FAQ as a primary AEO investment."
+      },
+
+      "from_internal_linking": {
+        "source": "build-internal-linking → internal-linking.json",
+        "artifact_path": "projects/{project_id}/internal-linking.json",
+        "data_treatment": "PHASE 8 LINKING COVERAGE CHECK — checked for presence and coverage of high-priority pages from seo-strategy.",
+        "availability": "Single artifact. Missing internal-linking is a medium-severity warning."
+      }
+    },
+
+    "validation_check_definitions": {
+      "category_1_required_artifact_presence": {
+        "description": "Verify all required Phase 1–9 artifacts exist at expected artifact paths for the project_id.",
+        "check_scope": "project-structure",
+        "checks": [
+          {
+            "check_name": "phase-1-store-profile-present",
+            "severity": "critical",
+            "blocking": true,
+            "logic": "Verify projects/{project_id}/store-profile.json exists and is non-empty. Missing store-profile is a critical blocker — the entire artifact chain cannot be validated without it."
+          },
+          {
+            "check_name": "phase-2-brand-positioning-present",
+            "severity": "high",
+            "blocking": true,
+            "logic": "Verify projects/{project_id}/brand-positioning.json exists and is non-empty."
+          },
+          {
+            "check_name": "phase-2-market-intelligence-present",
+            "severity": "medium",
+            "blocking": false,
+            "logic": "Verify projects/{project_id}/market-intelligence.json exists. Non-blocking but required for quality scoring."
+          },
+          {
+            "check_name": "phase-3-design-system-present",
+            "severity": "critical",
+            "blocking": true,
+            "logic": "Verify projects/{project_id}/design-system.json exists and has motion_strategy, performance_guardrails, and media_strategy fields. Missing design-system causes all ceiling compliance checks to be skipped."
+          },
+          {
+            "check_name": "phase-3-homepage-strategy-present",
+            "severity": "high",
+            "blocking": true,
+            "logic": "Verify projects/{project_id}/homepage-strategy.json exists."
+          },
+          {
+            "check_name": "phase-4-section-instances-present",
+            "severity": "high",
+            "blocking": false,
+            "logic": "Verify projects/{project_id}/section-instances/ directory is non-empty. Count must match expected count from homepage-strategy.section_sequence."
+          },
+          {
+            "check_name": "phase-4-product-content-present",
+            "severity": "high",
+            "blocking": false,
+            "logic": "Verify at least one product-content artifact exists. Zero product content artifacts for a store with products is a critical failure."
+          },
+          {
+            "check_name": "phase-6-policy-pages-present",
+            "severity": "critical",
+            "blocking": true,
+            "logic": "Verify page-content artifacts exist for: privacy-policy, terms-of-service, shipping-policy, return-policy. Missing any legal/policy page is a critical blocking failure."
+          },
+          {
+            "check_name": "phase-7-seo-strategy-present",
+            "severity": "high",
+            "blocking": false,
+            "logic": "Verify projects/{project_id}/seo-strategy.json exists. Absence causes all SEO consistency checks to be skipped."
+          },
+          {
+            "check_name": "phase-8-aeo-strategy-present",
+            "severity": "medium",
+            "blocking": false,
+            "logic": "Verify projects/{project_id}/aeo-strategy.json exists."
+          },
+          {
+            "check_name": "phase-8-structured-data-plan-present",
+            "severity": "medium",
+            "blocking": false,
+            "logic": "Verify projects/{project_id}/structured-data-plan.json exists."
+          },
+          {
+            "check_name": "phase-9-media-plan-present",
+            "severity": "high",
+            "blocking": false,
+            "logic": "Verify projects/{project_id}/media-plan.json exists."
+          },
+          {
+            "check_name": "phase-9-video-plan-present",
+            "severity": "medium",
+            "blocking": false,
+            "logic": "Verify projects/{project_id}/video-plan.json exists."
+          },
+          {
+            "check_name": "phase-9-motion-media-strategy-present",
+            "severity": "medium",
+            "blocking": false,
+            "logic": "Verify projects/{project_id}/motion-media-strategy.json exists."
+          }
+        ]
+      },
+
+      "category_2_schema_conformance_expectations": {
+        "description": "Planned AJV schema validation checks for each artifact type. These are planning-level specifications — not executed in this workflow. When implemented, each check runs AJV against the artifact file using the corresponding schema.",
+        "check_scope": "other",
+        "planned_ajv_checks": [
+          {
+            "check_name": "schema-conformance-store-profile",
+            "schema": "schemas/store-profile.schema.json",
+            "severity": "high",
+            "blocking": false
+          },
+          {
+            "check_name": "schema-conformance-brand-positioning",
+            "schema": "schemas/brand-positioning.schema.json",
+            "severity": "high",
+            "blocking": false
+          },
+          {
+            "check_name": "schema-conformance-design-system",
+            "schema": "schemas/design-system.schema.json",
+            "severity": "critical",
+            "blocking": true,
+            "note": "Critical because all ceiling compliance checks depend on valid design-system structure."
+          },
+          {
+            "check_name": "schema-conformance-seo-strategy",
+            "schema": "schemas/seo-strategy.schema.json",
+            "severity": "high",
+            "blocking": false
+          },
+          {
+            "check_name": "schema-conformance-aeo-strategy",
+            "schema": "schemas/aeo-strategy.schema.json",
+            "severity": "medium",
+            "blocking": false
+          },
+          {
+            "check_name": "schema-conformance-structured-data-plan",
+            "schema": "schemas/structured-data-plan.schema.json",
+            "severity": "medium",
+            "blocking": false
+          },
+          {
+            "check_name": "schema-conformance-media-plan",
+            "schema": "schemas/media-plan.schema.json",
+            "severity": "high",
+            "blocking": false
+          },
+          {
+            "check_name": "schema-conformance-video-plan",
+            "schema": "schemas/video-plan.schema.json",
+            "severity": "medium",
+            "blocking": false
+          },
+          {
+            "check_name": "schema-conformance-motion-media-strategy",
+            "schema": "schemas/motion-media-strategy.schema.json",
+            "severity": "medium",
+            "blocking": false
+          }
+        ]
+      },
+
+      "category_3_contradiction_detection": {
+        "description": "Cross-artifact consistency checks between related artifact pairs. Contradictions are planning-level inconsistencies that warrant human review.",
+        "check_scope": "content",
+        "checks": [
+          {
+            "check_name": "brand-positioning-design-system-brand-role-alignment",
+            "severity": "high",
+            "blocking": false,
+            "logic": "Compare brand-positioning.brand_role with design-system.brand_role. Refinements (more specific in design-system) are acceptable and pass. Direct contradictions are failures.",
+            "contradiction_example": "brand-positioning = value-leader, design-system = premium-innovator"
+          },
+          {
+            "check_name": "brand-positioning-design-system-forbidden-impressions-alignment",
+            "severity": "medium",
+            "blocking": false,
+            "logic": "design-system.forbidden_impressions must be a superset of or consistent with brand-positioning.forbidden_impressions. Reversals of brand-positioning constraints are contradictions.",
+            "contradiction_example": "brand-positioning forbids 'cheap', design-system removes 'cheap' from forbidden list"
+          },
+          {
+            "check_name": "homepage-strategy-section-plan-section-type-alignment",
+            "severity": "high",
+            "blocking": false,
+            "logic": "Each section type in homepage-strategy.section_sequence must have a corresponding section-instance artifact. Instances present in section-plan but absent from homepage-strategy are allowed (non-homepage sections).",
+            "contradiction_example": "homepage-strategy plans testimonial-section but no testimonial section-instance exists"
+          },
+          {
+            "check_name": "seo-strategy-product-seo-keyword-alignment",
+            "severity": "high",
+            "blocking": false,
+            "logic": "For each product-seo artifact, verify primary_keyword is within or extends the seo-strategy keyword clusters. Keywords that contradict strategy targeting priority assignments are failed checks.",
+            "contradiction_example": "seo-strategy deprioritizes broad generic terms, all product-seo primary keywords are broad generics"
+          },
+          {
+            "check_name": "seo-strategy-collection-seo-keyword-alignment",
+            "severity": "high",
+            "blocking": false,
+            "logic": "Same keyword alignment check applied to collection-seo artifacts.",
+            "contradiction_example": "seo-strategy targets long-tail category terms, collection-seo targets only brand-name terms"
+          },
+          {
+            "check_name": "seo-strategy-canonical-policy-alignment",
+            "severity": "critical",
+            "blocking": true,
+            "logic": "Canonical URL patterns in product-seo, collection-seo, and page-seo must be consistent with seo-strategy.canonical_strategy. Contradictory canonical assignments can cause SEO harm if implemented.",
+            "contradiction_example": "seo-strategy defines self-referential canonicals for all products, product-X canonical points to collection URL"
+          },
+          {
+            "check_name": "aeo-strategy-faq-page-answer-format-alignment",
+            "severity": "medium",
+            "blocking": false,
+            "logic": "faq-page answer formats must be compatible with aeo-strategy.answer_format_requirements.",
+            "contradiction_example": "aeo-strategy requires concise direct answers for voice search, faq-page uses long narrative paragraphs"
+          },
+          {
+            "check_name": "aeo-strategy-product-faq-answer-format-alignment",
+            "severity": "medium",
+            "blocking": false,
+            "logic": "product-faq answer formats must be compatible with aeo-strategy.answer_format_requirements.",
+            "contradiction_example": "aeo-strategy requires FAQ schema markup hints, product-faq artifacts have no schema annotations"
+          },
+          {
+            "check_name": "structured-data-plan-product-structured-data-schema-type-alignment",
+            "severity": "high",
+            "blocking": false,
+            "logic": "For each product in structured-data-plan.required_products, verify product-structured-data artifact uses a schema_type consistent with structured-data-plan.schema_types_planned.",
+            "contradiction_example": "structured-data-plan specifies Product+Offer schema, product-X uses only basic Item schema"
+          },
+          {
+            "check_name": "media-plan-video-plan-poster-slot-coverage",
+            "severity": "high",
+            "blocking": false,
+            "logic": "For each planned video slot in video-plan with poster_required = true, verify a corresponding poster image slot exists in media-plan.planned_asset_slots.",
+            "contradiction_example": "video-plan has hero-video slot with poster_required = true, no hero-image slot in media-plan"
+          },
+          {
+            "check_name": "video-plan-design-system-video-usage-ceiling-compliance",
+            "severity": "critical",
+            "blocking": true,
+            "logic": "video-plan.video_usage_level must be ≤ design-system.motion_strategy.video_usage_level ceiling.",
+            "contradiction_example": "design-system ceiling = light, video-plan video_usage_level = rich"
+          },
+          {
+            "check_name": "video-plan-autoplay-muted-compliance",
+            "severity": "critical",
+            "blocking": true,
+            "logic": "Every planned video slot with autoplay = true must also have muted = true. autoplay = true AND muted = false is always a critical blocking failure.",
+            "contradiction_example": "product-loop slot has autoplay = true, muted = false"
+          },
+          {
+            "check_name": "motion-media-strategy-design-system-motion-ceiling-compliance",
+            "severity": "critical",
+            "blocking": true,
+            "logic": "motion-media-strategy.motion_policy values (global_motion_level, scroll_motion_level, interaction_motion_level, mobile_motion_limit) must be ≤ design-system equivalent ceilings.",
+            "contradiction_example": "design-system global_motion_level = subtle, motion-media-strategy global_motion_level = strong"
+          },
+          {
+            "check_name": "motion-media-strategy-reduced-motion-compliance",
+            "severity": "critical",
+            "blocking": true,
+            "logic": "motion-media-strategy.motion_policy.reduced_motion_respect_required must be true. Any false or absent value is a critical blocking failure.",
+            "contradiction_example": "motion-media-strategy has reduced_motion_respect_required = false"
+          },
+          {
+            "check_name": "motion-media-strategy-fallback-policy-completeness",
+            "severity": "high",
+            "blocking": true,
+            "logic": "motion-media-strategy.fallback_policy must have poster_required_for_video = true, mobile_fallback_required_for_hero_media = true, and static_fallback_required_for_motion = true.",
+            "contradiction_example": "motion-media-strategy has static_fallback_required_for_motion = false"
+          }
+        ]
+      },
+
+      "category_4_placeholder_density": {
+        "description": "Measure PLACEHOLDER-REQUIRES-REVIEW and REQUIRES-OPERATIONAL-DATA marker density across all artifacts. High density signals implementation readiness risk.",
+        "check_scope": "content",
+        "checks": [
+          {
+            "check_name": "global-placeholder-density",
+            "severity": "variable",
+            "blocking_threshold": "density > 0.60 — more than 60% of content fields across all artifacts are placeholder → failed, blocking",
+            "warning_threshold": "density 0.30–0.60 → warning, non-blocking",
+            "pass_threshold": "density < 0.30 → passed",
+            "logic": "Count PLACEHOLDER-REQUIRES-REVIEW occurrences across all product-content, collection-content, and page-content artifacts. Divide by total content field count.",
+            "note": "Placeholder density is measured at the artifact field level. A single-field placeholder counts as one occurrence. 60% blocking threshold is a planning heuristic."
+          },
+          {
+            "check_name": "legal-page-placeholder-density",
+            "severity": "critical",
+            "blocking": true,
+            "logic": "Legal and policy pages must have zero PLACEHOLDER-REQUIRES-REVIEW and zero REQUIRES-OPERATIONAL-DATA markers in any content_body field.",
+            "note": "Legal pages have zero tolerance for placeholders. They are legal documents."
+          },
+          {
+            "check_name": "product-description-placeholder-density",
+            "severity": "high",
+            "blocking_threshold": "more than 50% of product descriptions contain PLACEHOLDER-REQUIRES-REVIEW → blocking",
+            "warning_threshold": "10–50% contain placeholders → warning",
+            "logic": "Count product-content artifacts where product_description contains PLACEHOLDER-REQUIRES-REVIEW. Calculate ratio against total product count.",
+            "note": "Product descriptions are the most critical conversion content."
+          },
+          {
+            "check_name": "pricing-operational-data-gap",
+            "severity": "critical",
+            "blocking": true,
+            "logic": "Any pricing field in any product-content artifact that contains REQUIRES-OPERATIONAL-DATA is a critical blocking failure.",
+            "note": "A store cannot publish without real pricing."
+          },
+          {
+            "check_name": "unresolved-review-flags-total-count",
+            "severity": "variable",
+            "logic": "Count all PLACEHOLDER-REQUIRES-REVIEW and REQUIRES-OPERATIONAL-DATA markers across all artifacts. Report absolute count and per-artifact-type breakdown. High counts produce warnings with recommended prioritized resolution actions.",
+            "note": "Absolute count is informational. Per-category breakdown enables prioritized resolution planning."
+          }
+        ]
+      },
+
+      "category_5_empty_sparse_conditions": {
+        "description": "Detect artifacts that are present but effectively empty or too sparse to be implementation-useful.",
+        "check_scope": "content",
+        "checks": [
+          {
+            "check_name": "product-content-sparse-detection",
+            "severity": "high",
+            "blocking": false,
+            "logic": "Identify product-content artifacts where product_description length < 50 characters after stripping placeholder markers. Sparse product descriptions are a high-severity warning.",
+            "note": "50-character threshold is a planning heuristic. Adjust per vertical in implementation."
+          },
+          {
+            "check_name": "seo-strategy-sparse-detection",
+            "severity": "medium",
+            "blocking": false,
+            "logic": "Flag seo-strategy artifacts with fewer than 3 keyword clusters as insufficiently synthesized.",
+            "note": "Minimum cluster count is a planning heuristic. Simple verticals may have fewer distinct keyword clusters."
+          },
+          {
+            "check_name": "structured-data-plan-sparse-detection",
+            "severity": "medium",
+            "blocking": false,
+            "logic": "Flag structured-data-plan artifacts where schema_types_planned array is empty or does not cover all products in the catalog.",
+            "note": "A structured-data-plan that does not cover all products is sparse by definition."
+          }
+        ]
+      }
+    },
+
+    "outputs": {
+      "primary_output": "validation-report.json",
+      "artifact_path": "projects/{project_id}/validation-report.json",
+      "schema": "schemas/validation-report.schema.json",
+      "output_fields": {
+        "report_id": {
+          "source": "Generated at runtime",
+          "type": "string",
+          "format_pattern": "run-validation-{project_id}-{timestamp}",
+          "note": "report_id is a runtime-generated identifier not present in this planning artifact."
+        },
+        "overall_status": {
+          "source": "Deterministic aggregation of check results",
+          "type": "constrained enum",
+          "schema_enum": ["passed", "passed-with-warnings", "failed", "blocked"],
+          "derivation_logic": {
+            "blocked": "Any check with blocking = true AND status = failed → overall_status = blocked",
+            "failed": "Any failed check with blocking = false AND no blocking check failed → overall_status = failed",
+            "passed-with-warnings": "No failed checks, at least one warning-status check",
+            "passed": "All checks passed with no warnings — rare at initial generation"
+          },
+          "note": "overall_status = blocked means build-publish-decision must not approve any launch mode until blockers are resolved."
+        },
+        "checks": {
+          "source": "Combined output of all five check categories",
+          "type": "array of check result objects conforming to validation-report.schema.json checks array item schema",
+          "note": "All skipped checks must include a details field explaining why they were skipped (missing prerequisite artifact)."
+        },
+        "summary": {
+          "source": "Aggregated from checks array",
+          "type": "object",
+          "fields": {
+            "passed_count": "count of checks with status = passed",
+            "warning_count": "count of checks with status = warning",
+            "failed_count": "count of checks with status = failed",
+            "blocking_count": "count of checks with status = failed AND blocking = true",
+            "manual_review_required": "true if any check has severity = critical OR any blocking check failed",
+            "publish_blocked": "true if blocking_count > 0"
+          }
+        }
+      },
+      "downstream_consumers": [
+        "build-quality-score — uses validation-report as primary input for scoring degradation and blocker detection",
+        "build-deployment-manifest — uses check results to determine implementation readiness and deferred item tracking",
+        "build-publish-decision — uses summary.publish_blocked and blocking_count as primary gating inputs"
+      ]
+    },
+
+    "nodes": {
+      "node_1_trigger": {
+        "id": "trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "name": "Receive Inputs",
+        "description": "Receives all upstream artifact objects from the orchestrating workflow.",
+        "input_contract": {
+          "project_id": "string — required",
+          "store_profile": "object — required",
+          "brand_positioning": "object — required",
+          "design_system": "object — required",
+          "homepage_strategy": "object — required",
+          "seo_strategy": "object — expected",
+          "aeo_strategy": "object — optional",
+          "structured_data_plan": "object — optional",
+          "section_instances": "array — expected",
+          "product_content_artifacts": "array — expected",
+          "product_seo_artifacts": "array — expected",
+          "product_faq_artifacts": "array — optional",
+          "product_structured_data_artifacts": "array — optional",
+          "collection_content_artifacts": "array — expected",
+          "collection_seo_artifacts": "array — expected",
+          "collection_navigation": "object — optional",
+          "page_content_artifacts": "array — required — must include policy pages",
+          "page_seo_artifacts": "array — expected",
+          "faq_page": "object — optional",
+          "internal_linking": "object — optional",
+          "media_plan": "object — expected",
+          "video_plan": "object — expected",
+          "motion_media_strategy": "object — expected"
+        }
+      },
+
+      "node_2_validate_inputs": {
+        "id": "validate-critical-upstream-inputs",
+        "type": "n8n-nodes-base.code",
+        "name": "Validate Critical Upstream Inputs",
+        "description": "Validates minimum required artifacts and catalogs all present/absent artifacts. Fails fast only if store-profile is absent. All other missing artifacts are captured as failed checks in node 3.",
+        "validation_checks": [
+          "project_id must be a non-empty string",
+          "store_profile must be present with project_id, store_id, and vertical — absence is a critical workflow halt",
+          "Catalog all passed artifacts into artifact_inventory: { artifact_name: present | absent } for all expected inputs",
+          "Flag artifact_inventory.design_system_absent = true if design-system is missing — causes ceiling compliance check category to be skipped",
+          "Flag artifact_inventory.seo_strategy_absent = true if seo-strategy is missing — causes SEO consistency check category to be skipped",
+          "Write artifact_inventory to workflow context for use by all subsequent nodes"
+        ],
+        "on_critical_failure": "store_profile absent → output validation_cannot_proceed = true. Halt workflow.",
+        "on_partial_absence": "Non-critical artifacts absent → continue. Absent artifacts generate failed presence checks in node 3."
+      },
+
+      "node_3_run_deterministic_checks": {
+        "id": "run-deterministic-checks",
+        "type": "n8n-nodes-base.code",
+        "name": "Run All Deterministic Validation Checks",
+        "description": "Executes all planned validation checks from the five check categories using deterministic code logic. Produces a raw checks array with per-check status, severity, blocking flag, and machine-readable detail objects.",
+        "check_execution_order": [
+          "1. Run category_1 required artifact presence checks using artifact_inventory",
+          "2. Run category_2 schema conformance expectation checks — document as planned AJV checks, mark as skipped if artifact absent",
+          "3. Run category_3 contradiction detection checks — compare artifact pairs. Skip if either artifact in a pair is absent.",
+          "4. Run category_4 placeholder density checks — count markers across available artifacts. Note which artifacts were absent and excluded from density calculation.",
+          "5. Run category_5 empty/sparse condition checks — measure field lengths and array sizes against thresholds.",
+          "6. Aggregate: compute blocking_count, failed_count, warning_count, passed_count, skipped_count",
+          "7. Determine preliminary_summary: publish_blocked = blocking_count > 0, manual_review_required = blocking_count > 0 OR any critical severity check failed"
+        ],
+        "output": {
+          "raw_checks_array": "array of check result objects with machine-readable detail",
+          "preliminary_summary": "passed_count, warning_count, failed_count, blocking_count, skipped_count",
+          "artifact_inventory_used": "record of which artifacts were present and included in which check categories"
+        }
+      },
+
+      "node_4_build_llm_prompt": {
+        "id": "build-llm-prompt",
+        "type": "n8n-nodes-base.code",
+        "name": "Build LLM Prompt for Validation Narrative",
+        "description": "Assembles a structured prompt for the LLM to synthesize human-readable descriptions, severity rationales, and recommended actions from the raw deterministic check results.",
+        "prompt_components": [
+          "System message: validation report narrative synthesizer. Role: translate deterministic check results into clear, actionable human-readable text. Do not invent check results. Do not change check status or severity. Do not fabricate facts about artifacts. Only synthesize descriptions and recommended actions from the provided check data.",
+          "Project context: project_id, vertical, store_name from store-profile",
+          "Raw checks array from node 3 with all machine-readable detail",
+          "Preliminary summary counts from node 3",
+          "Instruction: for each check, produce (1) a clear details string in plain language, (2) a recommended_action string with specific actionable guidance appropriate to the severity. For skipped checks, explain why it was skipped.",
+          "CRITICAL INSTRUCTIONS: Do not change status or severity. Do not add or remove checks. Do not soften blocking checks. For critical checks, always include explicit human review requirements. For legal pages, emphasize compliance risk of placeholder content."
+        ]
+      },
+
+      "node_5_llm_synthesis": {
+        "id": "llm-synthesis",
+        "type": "n8n-nodes-base.openAi",
+        "name": "LLM Synthesis — Validation Narrative",
+        "description": "Calls the LLM to synthesize human-readable check descriptions and recommended actions.",
+        "model": "gpt-4o",
+        "temperature": 0.1,
+        "response_format": "json_object",
+        "credential_placeholder": "PLACEHOLDER — confirm actual n8n OpenAI credential name at runtime. Do not hardcode.",
+        "evidence_boundary_note": "The LLM synthesizes language only. All pass/fail/warning/skipped determinations were made deterministically in node 3 and may not be overridden."
+      },
+
+      "node_6_assemble_validation_report": {
+        "id": "assemble-validation-report",
+        "type": "n8n-nodes-base.code",
+        "name": "Assemble Final Validation Report",
+        "description": "Merges deterministic check results with LLM-synthesized narrative. Constructs the final validation-report.json conforming to validation-report.schema.json.",
+        "assembly_steps": [
+          "Merge each check result from raw_checks_array with corresponding LLM details and recommended_action strings",
+          "Assign scope enum value to each check based on check_name prefix and check definition",
+          "Compute final summary counts: passed_count, warning_count, failed_count, blocking_count",
+          "Derive manual_review_required: true if blocking_count > 0 OR any critical severity check failed",
+          "Derive publish_blocked: true if blocking_count > 0",
+          "Derive overall_status: blocked > failed > passed-with-warnings > passed (apply in order)",
+          "Verify: LLM synthesis must not have changed any check status values. If discrepancy found → use deterministic values, log discrepancy in notes.",
+          "Add notes field summarizing key findings for human reader in plain language",
+          "Construct complete validation-report.json with all required schema fields"
+        ]
+      },
+
+      "node_7_validate_schema": {
+        "id": "validate-output-schema",
+        "type": "n8n-nodes-base.code",
+        "name": "Validate Output Against Schema",
+        "description": "Validates the assembled validation-report.json against schemas/validation-report.schema.json using AJV.",
+        "schema_reference": "schemas/validation-report.schema.json",
+        "on_validation_failure": "Output schema_validation_failed = true with errors array. Do not persist.",
+        "on_validation_success": "Proceed to persist."
+      },
+
+      "node_8_persist": {
+        "id": "persist",
+        "type": "n8n-nodes-base.github",
+        "name": "Persist to Git",
+        "description": "Writes the validated validation-report.json to the project folder.",
+        "target_path": "projects/{project_id}/validation-report.json",
+        "commit_message_pattern": "feat({project_id}): add validation-report artifact [run-validation]",
+        "credential_placeholder": "PLACEHOLDER — confirm actual n8n GitHub credential name at runtime. Do not hardcode.",
+        "draft_safety_note": "In draft mode, write to projects/{project_id}/drafts/validation-report.json."
+      },
+
+      "node_9_output": {
+        "id": "output",
+        "type": "n8n-nodes-base.set",
+        "name": "Output",
+        "description": "Returns the validation report summary and workflow status to the calling orchestrator.",
+        "output_fields": {
+          "workflow_id": "run-validation",
+          "project_id": "{project_id}",
+          "status": "completed | failed",
+          "artifact_path": "projects/{project_id}/validation-report.json",
+          "overall_status": "{overall_status from validation-report}",
+          "publish_blocked": "{publish_blocked from summary}",
+          "blocking_count": "{blocking_count from summary}",
+          "failed_count": "{failed_count from summary}",
+          "warning_count": "{warning_count from summary}",
+          "passed_count": "{passed_count from summary}",
+          "manual_review_required": "{manual_review_required from summary}",
+          "downstream_consumers": ["build-quality-score", "build-deployment-manifest", "build-publish-decision"],
+          "phase_10_step": 1,
+          "errors": []
+        }
+      }
+    },
+
+    "assumptions": [
+      "All Phase 1–9 artifacts are planning artifacts — not confirmed production-ready content, not validated against live Shopify stores, and not verified by operators for factual accuracy",
+      "PLACEHOLDER-REQUIRES-REVIEW markers are expected to be present in many artifacts at initial generation — high placeholder density is normal and does not represent a workflow generation failure",
+      "REQUIRES-OPERATIONAL-DATA markers indicate that the store operator has not yet provided specific facts (pricing, legal content, product specifications) — these are always blocking for the specific fields they appear in",
+      "Contradiction detection compares planning-level field values — minor differences representing refinement (e.g., brand_role more specific in design-system than brand-positioning) are acceptable warnings, not failures",
+      "AJV schema conformance checks are described as planned logic — they are not executed against live artifact files during this planning workflow run",
+      "Legal and policy pages are always treated as critical for both presence and placeholder density — placeholder legal content is always a critical blocking failure regardless of overall density score",
+      "The LLM synthesis node is responsible for language quality only — all check status determinations are made deterministically by code nodes and may not be overridden"
+    ],
+
+    "evidence_boundaries": [
+      "This workflow has no access to Shopify APIs, live store data, or production systems of any kind",
+      "Validation checks operate only on planning artifacts in the project folder — not on live implementations, theme code, or deployed configurations",
+      "Schema conformance checks are described as planned AJV logic — they are not executed against live artifact files in this planning workflow",
+      "Contradiction detection is based on field value comparison between planning artifacts — it cannot detect implementation-level contradictions that only appear after theme configuration",
+      "Placeholder density thresholds are planning heuristics — actual readiness requires human review of the specific placeholder content",
+      "The validation report does not constitute a technical security audit, accessibility audit, Core Web Vitals audit, performance audit, or legal compliance review"
+    ],
+
+    "open_questions": [
+      "What is the complete list of required legal and policy page types for this store's jurisdiction? Shipping and return policy requirements vary by region — jurisdiction must be confirmed before legal page completeness checks are finalized.",
+      "Should any Phase 2 artifacts (market-intelligence, competitor-clusters, pattern-manifest) be required for presence checks? Currently optional — confirm whether they are required for downstream quality scoring.",
+      "What is the correct placeholder density blocking threshold for this project type? 60% is a planning heuristic — confirm with the team.",
+      "Are there additional contradiction pairs that should be checked? The current set covers the most critical cross-phase relationships. Additional pairs may be identified during Phase 10 implementation review.",
+      "Should schema conformance checks be executed immediately as real AJV validation or deferred to a separate validation step? The current design treats them as planned logic.",
+      "Should run-validation also validate the pattern-manifest and competitor-cluster artifacts from Phases 2 and 3? They are not currently included in check definitions."
+    ],
+
+    "draft_dev_safety_notes": [
+      "This workflow definition is not yet executable n8n JSON. A developer must translate it before running.",
+      "All credential references are PLACEHOLDER values.",
+      "This is the first Phase 10 workflow. build-quality-score, build-deployment-manifest, and build-publish-decision all depend on its output.",
+      "In draft/dev mode, write output to projects/{project_id}/drafts/validation-report.json.",
+      "The validation report is the most consequential Phase 10 artifact — errors in check logic propagate to all downstream governance decisions. Review all check definitions carefully before implementation.",
+      "Contradiction detection checks require careful null-handling, absent-artifact handling, and partial schema conformance handling in implementation.",
+      "This workflow produces a planning artifact only — not a production validation certificate, compliance report, or automated CI/CD gate."
+    ]
+  }
+}

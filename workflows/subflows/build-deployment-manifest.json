@@ -1,0 +1,571 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. The deployment-manifest.json output is a planning artifact only — not a real deployment script, not a Shopify theme push command, not a CI/CD pipeline trigger, not a production deployment record, and not a publish approval. All implementation workstreams, prerequisite chains, rollout groups, and deferred items defined here are planning-level guidance for implementation teams. No actual deployment has been initiated by this workflow.",
+    "not_a_deployment_script_note": "IMPORTANT — THIS IS NOT A DEPLOYMENT SCRIPT: The deployment-manifest.json artifact translates planning artifacts into implementation workstreams and ordering guidance. It does not write code, does not configure Shopify, does not push theme files, does not create metafields, does not call any Shopify APIs, and does not schedule any automated deployment. A developer or operator must perform all implementation work manually or through separately managed automation, guided by this manifest.",
+    "implementation_domain_scope_note": "IMPORTANT — IMPLEMENTATION DOMAINS ARE PLANNING CATEGORIES, NOT TECHNICAL ROLES: The seven implementation domains (content entry, SEO metadata configuration, internal links, structured data implementation, media/video production, section/theme configuration, legal/operational fact completion) are planning categories that help organize the implementation work. They do not correspond to individual team members, deployment environments, or automated pipeline stages. The mapping of domains to actual team members and tools is a project management decision made outside this workflow.",
+    "conditional_item_handling_note": "IMPORTANT — CONDITIONAL ITEMS MUST BE FLAGGED, NOT SILENTLY OMITTED: Items in planning artifacts marked as PLACEHOLDER-REQUIRES-REVIEW, REQUIRES-OPERATIONAL-DATA, or DEFERRED must appear in the deployment manifest with their condition status clearly recorded. These items are not omitted from the manifest — they are tracked with appropriate implementation status values (skipped, or with status notes) so that implementation teams can plan resolution work.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/deployment-manifest.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "docs/architecture.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-deployment-manifest",
+    "name": "build-deployment-manifest",
+    "category": "governance",
+    "phase": "Phase 10 — Validation, Quality Scoring, Deployment Manifest, and Publish Decision",
+    "purpose": "Produce a deployment-planning artifact (deployment-manifest.json) that translates all planning artifacts from Phases 1–9 into structured implementation workstreams organized by domain, prerequisite chain, and rollout group. The deployment-manifest.json output captures: (1) the artifact-to-implementation mapping — which planning artifact drives which implementation work in which domain, (2) the implementation status of each artifact (generated, validated, failed, skipped) based on validation-report findings, (3) the validation summary consumed from run-validation, (4) the publish decision embedding consumed from build-quality-score, (5) implementation sequencing guidance with prerequisite chains, (6) rollout group assignments (defining what can be implemented in parallel vs. sequentially), (7) manual review gates with role assignments, (8) deferred items list with resolution requirements, and (9) a domain-level work breakdown differentiating editorial, technical, design, legal, and operational work. This workflow does not generate deployment scripts, does not execute any Shopify mutations, does not write theme files, and does not initiate any production deployment process.",
+
+    "deployment_manifest_vs_validation_vs_quality_score": "This workflow is parallel to build-quality-score (both consume validation-report) and is upstream of build-publish-decision. build-quality-score answers: how ready is the planning work? build-deployment-manifest answers: what implementation work needs to be done, in what order, and by whom? build-publish-decision uses both to make the final launch determination. The deployment manifest is implementation-planning documentation — not a quality gate.",
+
+    "upstream_dependency_order": "This workflow depends on: run-validation (Phase 10, step 1) — required for artifact status tracking. Also consumes directly: all Phase 1–9 planning artifacts (same set as run-validation), organized by implementation domain. Runs in parallel with build-quality-score (both depend on run-validation). Both must complete before build-publish-decision runs.",
+
+    "implementation_domains": {
+      "description": "Seven implementation domains that organize all planning-to-implementation work. Each artifact maps to one or more domains. Each domain maps to a primary implementation role.",
+      "domains": {
+        "content_entry": {
+          "description": "All product descriptions, collection descriptions, page copy, FAQ content, and section copy that must be entered in the Shopify admin or CMS. Primary role: editorial/content team.",
+          "source_artifacts": ["product-content", "collection-content", "page-content", "faq-page", "product-faq", "section-instances"],
+          "conditional_item_types": ["PLACEHOLDER-REQUIRES-REVIEW — content fields requiring human authoring", "REQUIRES-OPERATIONAL-DATA — content fields requiring operator-supplied facts"],
+          "prerequisite": "product-content, collection-content, and page-content artifacts must be generated and non-placeholder before content entry can begin in earnest"
+        },
+        "seo_metadata_configuration": {
+          "description": "All SEO title tags, meta descriptions, canonical URLs, URL handles, and header tag strategies that must be configured in Shopify metafields or theme settings. Primary role: SEO/technical team.",
+          "source_artifacts": ["seo-strategy", "product-seo", "collection-seo", "page-seo", "internal-linking"],
+          "conditional_item_types": ["DEFERRED SEO items from seo-strategy that require content completion first"],
+          "prerequisite": "seo-strategy must be reviewed by SEO reviewer. Canonical URL strategy must be confirmed before per-page SEO configuration begins."
+        },
+        "internal_links_implementation": {
+          "description": "All planned internal links from internal-linking.json that must be embedded in content or configured as navigation elements. Primary role: editorial/technical team.",
+          "source_artifacts": ["internal-linking"],
+          "conditional_item_types": ["Links to pages that do not yet have published content — these links cannot be implemented until the target page content is live"],
+          "prerequisite": "Target pages must exist before linking can be implemented. Internal links implementation depends on content entry and page creation."
+        },
+        "structured_data_implementation": {
+          "description": "All JSON-LD structured data from product-structured-data.json artifacts and structured-data-plan.json that must be implemented in theme code or Shopify metafields. Primary role: technical/developer team.",
+          "source_artifacts": ["product-structured-data", "structured-data-plan", "faq-page (FAQ schema)"],
+          "conditional_item_types": ["REQUIRES-OPERATIONAL-DATA fields in structured data — these must be resolved before the schema can be implemented", "DEFERRED structured data items from structured-data-plan"],
+          "prerequisite": "Structured data implementation requires: (1) structured-data-plan reviewed by technical reviewer, (2) all REQUIRES-OPERATIONAL-DATA fields resolved, (3) developer familiar with the target theme's structured data implementation method"
+        },
+        "media_video_production": {
+          "description": "All media and video asset production work defined in media-plan.json and video-plan.json. This includes photography, video recording, graphic design, and asset delivery. Primary role: media/production team (external to automation).",
+          "source_artifacts": ["media-plan", "video-plan"],
+          "conditional_item_types": ["requires-photography — photoshoot required", "requires-footage — video recording required", "requires-script — copywriting required before video production", "requires-presenter — presenter engagement required", "requires-design-creation — graphic design work required", "placeholder — no production path confirmed"],
+          "prerequisite": "Media production is independent of most other implementation domains but must be completed before media assets can be referenced in theme. Assets must be uploaded to Shopify CDN before content entry can reference them.",
+          "note": "Media and video production typically has the longest lead time of all implementation domains. It should begin as early as possible."
+        },
+        "section_theme_configuration": {
+          "description": "All Shopify theme section configuration, homepage section layout setup, design system token implementation, and navigation structure setup. Primary role: developer/theme implementor.",
+          "source_artifacts": ["design-system", "homepage-strategy", "section-instances", "collection-navigation", "motion-media-strategy"],
+          "conditional_item_types": ["Motion and animation implementation that depends on theme capabilities — must be reviewed for feasibility before committing", "Performance-sensitive configurations flagged in design-system performance_guardrails"],
+          "prerequisite": "Design-system must be reviewed by developer before theme configuration begins. Motion strategy feasibility must be confirmed against the target theme before any motion implementation. section-instances must be finalized before section layout is configured."
+        },
+        "legal_operational_completion": {
+          "description": "All legal page content completion, pricing confirmation, shipping rate setup, return policy authoring, and other operational facts that require the store operator's input. Primary role: operator/legal team.",
+          "source_artifacts": ["page-content (policy pages)", "product-content (pricing fields)", "store-profile (operational facts)"],
+          "conditional_item_types": ["REQUIRES-OPERATIONAL-DATA — any field in any artifact flagged as requiring operator-supplied facts", "Placeholder legal page content — requires legal review and authoring"],
+          "prerequisite": "Legal and operational completion must precede publishing in any mode. This is always on the critical path.",
+          "note": "Legal content (privacy policy, terms of service, return policy, shipping policy) requires legal review — not just content authoring. AI-generated policy text should never be published without legal review."
+        }
+      }
+    },
+
+    "inputs": {
+      "from_validation_report": {
+        "source": "run-validation → validation-report.json",
+        "artifact_path": "projects/{project_id}/validation-report.json",
+        "data_treatment": "IMPLEMENTATION STATUS SOURCE — validation-report check results determine the status field of each artifact entry in the manifest. Artifacts with failed checks get status = failed. Artifacts with passed checks get status = validated. Artifacts that are absent get status = skipped. validation-report is required for this workflow.",
+        "fields_used": [
+          {
+            "field": "checks",
+            "treatment": "ARTIFACT STATUS MAPPING — for each artifact type, find all checks in the validation-report that relate to that artifact. If any check for an artifact has status = failed AND blocking = true → artifact status = failed. If all checks passed → artifact status = validated. If artifact was absent → artifact status = skipped.",
+            "note": "Artifact status in the manifest reflects the validation result — not an independent re-assessment."
+          },
+          {
+            "field": "summary.publish_blocked",
+            "treatment": "VALIDATION SUMMARY EMBEDDING — publish_blocked is embedded in the manifest's validation_summary.manual_review_required field and informs the publish_decision.publish_allowed field.",
+            "note": "The manifest embeds a summary of the validation result, not a re-run of validation."
+          }
+        ]
+      },
+
+      "from_all_phase_artifacts": {
+        "source": "All Phase 1–9 planning artifacts",
+        "artifact_path": "projects/{project_id}/",
+        "data_treatment": "ARTIFACT INVENTORY SOURCE — all planning artifacts are inventoried and mapped to their implementation domain(s). Each artifact becomes one or more entries in the manifest's artifacts array, with artifact_type, artifact_name, status (from validation-report), and notes describing implementation domain assignment.",
+        "artifact_to_type_mapping": {
+          "store-profile": "other",
+          "brand-positioning": "other",
+          "market-intelligence": "other",
+          "design-system": "theme",
+          "homepage-strategy": "homepage-strategy",
+          "section-instances": "theme",
+          "product-content": "product-content",
+          "product-seo": "product-seo",
+          "product-faq": "product-content",
+          "product-structured-data": "structured-data",
+          "collection-content": "collection-content",
+          "collection-seo": "collection-seo",
+          "collection-navigation": "navigation",
+          "page-content": "other",
+          "page-seo": "other",
+          "faq-page": "other",
+          "seo-strategy": "other",
+          "aeo-strategy": "other",
+          "internal-linking": "other",
+          "structured-data-plan": "structured-data",
+          "media-plan": "media-assets",
+          "video-plan": "media-assets",
+          "motion-media-strategy": "theme"
+        },
+        "note": "artifact_type must match the schema enum: theme | product-content | product-seo | collection-content | collection-seo | homepage-strategy | design-system | media-assets | structured-data | navigation | other"
+      },
+
+      "from_design_system": {
+        "source": "build-design-system → design-system.json",
+        "artifact_path": "projects/{project_id}/design-system.json",
+        "data_treatment": "SECTION/THEME CONFIGURATION DOMAIN INPUT — design-system provides the implementation guidance for section_theme_configuration domain: motion ceilings, performance guardrails, and media policies that developers must implement.",
+        "fields_used": [
+          {
+            "field": "performance_guardrails",
+            "treatment": "MANUAL REVIEW GATE TRIGGER — if performance_guardrails contains high or critical performance_priority, the section_theme_configuration domain must include a manual review gate requiring developer performance review before motion or media implementation.",
+            "note": "Performance-sensitive configurations are a high-priority manual review gate."
+          }
+        ]
+      },
+
+      "from_structured_data_plan": {
+        "source": "build-structured-data-plan → structured-data-plan.json",
+        "artifact_path": "projects/{project_id}/structured-data-plan.json",
+        "data_treatment": "STRUCTURED DATA DOMAIN INPUT — structured-data-plan provides the schema types and implementation priorities for the structured_data_implementation domain.",
+        "fields_used": [
+          {
+            "field": "implementation_priority",
+            "treatment": "ROLLOUT GROUP ASSIGNMENT — high implementation priority structured data items are assigned to rollout group 1 (with content entry). Standard priority items are assigned to rollout group 2.",
+            "note": "Implementation priority from the plan informs sequencing guidance in the manifest."
+          }
+        ]
+      },
+
+      "from_media_plan": {
+        "source": "build-media-plan → media-plan.json",
+        "artifact_path": "projects/{project_id}/media-plan.json",
+        "data_treatment": "MEDIA PRODUCTION DOMAIN INPUT — media-plan provides the asset slots, sourcing requirements, and production dependencies for the media_video_production domain.",
+        "fields_used": [
+          {
+            "field": "sourcing_requirements_summary",
+            "treatment": "MEDIA WORK BREAKDOWN — sourcing_requirements_summary is embedded in the manifest as a media domain implementation note, describing the production work remaining.",
+            "note": "Media production work is always external to the automation — the manifest documents it as operator/production team responsibility."
+          }
+        ]
+      },
+
+      "from_video_plan": {
+        "source": "build-video-plan → video-plan.json",
+        "artifact_path": "projects/{project_id}/video-plan.json",
+        "data_treatment": "VIDEO PRODUCTION DOMAIN INPUT — video-plan provides the video slot production dependencies and sourcing requirements for the media_video_production domain.",
+        "fields_used": [
+          {
+            "field": "video_sourcing_summary",
+            "treatment": "VIDEO WORK BREAKDOWN — video_sourcing_summary.slots_with_no_production_path is embedded as a deferred items note in the manifest.",
+            "note": "Video slots with no production path are deferred items — they must be resolved before the media domain can be completed."
+          }
+        ]
+      },
+
+      "from_page_content_policy_pages": {
+        "source": "build-page-content → page-content.json for policy pages",
+        "artifact_path": "projects/{project_id}/page-content/",
+        "data_treatment": "LEGAL DOMAIN INPUT — policy page content status drives the legal_operational_completion domain implementation status and deferred items.",
+        "fields_used": [
+          {
+            "field": "content_body",
+            "treatment": "DEFERRED ITEM DETECTION — PLACEHOLDER-REQUIRES-REVIEW or REQUIRES-OPERATIONAL-DATA in any policy page content_body creates a deferred item in the legal_operational_completion domain with resolution_requirement = legal review and operator authoring required.",
+            "note": "Placeholder legal content is always a deferred item that blocks publishing in any mode."
+          }
+        ]
+      }
+    },
+
+    "implementation_sequencing": {
+      "description": "Implementation sequencing guidance based on artifact prerequisite chains and domain dependencies.",
+      "rollout_groups": {
+        "group_0_legal_and_operational_prerequisites": {
+          "name": "Legal and Operational Prerequisites",
+          "description": "Work that must complete before any other implementation begins.",
+          "domains": ["legal_operational_completion"],
+          "rationale": "Legal pages, pricing, and operational facts cannot be deferred. They are on the critical path for all publish modes including soft launch.",
+          "note": "Group 0 work is operator responsibility — it cannot be automated or delegated to editorial teams."
+        },
+        "group_1_foundation": {
+          "name": "Foundation Configuration",
+          "description": "Theme and design system configuration that must precede content entry.",
+          "domains": ["section_theme_configuration"],
+          "prerequisite": "design-system validated, motion strategy feasibility confirmed with developer",
+          "rationale": "Content cannot be entered usefully until the theme structure exists to receive it."
+        },
+        "group_2_content_and_seo": {
+          "name": "Content Entry and SEO Configuration",
+          "description": "All product, collection, and page content entry plus SEO metadata configuration. These can proceed in parallel once foundation is in place.",
+          "domains": ["content_entry", "seo_metadata_configuration"],
+          "prerequisite": "Group 1 complete, product catalog finalized in Shopify admin",
+          "rationale": "Content and SEO configuration are the largest volume of work and should run in parallel where possible."
+        },
+        "group_3_structured_data_and_linking": {
+          "name": "Structured Data and Internal Links",
+          "description": "JSON-LD structured data implementation and internal link embedding. Depends on content being present.",
+          "domains": ["structured_data_implementation", "internal_links_implementation"],
+          "prerequisite": "Group 2 substantially complete — target pages and products must exist before links can be implemented and structured data can reference product handles",
+          "rationale": "Structured data and internal links depend on content URLs existing. Starting before content is in place creates rework."
+        },
+        "group_4_media": {
+          "name": "Media and Video Production",
+          "description": "Asset production and upload. Independent of most implementation work but must complete before referenced assets can be deployed.",
+          "domains": ["media_video_production"],
+          "prerequisite": "Media plan and video plan reviewed by production team. Production timeline confirmed.",
+          "rationale": "Media production is independent of technical implementation but must be complete before media-dependent sections can be configured. Run in parallel with Groups 1–3 to reduce critical path length.",
+          "note": "Media production begins during Group 1 in practice — it has the longest lead time."
+        }
+      },
+      "manual_review_gates": [
+        {
+          "gate_name": "legal-content-review",
+          "domain": "legal_operational_completion",
+          "position": "Before Group 0 completion",
+          "required_role": "legal-reviewer",
+          "description": "All legal page content (privacy policy, terms of service, shipping policy, return policy) must be reviewed and approved by a legal reviewer before any publish mode. AI-generated or placeholder legal content must never be published without legal review.",
+          "blocking": true
+        },
+        {
+          "gate_name": "seo-strategy-review",
+          "domain": "seo_metadata_configuration",
+          "position": "Before Group 2 begins",
+          "required_role": "content-reviewer or technical-reviewer",
+          "description": "seo-strategy.json must be reviewed by a human SEO reviewer before per-page SEO configuration begins. Any revision_guidance flags must be resolved.",
+          "blocking": false
+        },
+        {
+          "gate_name": "design-system-developer-review",
+          "domain": "section_theme_configuration",
+          "position": "Before Group 1 begins",
+          "required_role": "technical-reviewer",
+          "description": "design-system.json and motion-media-strategy.json must be reviewed by a developer familiar with the target theme. Motion feasibility and performance guardrail implications must be confirmed before theme configuration begins.",
+          "blocking": true
+        },
+        {
+          "gate_name": "structured-data-technical-review",
+          "domain": "structured_data_implementation",
+          "position": "Before Group 3 begins",
+          "required_role": "technical-reviewer",
+          "description": "structured-data-plan.json and product-structured-data.json artifacts must be reviewed by a developer before JSON-LD implementation. Schema type selections and required field mappings must be confirmed.",
+          "blocking": false
+        },
+        {
+          "gate_name": "pre-launch-content-audit",
+          "domain": "content_entry",
+          "position": "Before any publish mode",
+          "required_role": "content-reviewer",
+          "description": "All product descriptions, collection descriptions, and page content must be audited for placeholder-free status before any launch mode. PLACEHOLDER-REQUIRES-REVIEW items must be resolved.",
+          "blocking": true
+        }
+      ]
+    },
+
+    "deferred_items_policy": {
+      "description": "Deferred items are planning artifacts or implementation tasks that cannot be completed at initial launch time due to missing data, production dependencies, or intentional scope decisions.",
+      "deferred_item_types": [
+        {
+          "type": "PLACEHOLDER-REQUIRES-REVIEW",
+          "treatment": "Must be resolved before the relevant domain is considered implementation-complete. Deferred items of this type are tracked in the manifest notes field with recommended resolution action.",
+          "blocking_for_publish": "Yes — for content domains. Any PLACEHOLDER-REQUIRES-REVIEW in product descriptions, legal pages, or SEO metadata blocks publish in most modes."
+        },
+        {
+          "type": "REQUIRES-OPERATIONAL-DATA",
+          "treatment": "Must be resolved by the store operator before implementation of the affected field. These items cannot be automated — they require operator input.",
+          "blocking_for_publish": "Yes for critical fields (pricing, legal content). No for lower-priority operational enrichment."
+        },
+        {
+          "type": "DEFERRED-VIDEO-PRODUCTION",
+          "treatment": "Video slots with no confirmed production path are implementation-deferred. The manifest tracks them with status = skipped and notes the production dependency.",
+          "blocking_for_publish": "No — if video fallbacks are in place and the store functions without video, deferred video production does not block initial launch."
+        },
+        {
+          "type": "DEFERRED-MEDIA-ASSETS",
+          "treatment": "Media asset slots that are unavailable or require photography/design work are implementation-deferred. The manifest tracks them with status = skipped and notes the production dependency.",
+          "blocking_for_publish": "Depends on asset role. Hero image absence is a soft-launch blocker. Secondary product images can be deferred for initial launch."
+        }
+      ]
+    },
+
+    "outputs": {
+      "primary_output": "deployment-manifest.json",
+      "artifact_path": "projects/{project_id}/deployment-manifest.json",
+      "schema": "schemas/deployment-manifest.schema.json",
+      "output_fields": {
+        "manifest_id": {
+          "source": "Generated at runtime",
+          "type": "string",
+          "format_pattern": "build-deployment-manifest-{project_id}-{timestamp}",
+          "note": "Runtime-generated identifier."
+        },
+        "workflow_version": {
+          "source": "workflow._meta.version",
+          "type": "string",
+          "note": "Version of the workflow definition that produced this manifest."
+        },
+        "artifacts": {
+          "source": "Derived from all Phase 1–9 planning artifacts and validation-report artifact status mapping",
+          "type": "array of artifact entries conforming to deployment-manifest.schema.json artifacts array item schema",
+          "artifact_entries_format": {
+            "artifact_type": "from artifact_to_type_mapping in inputs section — schema enum value",
+            "artifact_name": "human-readable artifact name (e.g., 'product-content-{product_handle}', 'design-system')",
+            "status": "generated | validated | failed | skipped — derived from validation-report check results for this artifact",
+            "notes": "implementation domain assignment, deferred item conditions, manual review gate requirements for this artifact"
+          },
+          "note": "Each significant planning artifact from Phases 1–9 is represented as an artifact entry. Per-product and per-collection artifacts are each individual entries."
+        },
+        "validation_summary": {
+          "source": "Directly consumed from validation-report.summary",
+          "type": "object",
+          "fields": {
+            "checks_passed": "array of check_name strings for passed checks from validation-report",
+            "checks_failed": "array of check_name strings for failed checks from validation-report",
+            "warnings": "array of check_name strings for warning-status checks from validation-report",
+            "manual_review_required": "from validation-report.summary.manual_review_required"
+          }
+        },
+        "publish_decision": {
+          "source": "Derived from validation-report.summary.publish_blocked and quality-score.launch_readiness (if available)",
+          "type": "object",
+          "fields": {
+            "publish_allowed": "false if validation-report.publish_blocked = true. Otherwise: true if launch_readiness = launch-ready or review-ready. false otherwise.",
+            "decision_reason": "LLM-synthesized description of the primary reasons for the publish decision in this manifest",
+            "rollback_ready": "false — no deployment has been made, rollback not applicable",
+            "approval_required": "true if any manual review gate is blocking"
+          },
+          "note": "The publish_decision in the deployment manifest is a preliminary planning signal. The authoritative publish decision is produced by build-publish-decision."
+        }
+      },
+      "downstream_consumers": [
+        "build-publish-decision — uses deployment-manifest.validation_summary and publish_decision as key inputs alongside quality-score and validation-report"
+      ]
+    },
+
+    "nodes": {
+      "node_1_trigger": {
+        "id": "trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "name": "Receive Inputs",
+        "description": "Receives all upstream artifact objects from the orchestrating workflow.",
+        "input_contract": {
+          "project_id": "string — required",
+          "validation_report": "object — required — validation-report.json from run-validation",
+          "design_system": "object — expected",
+          "homepage_strategy": "object — expected",
+          "section_instances": "array — expected",
+          "product_content_artifacts": "array — expected",
+          "product_seo_artifacts": "array — expected",
+          "product_faq_artifacts": "array — optional",
+          "product_structured_data_artifacts": "array — optional",
+          "collection_content_artifacts": "array — expected",
+          "collection_seo_artifacts": "array — expected",
+          "collection_navigation": "object — optional",
+          "page_content_artifacts": "array — required",
+          "page_seo_artifacts": "array — expected",
+          "faq_page": "object — optional",
+          "seo_strategy": "object — expected",
+          "aeo_strategy": "object — optional",
+          "internal_linking": "object — optional",
+          "structured_data_plan": "object — optional",
+          "media_plan": "object — expected",
+          "video_plan": "object — expected",
+          "motion_media_strategy": "object — expected",
+          "quality_score": "object — optional — quality-score.json from build-quality-score if available"
+        }
+      },
+
+      "node_2_validate_inputs": {
+        "id": "validate-upstream-inputs",
+        "type": "n8n-nodes-base.code",
+        "name": "Validate Upstream Inputs",
+        "description": "Validates critical upstream inputs. Fails fast only if validation_report is absent.",
+        "validation_checks": [
+          "project_id must be a non-empty string",
+          "validation_report must be present with artifacts summary fields — absence is a workflow halt condition",
+          "Build artifact_inventory: catalog all passed artifacts as present or absent",
+          "Extract validation_report.checks grouped by check scope into domain_check_map for artifact status derivation in node 3",
+          "Extract validation_report.summary.publish_blocked and blocking_count into workflow context",
+          "If quality_score is present, extract launch_readiness for publish_decision assembly in node 4"
+        ],
+        "on_critical_failure": "validation_report absent → halt workflow with quality_scoring_cannot_proceed = true.",
+        "on_partial_absence": "Non-required artifacts absent → proceed. Absent artifacts get status = skipped in manifest."
+      },
+
+      "node_3_build_artifact_inventory_and_status": {
+        "id": "build-artifact-inventory-and-status",
+        "type": "n8n-nodes-base.code",
+        "name": "Build Artifact Inventory and Derive Status",
+        "description": "Inventories all Phase 1–9 artifacts, maps them to schema artifact_type values and implementation domains, and derives each artifact's status from validation-report check results.",
+        "processing_steps": [
+          "For each expected artifact in phases 1–9: check presence against artifact_inventory",
+          "For each present artifact: find all validation-report checks that scope to this artifact. If any blocking failed check → status = failed. If all checks passed → status = validated. If no relevant checks (minor artifact) → status = generated.",
+          "For each absent artifact: status = skipped, notes = 'Artifact absent — presence check failed in validation-report'",
+          "Map each artifact to artifact_type enum value using artifact_to_type_mapping",
+          "Map each artifact to primary implementation domain(s) from implementation_domains definitions",
+          "Identify and extract deferred items: scan all artifacts for PLACEHOLDER-REQUIRES-REVIEW, REQUIRES-OPERATIONAL-DATA, and video/media production gaps. Create deferred_items list with type, artifact_name, and resolution_requirement per deferred item.",
+          "Extract rollout group assignments for each artifact based on domain and sequencing rules",
+          "Identify manual review gate requirements based on artifact content (legal pages → legal-content-review gate, design-system → design-system-developer-review gate, etc.)",
+          "Build artifacts array: one entry per significant planning artifact with artifact_type, artifact_name, status, and notes",
+          "Build validation_summary: extract checks_passed, checks_failed, warnings from validation-report",
+          "Build preliminary publish_decision based on validation_report.publish_blocked and quality_score.launch_readiness if available"
+        ],
+        "output": {
+          "artifacts_array": "complete array of artifact entries",
+          "deferred_items_list": "array of deferred item objects",
+          "rollout_groups_summary": "summary of rollout group assignments",
+          "manual_review_gates_triggered": "array of gate names that are triggered by this project's artifact state",
+          "validation_summary": "object with checks_passed, checks_failed, warnings arrays",
+          "preliminary_publish_decision": "object with publish_allowed, decision_reason, rollback_ready, approval_required"
+        }
+      },
+
+      "node_4_build_llm_prompt": {
+        "id": "build-llm-prompt",
+        "type": "n8n-nodes-base.code",
+        "name": "Build LLM Prompt for Manifest Assembly",
+        "description": "Assembles a structured prompt for the LLM to synthesize implementation notes, deferred item descriptions, rollout guidance narrative, and publish decision rationale for the manifest.",
+        "prompt_components": [
+          "System message: deployment manifest narrative synthesizer for schema-driven commerce OS. Role: translate structured artifact inventory, domain assignments, rollout groups, and deferred items into clear implementation guidance text. Do not invent artifact statuses. Do not override deterministic decisions. Do not describe this as a deployment script or suggest that any automated deployment will occur. This is implementation planning documentation.",
+          "Project context: project_id, vertical, store_name",
+          "Artifacts array from node 3 with all statuses and domain assignments",
+          "Deferred items list from node 3",
+          "Rollout groups summary from node 3",
+          "Manual review gates triggered",
+          "Validation summary",
+          "Preliminary publish decision",
+          "Instruction: produce (1) artifact notes — per-artifact implementation guidance note describing what implementation work this artifact drives and any conditional items, (2) deferred item descriptions — plain language resolution requirement per deferred item, (3) rollout guidance — concise description of each rollout group's scope and prerequisites, (4) publish decision reason — clear plain-language rationale for the preliminary publish_allowed value, (5) implementation workstream description — one paragraph per domain describing the work to be done, who is responsible, and what the prerequisites are.",
+          "CRITICAL INSTRUCTIONS: Do not suggest that implementation can proceed without resolving legal placeholders. Do not frame deferred items as optional. Do not suggest that AI-generated legal content is acceptable for publish without legal review. Maintain distinction between planning documentation and deployment automation."
+        ]
+      },
+
+      "node_5_llm_synthesis": {
+        "id": "llm-synthesis",
+        "type": "n8n-nodes-base.openAi",
+        "name": "LLM Synthesis — Deployment Manifest Narrative",
+        "description": "Calls the LLM to synthesize implementation notes, deferred item descriptions, and publish decision rationale.",
+        "model": "gpt-4o",
+        "temperature": 0.2,
+        "response_format": "json_object",
+        "credential_placeholder": "PLACEHOLDER — confirm actual n8n OpenAI credential name at runtime. Do not hardcode.",
+        "evidence_boundary_note": "The LLM synthesizes implementation guidance language only. All artifact statuses, domain assignments, validation summaries, and publish decision values were computed deterministically in node 3 and may not be overridden."
+      },
+
+      "node_6_assemble_deployment_manifest": {
+        "id": "assemble-deployment-manifest",
+        "type": "n8n-nodes-base.code",
+        "name": "Assemble Final Deployment Manifest",
+        "description": "Merges deterministic inventory from node 3 with LLM narrative from node 5. Constructs final deployment-manifest.json conforming to deployment-manifest.schema.json.",
+        "assembly_steps": [
+          "Merge artifact entries from node 3 with LLM-synthesized per-artifact notes",
+          "Set validation_summary from node 3 (deterministic)",
+          "Set publish_decision from node 3 with LLM-synthesized decision_reason from node 5",
+          "Verify LLM output has not changed any deterministic values (artifact_type, artifact_name, status, validation check arrays, publish_allowed). If discrepancy found → use node 3 values, log discrepancy.",
+          "Add notes field with: implementation workstream descriptions, deferred items summary, rollout group assignments, and evidence boundary statement",
+          "Set manifest_id, workflow_version from context",
+          "Construct complete deployment-manifest.json with all required schema fields"
+        ]
+      },
+
+      "node_7_validate_schema": {
+        "id": "validate-output-schema",
+        "type": "n8n-nodes-base.code",
+        "name": "Validate Output Against Schema",
+        "description": "Validates the assembled deployment-manifest.json against schemas/deployment-manifest.schema.json using AJV.",
+        "schema_reference": "schemas/deployment-manifest.schema.json",
+        "on_validation_failure": "Output schema_validation_failed = true with errors array. Do not persist.",
+        "on_validation_success": "Proceed to persist."
+      },
+
+      "node_8_persist": {
+        "id": "persist",
+        "type": "n8n-nodes-base.github",
+        "name": "Persist to Git",
+        "description": "Writes the validated deployment-manifest.json to the project folder.",
+        "target_path": "projects/{project_id}/deployment-manifest.json",
+        "commit_message_pattern": "feat({project_id}): add deployment-manifest artifact [build-deployment-manifest]",
+        "credential_placeholder": "PLACEHOLDER — confirm actual n8n GitHub credential name at runtime. Do not hardcode.",
+        "draft_safety_note": "In draft mode, write to projects/{project_id}/drafts/deployment-manifest.json."
+      },
+
+      "node_9_output": {
+        "id": "output",
+        "type": "n8n-nodes-base.set",
+        "name": "Output",
+        "description": "Returns the deployment manifest summary and workflow status to the calling orchestrator.",
+        "output_fields": {
+          "workflow_id": "build-deployment-manifest",
+          "project_id": "{project_id}",
+          "status": "completed | failed",
+          "artifact_path": "projects/{project_id}/deployment-manifest.json",
+          "artifact_count": "{count of artifact entries}",
+          "deferred_items_count": "{count of deferred items in manifest notes}",
+          "manual_review_gates_count": "{count of triggered manual review gates}",
+          "publish_allowed": "{publish_decision.publish_allowed from manifest}",
+          "approval_required": "{publish_decision.approval_required from manifest}",
+          "downstream_consumers": ["build-publish-decision"],
+          "phase_10_step": 3,
+          "errors": []
+        }
+      }
+    },
+
+    "assumptions": [
+      "validation-report.json from run-validation is required for this workflow — artifact status in the manifest is derived from validation check results, not re-assessed independently",
+      "Implementation domain assignments are planning-level categorizations — actual implementation team assignments are a project management decision outside this workflow",
+      "Rollout group assignments are ordering recommendations — they are not enforced by any automation and must be adapted to the specific project's implementation team structure",
+      "Manual review gates are planning requirements — they are not enforced by any workflow automation and depend on human review processes being established by the project team",
+      "Deferred items are tracked, not resolved — this workflow documents deferred items but does not resolve them",
+      "Video and media production deferred items are external to the automation — the manifest communicates them to production teams but cannot initiate or manage production work",
+      "Legal content is always on the critical path — no launch mode should proceed without legal page content review, regardless of other manifest signals",
+      "The preliminary publish_decision in the manifest is a planning signal, not the authoritative publish decision — build-publish-decision makes the final determination"
+    ],
+
+    "evidence_boundaries": [
+      "This workflow has no access to Shopify admin, Shopify APIs, theme files, or any production or staging environment",
+      "Artifact statuses in the manifest are derived from planning-level validation check results — not from live implementation verification",
+      "Implementation workstream descriptions are planning guidance — they are not confirmed implementation specifications or approved project plans",
+      "Rollout group assignments are planning heuristics — actual implementation sequencing must be confirmed with the implementation team",
+      "The manifest's publish_decision.publish_allowed is a preliminary planning signal — the authoritative publish decision is produced by build-publish-decision",
+      "Deferred item resolution requirements are planning recommendations — they do not guarantee resolution is possible within any particular timeframe"
+    ],
+
+    "open_questions": [
+      "Should the deployment manifest include environment-specific entries (development, staging, production)? The current design is environment-agnostic — confirm whether environment separation is needed.",
+      "Should rollout groups be more granular within the content_entry domain? Large catalogs may require content entry to be batched by product category.",
+      "Should the manifest track estimated effort per domain or rollout group? The current design omits effort estimates intentionally — confirm whether planning estimates are in scope.",
+      "Are there additional implementation domains beyond the seven defined? SEO technical implementation (site maps, robots.txt, redirect rules) is not explicitly captured — confirm scope.",
+      "Should the manifest reference specific Shopify admin sections, metafield namespaces, or theme file paths for each implementation domain? This would make it more actionable but more theme-specific.",
+      "How should the manifest handle a project that is implementing on a pre-configured theme vs. building from scratch? The current design is theme-agnostic."
+    ],
+
+    "draft_dev_safety_notes": [
+      "This workflow definition is not yet executable n8n JSON. A developer must translate it before running.",
+      "All credential references are PLACEHOLDER values.",
+      "This workflow runs in parallel with build-quality-score (both depend on run-validation). Both must complete before build-publish-decision runs.",
+      "In draft/dev mode, write output to projects/{project_id}/drafts/deployment-manifest.json.",
+      "The manifest's artifact_type field must use valid schema enum values. The artifact_to_type_mapping in the inputs section must be complete and accurate in implementation.",
+      "Legal content review gates are non-negotiable — never implement a version of this workflow that removes or bypasses the legal-content-review gate.",
+      "This workflow produces a planning artifact only — not a deployment script, not a Shopify admin configuration guide, not an automated deployment trigger."
+    ]
+  }
+}

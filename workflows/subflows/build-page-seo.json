@@ -1,0 +1,661 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. Page SEO outputs are planning artifacts — not validated keyword strategies, not live meta tag configurations, and not finalized search optimization decisions. All keyword decisions in this workflow are planning hypotheses grounded in page content signals and strategic context. Human review and keyword research validation are required before any page-seo artifact influences live store metadata.",
+    "seo_strategy_availability_note": "PHASE 7 CONTEXT: Unlike earlier phases (4-6) where build-seo-strategy was not available, Phase 7 implements build-seo-strategy alongside build-page-seo. When this workflow runs as intended in Phase 7, seo-strategy.json SHOULD be available as an input. The seo-strategy.json artifact provides: primary_seo_goal, keyword_focus type guidance, content_depth stance, page_priority ordering, and internal_linking_strategy posture. This workflow must still handle the case where seo-strategy.json is absent (e.g. running page-seo before seo-strategy has been generated) — in that case, operate in provisional mode using market-intelligence as the keyword proxy, matching the Phase 5-6 fallback pattern.",
+    "page_seo_boundary_note": "IMPORTANT — GENERAL PAGE SEO IS CATEGORICALLY DIFFERENT FROM PRODUCT AND COLLECTION SEO: General pages (About, Contact, Shipping, Returns, Trust, Guide, FAQ) serve trust, logistics, identity, and support functions. Their search intent is predominantly informational. Their primary keywords are often navigational or branded rather than competitive commercial terms. Many general pages may not be significant SEO drivers — they are trust drivers that need to be findable rather than ranking opportunities. This workflow should not treat general page SEO with the same commercial keyword targeting logic as product and collection SEO.",
+    "placeholder_degradation_note": "IMPORTANT — PLACEHOLDER-HEAVY PAGES REQUIRE DEGRADED SEO OUTPUT: Many general store pages (Contact, Shipping, Returns) may contain PLACEHOLDER-REQUIRES-REVIEW content in their page-content artifacts because operational facts (shipping rates, return windows, contact details) were unavailable during content planning. When page content is heavily placeholder-bound, this workflow must produce conservative, degraded SEO planning: keywords that are honestly navigational/informational, seo_title that describes the page purpose rather than targeting competitive queries, meta_description framing that is honest about what the page will contain without inflating placeholder content. Do not claim confident SEO targeting for pages whose content is not yet determined.",
+    "aeo_provisional_note": "IMPORTANT — AEO STRATEGY IS NOT AVAILABLE IN PHASE 7: aeo-strategy.json (step 12) is out of Phase 7 scope. answer_targets generated here are provisional AEO seeds — planning hypotheses about what buyer questions this page should address. They are not aligned to a finalized AEO question taxonomy. When aeo-strategy.json becomes available in a later phase, answer_targets should be reviewed and updated. All answer_targets are marked PROVISIONAL-PENDING-AEO-STRATEGY in the output notes.",
+    "slug_handling_note": "For Shopify general pages, the platform uses the /pages/{slug} URL structure. The slug field in page-seo.json should contain only the slug segment (e.g. 'about-us', 'shipping', 'faq') — not the full path. Where a Shopify page already exists, the existing handle is the operational truth for the slug. Where a page does not yet exist in Shopify, the slug should be generated from the page_type in a predictable, clean format.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/page-seo.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-page-seo",
+    "name": "build-page-seo",
+    "category": "planning",
+    "phase": "Phase 7 — Page SEO, FAQ Page, and SEO Strategy Planning",
+    "purpose": "Synthesize schema-validated page SEO planning artifacts for each general store page produced by build-page-content. General pages (About, Contact, Shipping, Returns, Trust, Guide, FAQ-page, legal pages) have categorically different SEO characteristics than product or collection pages. They serve trust, logistics, identity, and support functions. Their search value is predominantly in being findable by buyers who already trust the store (navigational, branded, informational queries) — not in capturing new buyers through competitive keyword ranking. This workflow assigns: primary_keyword (usually branded navigational or informational), secondary_keywords (related informational queries buyers might use), search_intent (predominantly informational, support, or hybrid), seo_title (honest page description within 70 characters), meta_description (honest framing within 180 characters), slug (from Shopify page handle or generated from page_type), page_role (from schema enum), internal_linking_targets (structural planning), and answer_targets (provisional AEO seeds). When page content contains PLACEHOLDER-REQUIRES-REVIEW sections, this workflow degrades SEO planning conservatively — it does not fake confident keyword targeting for pages whose content is not yet determined. seo-strategy.json (from Phase 7 build-seo-strategy) is used as a strategy alignment layer when available.",
+
+    "general_page_seo_philosophy": "General page SEO is primarily defensive and trust-supporting, not primarily offensive keyword capture. The goals are: (1) ensure the page is findable by buyers who search for it by name or purpose (about [brand name], [brand name] shipping policy, [brand name] return policy, [brand name] FAQ), (2) ensure the page supports trust signals that may influence ranking across the site, (3) ensure the page does not create duplicate content or indexation problems. General page SEO should not be treated as an opportunity to insert irrelevant keyword targets into supportive pages. Each page's SEO plan should be honest about its actual search role.",
+
+    "page_role_mapping": {
+      "about-page": {
+        "schema_page_role": "about-page",
+        "typical_search_intent": "informational",
+        "primary_keyword_pattern": "Branded navigational (e.g. '[store name] about', '[store name] brand story') or category identity (e.g. 'sustainable apparel brand about us'). Not a commercial keyword target.",
+        "content_depth_default": "balanced",
+        "seo_priority": "Medium — important for brand trust signals but not a primary traffic driver",
+        "degradation_trigger": "If about-page content contains heavy brand story placeholders, SEO plan should note that finalized About page keywords depend on the actual brand story content"
+      },
+      "contact-page": {
+        "schema_page_role": "support-page",
+        "typical_search_intent": "informational",
+        "primary_keyword_pattern": "Branded navigational (e.g. '[store name] contact', '[store name] customer service'). These are support queries — the page does not compete for non-branded searches.",
+        "content_depth_default": "light",
+        "seo_priority": "Low for SEO, High for user experience and trust",
+        "degradation_trigger": "If contact details are all PLACEHOLDER-REQUIRES-REVIEW, seo_title and meta_description must reflect the page purpose without inflating the placeholder content into a keyword strategy"
+      },
+      "shipping-page": {
+        "schema_page_role": "support-page",
+        "typical_search_intent": "informational",
+        "primary_keyword_pattern": "Branded navigational ('[store name] shipping') or informational shipping query ('[store name] shipping policy', '[store name] delivery times'). Some stores in highly competitive niches may be able to target informational shipping queries.",
+        "content_depth_default": "light",
+        "seo_priority": "Low-Medium — shipping pages may capture trust-oriented searches pre-purchase",
+        "degradation_trigger": "If shipping specifics are all PLACEHOLDER-REQUIRES-REVIEW, the SEO plan should reflect that the page cannot make specific shipping claims until operational facts are confirmed"
+      },
+      "returns-page": {
+        "schema_page_role": "support-page",
+        "typical_search_intent": "informational",
+        "primary_keyword_pattern": "Branded navigational or informational ('[store name] return policy', '[store name] refund policy'). Return policy searches are high-intent trust queries.",
+        "content_depth_default": "light",
+        "seo_priority": "Medium — return policy is a significant trust signal and pre-purchase research target",
+        "degradation_trigger": "Same as shipping — if return window and conditions are PLACEHOLDER-REQUIRES-REVIEW, SEO plan degrades to honest framing"
+      },
+      "trust-page": {
+        "schema_page_role": "trust-page",
+        "typical_search_intent": "commercial",
+        "primary_keyword_pattern": "Brand + trust signals (e.g. '[store name] guarantee', '[store name] promise', 'is [store name] legit'). May capture commercial-intent trust verification searches.",
+        "content_depth_default": "balanced",
+        "seo_priority": "Medium-High for brands where trust is a primary purchase barrier",
+        "degradation_trigger": "If trust page content is sparse or heavily aspirational without specific guarantee terms, SEO plan should reflect the page's current content state"
+      },
+      "guide-page": {
+        "schema_page_role": "guide-page",
+        "typical_search_intent": "informational",
+        "primary_keyword_pattern": "Educational topic terms (e.g. 'how to choose [product category]', 'best [product type] for [use case]', '[category] buyer guide'). Guide pages have the strongest potential for organic search capture among general pages.",
+        "content_depth_default": "deep",
+        "seo_priority": "High — guide pages are the primary SEO opportunity for knowledge-plus-commerce strategy stores",
+        "degradation_trigger": "If guide content is sparse or generic without category-specific educational value, SEO plan should reflect that the guide needs enrichment before it can support organic search"
+      },
+      "faq-page": {
+        "schema_page_role": "faq-page",
+        "typical_search_intent": "informational",
+        "primary_keyword_pattern": "FAQ-specific navigational or informational queries ('[store name] FAQ', '[store name] frequently asked questions', or topical FAQ queries specific to the category). FAQ pages may also capture branded informational queries.",
+        "content_depth_default": "balanced",
+        "seo_priority": "Medium-High for stores where AEO is a strategy priority. Note: the full FAQ artifact is produced by build-faq-page (step 22) — this workflow produces only the SEO planning layer for the FAQ page.",
+        "degradation_trigger": "FAQ page SEO should be planned conservatively until the full FAQ content artifact is available from build-faq-page. The page-content faq-page scaffold is a planning seed."
+      },
+      "legal-support-page": {
+        "schema_page_role": "support-page",
+        "typical_search_intent": "informational",
+        "primary_keyword_pattern": "Branded legal navigational queries only. Legal pages should not target non-branded keyword searches. They are required pages, not SEO assets.",
+        "content_depth_default": "light",
+        "seo_priority": "Very Low — legal pages are required pages that should be indexed but are not SEO drivers",
+        "degradation_trigger": "Legal pages should produce minimal SEO plans with noindex consideration noted if the legal content is generic or template-based. seo_title should be accurate and unoptimized."
+      }
+    },
+
+    "inputs": {
+      "from_page_content": {
+        "source": "build-page-content → page-content.json (per page)",
+        "artifact_path": "projects/{project_id}/page-content/{page_type}.json",
+        "data_treatment": "PRIMARY PLANNING LAYER — page content is the main input for SEO synthesis. It defines what the page actually contains, what trust elements are present, and what CTA direction exists.",
+        "fields_used": [
+          {
+            "field": "page_title",
+            "treatment": "SEO TITLE ANCHOR — the page_title is the primary signal for seo_title construction. The seo_title should be based on page_title but may be reformatted to optimize for search presentation within 70 characters.",
+            "note": "page_title is synthesized planning content — it may still require human refinement before production use."
+          },
+          {
+            "field": "page_type",
+            "treatment": "OPERATIONAL CLASSIFICATION — page_type (about-page, contact-page, shipping-page, returns-page, trust-page, guide-page, faq-page, legal-support-page) determines: page_role mapping, typical search_intent, keyword pattern type, and content_depth default. This is the most deterministic input for SEO classification.",
+            "note": "page_type is a planning classification — confirm against actual Shopify page structure at implementation time."
+          },
+          {
+            "field": "page_goal",
+            "treatment": "SEARCH INTENT ALIGNMENT — page_goal (trust-building, support-reduction, education, conversion-support, compliance) cross-validates search_intent classification. trust-building goals → informational or commercial intent. support-reduction goals → informational intent. education goals → informational intent.",
+            "note": "page_goal aligns SEO intent classification with the page's content purpose."
+          },
+          {
+            "field": "intro_text",
+            "treatment": "KEYWORD SIGNAL — noun phrases and category vocabulary in the intro text suggest primary and secondary keyword candidates. For general pages, extract brand-aligned and category-aligned vocabulary rather than commercial keywords.",
+            "note": "Synthesized content — use as directional vocabulary signal, not verbatim keyword extraction."
+          },
+          {
+            "field": "body_sections",
+            "treatment": "CONTENT DEPTH SIGNAL — the number and richness of body sections informs content_depth assignment. One or two short sections → light. Three to five balanced sections → balanced. Rich multi-section educational content → deep.",
+            "note": "content_depth reflects actual page content richness — not a keyword strategy target."
+          },
+          {
+            "field": "trust_elements",
+            "treatment": "META DESCRIPTION FRAMING SIGNAL — trust elements in the page content indicate what trust claims can be honestly included in the meta description. Do not include trust claims in the meta description that are not supported by the page content.",
+            "note": "Trust elements are synthesized planning content. Inflating them into meta description claims risks misleading buyers."
+          },
+          {
+            "field": "faq_items",
+            "treatment": "ANSWER TARGET SIGNAL — FAQ items in the page content plan are seeds for answer_targets. For general pages, FAQ items often cover operational questions (shipping, returns, support) that are strong informational query targets.",
+            "note": "Used as provisional AEO seed signals — not final answer targets. FAQ page SEO should reference the full FAQ artifact from build-faq-page when available."
+          },
+          {
+            "field": "cta_direction",
+            "treatment": "INTENT CROSS-VALIDATION — CTA direction helps cross-validate search_intent. contact-support CTA → informational support intent. explore-products CTA → commercial or hybrid intent.",
+            "note": "Supporting signal — does not override the primary intent classification logic."
+          },
+          {
+            "field": "notes",
+            "treatment": "PLACEHOLDER DENSITY DETECTION — the page-content notes field may contain flags indicating sparse data, legal review requirements, or heavy placeholder content. PLACEHOLDER-REQUIRES-REVIEW, SPARSE DATA, PLACEHOLDER-REQUIRES-LEGAL-REVIEW flags must trigger conservative SEO degradation for that page.",
+            "note": "Placeholder flags propagate to SEO planning. A page with heavy placeholders cannot have confident keyword targeting."
+          }
+        ]
+      },
+
+      "from_seo_strategy": {
+        "source": "build-seo-strategy → seo-strategy.json",
+        "artifact_path": "projects/{project_id}/seo-strategy.json",
+        "data_treatment": "STRATEGY ALIGNMENT LAYER — seo-strategy.json provides the store-level SEO framework that page SEO decisions should align with",
+        "availability": "AVAILABLE IN PHASE 7 — seo-strategy.json is implemented in the same phase as build-page-seo. When running Phase 7 as intended, seo-strategy.json should be available. If absent (running page-seo before seo-strategy has completed), workflow operates in provisional mode.",
+        "fields_used": [
+          {
+            "field": "primary_seo_goal",
+            "treatment": "STRATEGY CONTEXT — the primary SEO goal informs which general pages deserve deeper SEO attention. A knowledge-plus-commerce strategy → guide pages are high priority. A transactional-growth strategy → general pages are mostly defensive (trust support), not primary SEO targets.",
+            "note": "primary_seo_goal shapes the ambition level of page SEO planning — not the page content itself."
+          },
+          {
+            "field": "page_priority",
+            "treatment": "PRIORITY CALIBRATION — if the seo-strategy page_priority includes 'faq-pages' or 'guide-pages' near the top, those page types should receive deeper SEO planning in this workflow. Support pages (shipping, returns, contact) are rarely in the top page_priority regardless of strategy.",
+            "note": "page_priority from strategy informs content_depth decisions for each page type."
+          },
+          {
+            "field": "content_depth",
+            "treatment": "DEPTH CALIBRATION — the strategy-level content_depth stance (light, balanced, deep) sets the default depth posture. Individual page content depth may still vary based on page richness — but the strategy provides the default expectation.",
+            "note": "Used to calibrate content_depth assignment per page in alignment with store-level strategy."
+          },
+          {
+            "field": "knowledge_seo_role",
+            "treatment": "GUIDE AND FAQ PRIORITY SIGNAL — when knowledge_seo_role = 'balanced' or 'major', guide pages and FAQ pages should receive more ambitious SEO planning (deeper content_depth, richer answer_targets, stronger internal_linking_targets recommendations). When knowledge_seo_role = 'none', these pages receive minimal SEO scaffolding.",
+            "note": "knowledge_seo_role is the primary signal for guide and FAQ page SEO planning ambition."
+          },
+          {
+            "field": "internal_linking_strategy",
+            "treatment": "LINKING POSTURE — the internal_linking_strategy from seo-strategy informs how many and what types of internal_linking_targets should be recommended per page. A 'rich' link_depth store → more internal linking targets per page. A 'simple' link_depth store → fewer.",
+            "note": "Internal linking targets are structural planning recommendations — not validated link maps. The detailed internal linking plan is out of Phase 7 scope (build-internal-linking is step 23)."
+          }
+        ],
+        "fallback_behavior": "When absent: set provisional_mode.seo_strategy = true. Use market_intelligence.search_intents as keyword proxies. Use page_role_mapping defaults for content_depth and SEO priority. Mark all keyword fields as PROVISIONAL-PENDING-SEO-STRATEGY."
+      },
+
+      "from_market_intelligence": {
+        "source": "build-market-intelligence → market-intelligence.json",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "data_treatment": "PROVISIONAL KEYWORD PROXY AND CONTENT OPPORTUNITY LAYER — market intelligence provides search intent signals and content opportunities. For general pages, market intelligence is most useful for guide pages and FAQ pages — not for purely operational support pages.",
+        "fields_used": [
+          {
+            "field": "search_intents",
+            "treatment": "INFORMATIONAL INTENT SIGNALS — informational intents and their example queries are the most relevant for general page SEO. They hint at what buyers are researching rather than what they want to buy.",
+            "note": "Example queries within informational intents are planning proxies for guide and FAQ page keyword targets."
+          },
+          {
+            "field": "content_opportunities",
+            "treatment": "GUIDE PAGE KEYWORD SIGNAL — content opportunities map directly to guide page topics. If the guide page content was created from content_opportunities signals, the same signals inform guide page primary and secondary keywords.",
+            "note": "Used specifically for guide-page SEO planning. Less relevant for purely operational pages."
+          },
+          {
+            "field": "aeo_considerations",
+            "treatment": "ANSWER TARGET SEED — any AEO considerations in market intelligence hint at what questions buyers commonly ask. These are provisional seeds for answer_targets across all general pages.",
+            "note": "Optional field — may be absent. PROVISIONAL-PENDING-AEO-STRATEGY — these are not finalized AEO targets."
+          },
+          {
+            "field": "trust_factors",
+            "treatment": "TRUST PAGE AND SUPPORT PAGE SEO SIGNAL — trust factors reveal what trust signals buyers require in this market. Strong trust factor categories (warranty, credentials, reviews, certifications) → these topics may be relevant keywords for trust pages and support pages.",
+            "note": "Supporting signal for trust-page and returns-page SEO framing."
+          }
+        ]
+      },
+
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "data_treatment": "TONE AND IDENTITY GUARDRAIL — brand positioning constrains how SEO copy is framed across all general pages",
+        "fields_used": [
+          {
+            "field": "tone_of_voice.style",
+            "treatment": "COPY TONE GUARDRAIL — seo_title and meta_description for all general pages must conform to the brand tone. A premium-confident brand must not produce commodity-feeling meta descriptions even for support pages.",
+            "note": "Hard guardrail on copy tone — applied during constraint enforcement."
+          },
+          {
+            "field": "value_proposition",
+            "treatment": "META DESCRIPTION FRAMING ANCHOR FOR ABOUT AND TRUST PAGES — the value proposition provides the differentiation framing for About page and Trust page meta descriptions.",
+            "note": "Directional framing — not lifted verbatim. Most relevant for about-page and trust-page."
+          },
+          {
+            "field": "brand_traits",
+            "treatment": "VOCABULARY SIGNAL — brand traits inform the descriptive vocabulary used in seo_title and meta_description for brand-facing pages (about-page, trust-page).",
+            "note": "Used to ensure SEO copy aligns with established brand character."
+          },
+          {
+            "field": "seo_tone_hint",
+            "treatment": "OPTIONAL DIRECT SEO COPY DIRECTION — if present, apply as a tone constraint to all page SEO copy.",
+            "note": "Optional field — may be absent."
+          },
+          {
+            "field": "forbidden_impressions",
+            "treatment": "HARD COPY EXCLUSION — any impressions listed in forbidden_impressions must never appear in seo_title or meta_description for any page.",
+            "note": "Hard constraint — applied during constraint enforcement node."
+          }
+        ]
+      },
+
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "data_treatment": "OPERATIONAL CONTEXT LAYER — store profile provides the store name, domain, and type context needed for branded keyword derivation",
+        "fields_used": [
+          {
+            "field": "store_name",
+            "treatment": "BRANDED KEYWORD ANCHOR — the store_name is the brand term that appears in navigational and branded keyword targets for all general pages. About page primary keyword = '[store_name] about'. Contact page primary keyword = '[store_name] contact'. Etc.",
+            "note": "store_name is operational truth — it must not be altered in SEO planning."
+          },
+          {
+            "field": "domain",
+            "treatment": "SLUG CONTEXT — the domain provides context for understanding what a correct slug looks like in this store's URL structure. Pages at /pages/{slug} in Shopify.",
+            "note": "Optional context — slug is primarily derived from page_type and existing Shopify page handles."
+          },
+          {
+            "field": "vertical",
+            "treatment": "CATEGORY KEYWORD CONTEXT — the vertical helps calibrate what category vocabulary is appropriate for guide pages and trust pages that reference the store's product area.",
+            "note": "Most relevant for guide-page and trust-page SEO planning."
+          }
+        ]
+      }
+    },
+
+    "outputs": {
+      "primary_output": "page-seo.json per page",
+      "artifact_path": "projects/{project_id}/page-seo/{page_type}.json",
+      "review_manifest_path": "projects/{project_id}/page-seo/_review-required.json",
+      "schema": "schemas/page-seo.schema.json",
+      "output_fields": {
+        "primary_keyword": {
+          "source": "Derived from page_type + store_name + market intelligence informational intents (for guide/FAQ pages) + page content vocabulary",
+          "type": "LLM-synthesized string (branded/informational for support pages; topic-based for guide/FAQ pages)",
+          "constraint": "Must reflect the actual page purpose. For support pages (contact, shipping, returns): branded navigational queries only. For guide pages: educational topic terms from the category. For FAQ pages: branded or topical FAQ queries. Must not force commercial keyword targets onto trust/support pages.",
+          "degradation_rule": "If the page contains PLACEHOLDER-REQUIRES-REVIEW notes, primary_keyword must be a safe navigational default (e.g. '[store_name] [page_type]') — not a fabricated confident topic keyword.",
+          "note": "primary_keyword for general pages is rarely a competitive search opportunity. It is primarily a navigational and brand trust signal."
+        },
+        "secondary_keywords": {
+          "source": "LLM synthesis from page content vocabulary, market intelligence informational intents, trust factors (for trust/support pages), FAQ items (for faq and guide pages)",
+          "type": "LLM-synthesized array (minItems: 1)",
+          "constraint": "Must reflect the page's actual topic area. 2-4 secondary keywords is a reasonable planning target for general pages. Must not include unrelated commercial keywords. Support pages should have support-oriented secondary keywords only.",
+          "degradation_rule": "Placeholder-heavy pages: limit to 2 generic navigational secondary keywords maximum.",
+          "provisional_flag": "PROVISIONAL-PENDING-SEO-STRATEGY (when seo-strategy.json is absent)"
+        },
+        "search_intent": {
+          "source": "Derived from page_type via page_role_mapping defaults, cross-validated with page_goal and cta_direction",
+          "type": "constrained enum",
+          "schema_enum": ["informational", "commercial", "transactional", "comparison", "hybrid"],
+          "derivation_logic": {
+            "about-page": "informational — buyers researching the brand story",
+            "contact-page": "informational — buyers seeking support contact information",
+            "shipping-page": "informational — buyers researching logistics before or after purchase",
+            "returns-page": "informational — buyers researching return policy pre-purchase or post-purchase",
+            "trust-page": "commercial — buyers verifying trust signals before purchasing",
+            "guide-page": "informational — buyers researching how to choose or use a product category",
+            "faq-page": "informational — buyers seeking answers to common questions (may be hybrid if FAQ drives commerce)",
+            "legal-support-page": "informational — buyers reviewing legal or policy requirements"
+          },
+          "note": "General pages are almost always informational or commercial. Transactional or comparison intent is not appropriate for support or trust pages."
+        },
+        "seo_title": {
+          "source": "LLM synthesis — constrained by maxLength 70 characters. Based on page_title reformatted for search presentation. Must include primary_keyword naturally.",
+          "type": "LLM-synthesized string — constrained by maxLength: 70",
+          "constraint": "Must not exceed 70 characters. Must honestly reflect the page content. Must include primary_keyword. Must conform to brand tone. Must not inflate placeholder content into confident keyword claims.",
+          "format_guidance": {
+            "about-page": "[Store Name] — [Brand Identity or Category] | About Us",
+            "support-page": "[Store Name] [Page Purpose] | [Store Name]",
+            "trust-page": "[Trust Promise or Guarantee] | [Store Name]",
+            "guide-page": "[Educational Topic] — [Category Qualifier] | [Store Name]",
+            "faq-page": "Frequently Asked Questions | [Store Name]"
+          },
+          "degradation_rule": "Placeholder-heavy pages: seo_title = '[Page Purpose Description] | [Store Name]' as a safe, honest fallback.",
+          "note": "seo_title is a planning proposal — requires human review before implementation."
+        },
+        "meta_description": {
+          "source": "LLM synthesis — constrained by maxLength 180 characters. Based on page_goal, intro_text, and trust_elements from page content.",
+          "type": "LLM-synthesized string — constrained by maxLength: 180",
+          "constraint": "Must not exceed 180 characters. Must be honest — no claims not supported by the page content. Must not inflate placeholders into confident promises. Must conform to brand tone.",
+          "degradation_rule": "Placeholder-heavy pages: meta_description must use safe generic framing ('Our [page type] — [page purpose]. Contact us for details.') without inventing specific claims.",
+          "note": "meta_description is a planning proposal — not final production copy. Requires human review."
+        },
+        "slug": {
+          "source": "Derived from Shopify page handle if the page already exists in Shopify. Generated from page_type if the page does not yet exist.",
+          "type": "operational truth default (if Shopify page exists) or derived from page_type",
+          "constraint": "Must conform to pattern ^[a-z0-9-]+$. Must not include /pages/ prefix — slug only.",
+          "default_slugs_by_page_type": {
+            "about-page": "about-us",
+            "contact-page": "contact",
+            "shipping-page": "shipping",
+            "returns-page": "returns",
+            "trust-page": "our-promise",
+            "guide-page": "Derived from guide topic (e.g. 'buyers-guide', 'how-to-choose')",
+            "faq-page": "faq",
+            "legal-support-page": "Derived from legal page type (e.g. 'privacy-policy', 'terms-of-service')"
+          },
+          "slug_change_safety_note": "If the generated slug differs from a Shopify page handle, flag as SLUG-MIGRATION-REVIEW."
+        },
+        "page_role": {
+          "source": "Mapped from page_type using page_role_mapping defined in this workflow",
+          "type": "constrained enum — derived deterministically from page_type",
+          "schema_enum": ["trust-page", "guide-page", "faq-page", "support-page", "landing-page", "about-page", "hybrid-page"],
+          "mapping": {
+            "about-page": "about-page",
+            "contact-page": "support-page",
+            "shipping-page": "support-page",
+            "returns-page": "support-page",
+            "trust-page": "trust-page",
+            "guide-page": "guide-page",
+            "faq-page": "faq-page",
+            "legal-support-page": "support-page"
+          },
+          "note": "page_role is deterministic — it is derived directly from page_type via the mapping table, not from LLM synthesis."
+        },
+        "internal_linking_targets": {
+          "source": "Structural planning — derived from page_role + seo_strategy internal_linking_strategy + general knowledge of what pages typically link to",
+          "type": "LLM-synthesized array (minItems: 1)",
+          "constraint": "Each target must have target_type (from schema enum) and target_reason (non-empty string). Must not invent specific page URLs — target_type and reason are structural planning decisions.",
+          "schema_enum_for_target_type": ["homepage", "collection-page", "product-page", "guide-page", "faq-page", "blog-article", "page"],
+          "standard_recommendations_by_role": {
+            "about-page": "homepage (brand equity flow), collection-page (guide buyers into shop)",
+            "support-page": "homepage (brand anchor), faq-page (if separate FAQ exists), page (other relevant support pages like shipping or returns)",
+            "trust-page": "homepage, collection-page (drive buyers into shop after trust verification)",
+            "guide-page": "collection-page (guide-to-category conversion), product-page (guide-to-product conversion), faq-page (supporting FAQ), homepage",
+            "faq-page": "homepage, collection-page, product-page (where FAQ answers reference specific products)"
+          },
+          "provisional_flag": "PROVISIONAL-PENDING-INTERNAL-LINKING-STRATEGY: Internal linking targets will be refined by build-internal-linking (step 23)."
+        },
+        "answer_targets": {
+          "source": "PROVISIONAL synthesis from page faq_items, page_goal, search_intent, and market intelligence aeo_considerations",
+          "type": "provisional LLM-synthesized array (minItems: 1)",
+          "constraint": "Each target must have question_type (from schema enum) and answer_goal (non-empty string). answer_goal describes the communication goal — not the verbatim answer text.",
+          "schema_enum_for_question_type": ["what-is-it", "who-is-it-for", "how-does-it-work", "why-does-it-matter", "comparison", "trust", "shipping", "returns", "contact", "support"],
+          "standard_recommendations_by_role": {
+            "about-page": "what-is-it (brand identity), who-is-it-for (audience clarity), why-does-it-matter (brand reason-to-exist)",
+            "contact-page": "contact (how to reach us), support (support scope), returns (links to returns policy)",
+            "shipping-page": "shipping (shipping mechanics), why-does-it-matter (why shipping policy matters to buyers)",
+            "returns-page": "returns (return mechanics), trust (returns policy as a trust signal)",
+            "trust-page": "trust (guarantee or promise), why-does-it-matter (why to trust this store), comparison (how this store compares on trust)",
+            "guide-page": "what-is-it (category overview), how-does-it-work (how products in category work), who-is-it-for (audience segments), comparison (how to compare options)",
+            "faq-page": "what-is-it (about the store), shipping (shipping FAQs), returns (return FAQs), support (support process), trust (trust FAQs)"
+          },
+          "provisional_flag": "PROVISIONAL-PENDING-AEO-STRATEGY: Answer targets will be reviewed and updated when aeo-strategy.json is available (step 12).",
+          "note": "answer_targets for general pages are provisional AEO seeds — they describe the questions the page should address, not finalized answer engine optimization strategy."
+        },
+        "structured_data_targets": {
+          "source": "Conservative defaults based on page_role",
+          "type": "optional derived array",
+          "schema_enum": ["faq", "article", "breadcrumb", "how-to", "organization"],
+          "default_logic": {
+            "about-page": "organization (brand entity clarity)",
+            "support-page": "breadcrumb (navigation clarity) — faq if page contains FAQ items",
+            "trust-page": "organization (trust entity signal)",
+            "guide-page": "article (educational content signal) — how-to if guide has step-by-step structure — faq if guide contains FAQ items",
+            "faq-page": "faq (FAQ rich result opportunity)"
+          },
+          "note": "structured_data_targets is optional in the schema. Detailed structured data planning is out of Phase 7 scope (build-structured-data-plan is step 24)."
+        },
+        "canonical_strategy": {
+          "source": "Derived — general pages in Shopify are self-canonical by default",
+          "type": "constrained enum",
+          "schema_enum": ["self-canonical", "platform-default"],
+          "default": "platform-default (Shopify manages canonical for standard page URLs)",
+          "note": "General pages do not typically have faceted filtering or pagination issues. Canonical strategy is a safe default. Flag for review if a general page type has known URL parameter issues."
+        },
+        "content_depth": {
+          "source": "Derived from page_role_mapping default + body_sections richness in page content + seo_strategy.content_depth stance + seo_strategy.knowledge_seo_role",
+          "type": "constrained enum",
+          "schema_enum": ["light", "balanced", "deep"],
+          "derivation_logic": {
+            "light": "Support pages (contact, shipping, returns, legal) — these pages are short operational reference pages. Also: placeholder-heavy pages regardless of page type.",
+            "balanced": "About page, trust page, FAQ page — these pages need moderate depth to serve their trust and support functions.",
+            "deep": "Guide pages where knowledge_seo_role = balanced or major in seo-strategy. FAQ page when knowledge_seo_role = major. Otherwise, guide pages default to balanced."
+          }
+        },
+        "notes": {
+          "source": "Workflow-generated synthesis metadata per page",
+          "type": "machine-generated string",
+          "required_content": "Must include: synthesis timestamp, page_type identifier, list of inputs used, placeholder density flag (PLACEHOLDER-HEAVY if notes field in page-content contains placeholder flags), PROVISIONAL-PENDING-SEO-STRATEGY flag (when seo-strategy.json is absent), PROVISIONAL-PENDING-AEO-STRATEGY flag for all answer_targets, SEO priority level for this page type, evidence boundary label (e.g. 'Keywords are branded navigational estimates — not validated search query data')."
+        }
+      }
+    },
+
+    "placeholder_degradation_rules": {
+      "purpose": "Define how SEO planning degrades when page content is heavily placeholder-bound. This prevents the workflow from producing confident keyword targeting for pages whose content is not yet determined.",
+      "trigger_detection": "Scan the page-content notes field and body_sections text for PLACEHOLDER-REQUIRES-REVIEW, SPARSE DATA, PLACEHOLDER-REQUIRES-LEGAL-REVIEW strings. Compute placeholder_density: none (0 flags), light (1-2 flags), heavy (3+ flags or in primary sections).",
+      "degradation_levels": {
+        "none": "Standard SEO synthesis — all fields synthesized normally.",
+        "light": "Minor degradation — synthesize normally but add note: 'SOME-PLACEHOLDER-CONTENT: Review SEO copy after operational details are confirmed.' Do not override specific keyword decisions.",
+        "heavy": "Full degradation — primary_keyword = safe branded navigational default; secondary_keywords = limited to 2 generic; meta_description = honest generic framing without specific operational claims; notes field must include PLACEHOLDER-HEAVY-SEO-DEGRADED."
+      },
+      "legal_page_special_rule": "Legal support pages with PLACEHOLDER-REQUIRES-LEGAL-REVIEW must always receive heavy degradation regardless of content volume. Legal pages should not be keyword-optimized until legal content is reviewed and confirmed."
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-page-content",
+        "provides": ["page-content.json per page"],
+        "required": true,
+        "note": "build-page-content (workflow step 20) must complete before this workflow runs. One page-seo artifact is produced for each page-content artifact. The page_type from page-content is the primary key for artifact matching."
+      },
+      {
+        "workflow": "build-seo-strategy",
+        "provides": ["seo-strategy.json"],
+        "required": false,
+        "note": "PHASE 7 CONTEXT: seo-strategy.json is built in the same phase as build-page-seo. When running Phase 7 in sequence, seo-strategy.json should be available. If absent, workflow operates in PROVISIONAL mode with market-intelligence as the keyword proxy."
+      },
+      {
+        "workflow": "build-market-intelligence",
+        "provides": ["market-intelligence.json"],
+        "required": true,
+        "note": "market-intelligence.json provides search intent signals and content opportunities that are the primary keyword proxy when seo-strategy.json is absent, and an enrichment layer when seo-strategy.json is present."
+      },
+      {
+        "workflow": "build-brand-positioning",
+        "provides": ["brand-positioning.json"],
+        "required": true,
+        "note": "brand-positioning.json provides tone guardrails and forbidden impressions that constrain all page SEO copy."
+      },
+      {
+        "workflow": "build-store-profile",
+        "provides": ["store-profile.json"],
+        "required": true,
+        "note": "store-profile.json provides store_name (branded keyword anchor) and vertical context."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-faq-page",
+        "receives": ["page-seo.json for faq-page type"],
+        "note": "Workflow step 22. build-faq-page uses the faq-page page-seo artifact's search_intent, answer_targets, and internal_linking_targets as planning context for the full FAQ page content artifact."
+      },
+      {
+        "workflow": "build-internal-linking",
+        "receives": ["page-seo.json (all pages)"],
+        "note": "Workflow step 23 — out of Phase 7 scope. Internal linking targets from all page-seo artifacts feed into the store-level internal linking plan."
+      },
+      {
+        "workflow": "build-structured-data-plan",
+        "receives": ["page-seo.json (all pages)"],
+        "note": "Workflow step 24 — out of Phase 7 scope. structured_data_targets from page-seo artifacts seed the structured data planning for general pages."
+      },
+      {
+        "workflow": "run-validation",
+        "receives": ["page-seo.json (all pages)"],
+        "note": "Out of Phase 7 scope (workflow step 28). Validates page-seo artifacts against schema and strategy alignment."
+      }
+    ],
+
+    "schema_alignment": {
+      "page-seo.schema.json": {
+        "required_fields_covered": [
+          "primary_keyword",
+          "secondary_keywords",
+          "search_intent",
+          "seo_title",
+          "meta_description",
+          "slug",
+          "page_role",
+          "internal_linking_targets",
+          "answer_targets"
+        ],
+        "optional_fields_covered": [
+          "structured_data_targets",
+          "canonical_strategy",
+          "content_depth",
+          "notes"
+        ],
+        "schema_enum_notes": {
+          "search_intent": "enum: informational | commercial | transactional | comparison | hybrid",
+          "page_role": "enum: trust-page | guide-page | faq-page | support-page | landing-page | about-page | hybrid-page",
+          "internal_linking_targets[].target_type": "enum: homepage | collection-page | product-page | guide-page | faq-page | blog-article | page",
+          "answer_targets[].question_type": "enum: what-is-it | who-is-it-for | how-does-it-work | why-does-it-matter | comparison | trust | shipping | returns | contact | support",
+          "structured_data_targets items": "enum: faq | article | breadcrumb | how-to | organization",
+          "canonical_strategy": "enum: self-canonical | platform-default",
+          "content_depth": "enum: light | balanced | deep"
+        },
+        "seo_title_note": "Schema maxLength: 70 — the LLM must respect this hard character limit. Constraint enforcement must check character count.",
+        "meta_description_note": "Schema maxLength: 180 — the LLM must respect this hard character limit. Constraint enforcement must check character count.",
+        "slug_note": "Schema pattern: ^[a-z0-9-]+$ — slug must match this pattern. Must not include /pages/ prefix.",
+        "validation_note": "Each page-seo object must be validated against schemas/page-seo.schema.json using ajv. All required fields, enum values, character limits, and array minimums must be validated."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: page_content_artifacts (array of page-content.json objects or paths), market_intelligence (object), brand_positioning (object), store_profile (object). Optional: seo_strategy (object — available in Phase 7 when build-seo-strategy completes first). All required inputs must be present before this workflow begins.",
+        "input": "page_content_artifacts + market_intelligence + brand_positioning + store_profile + optional seo_strategy",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present. page_content_artifacts must be a non-empty array. market_intelligence must have search_intents. brand_positioning must have tone_of_voice and forbidden_impressions. store_profile must have store_name. Check whether seo_strategy is present — log availability. If seo_strategy is absent, set provisional_mode.seo_strategy = true. Log provisional mode status prominently.",
+        "input": "all inputs",
+        "output": "validated inputs + provisional_mode flags or halt error"
+      },
+      {
+        "step": 3,
+        "name": "Extract Page SEO Planning Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Extract and prepare planning signals for page SEO synthesis. Produce a page_seo_signals object: (1) STORE BRAND ANCHOR: store_name from store_profile — this is the branded keyword root for all navigational page keywords. (2) VERTICAL CONTEXT: vertical from store_profile — informs guide page and trust page category vocabulary. (3) INTENT SIGNALS: informational intents and example queries from market_intelligence.search_intents — primary planning proxy for guide/FAQ page keywords. (4) CONTENT OPPORTUNITIES: content_opportunities from market_intelligence — seed for guide page keyword targets. (5) AEO SEEDS: aeo_considerations from market_intelligence (optional). (6) STRATEGY SIGNALS: If seo_strategy is present, extract: primary_seo_goal, page_priority, content_depth, knowledge_seo_role, internal_linking_strategy.link_depth, internal_linking_strategy.cross_linking_intensity. If absent, set provisional defaults from market intelligence signals. (7) TONE GUARDRAILS: tone_of_voice.style and seo_tone_hint from brand_positioning. (8) FORBIDDEN IMPRESSIONS: forbidden_impressions from brand_positioning. (9) PROVISIONAL FLAGS: seo_strategy = true/false.",
+        "input": "validated market_intelligence + brand_positioning + store_profile + optional seo_strategy + provisional_mode flags",
+        "output": "page_seo_signals object"
+      },
+      {
+        "step": 4,
+        "name": "Classify Pages and Detect Placeholder Density (per page)",
+        "type": "Code node (JavaScript)",
+        "description": "For each page in page_content_artifacts: (1) CLASSIFY: determine page_type, map to page_role using page_role_mapping, determine search_intent default, determine seo_priority classification. (2) DETECT PLACEHOLDER DENSITY: scan notes field and body_sections text for PLACEHOLDER-REQUIRES-REVIEW, SPARSE DATA, PLACEHOLDER-REQUIRES-LEGAL-REVIEW strings. Compute placeholder_density: none / light / heavy. (3) APPLY DEGRADATION FLAG: Set page_degradation = 'none' / 'light' / 'heavy' per the degradation rules. (4) LEGAL SAFETY: If page_type = legal-support-page, set page_degradation = 'heavy' regardless of content. Produce a classified_pages array where each page has: page_type, page_role, search_intent_default, seo_priority, placeholder_density, page_degradation.",
+        "input": "page_content_artifacts",
+        "output": "classified_pages array with degradation flags"
+      },
+      {
+        "step": 5,
+        "name": "Build LLM Page SEO Prompt (per page)",
+        "type": "Code node (JavaScript)",
+        "description": "For each page in classified_pages, assemble a structured LLM prompt. The prompt must: (1) Present page classification: page_type, page_role, search_intent_default, seo_priority. (2) Present page content signals: page_title, page_goal, intro_text summary, body_sections count and richness, trust_elements, faq_items (if present), cta_direction, notes flags. (3) Present page SEO planning signals: store_name (branded keyword anchor), vertical context, relevant search_intent and content_opportunities signals, AEO seeds. (4) Present strategy alignment: primary_seo_goal and page_priority from seo_strategy if available; note which pages are high/low priority per strategy. (5) Apply degradation instructions: if page_degradation = 'heavy', include explicit instruction: 'This page has heavy placeholder content. Primary keyword must be a safe branded navigational default. meta_description must be generic and honest. Do not invent specific operational claims.' (6) Request output as valid JSON conforming to schemas/page-seo.schema.json. Include all schema enum values. (7) Enforce character limits: seo_title <= 70, meta_description <= 180. (8) Instruct slug = safe default from slug_defaults table or from Shopify page handle if available. (9) Include provisional mode notices if seo_strategy is absent or aeo_strategy is unavailable.",
+        "input": "classified page + page_content artifact + page_seo_signals",
+        "output": "assembled LLM prompt string per page",
+        "prompt_safety_note": "Prompt must state: 'General page keywords are primarily navigational and informational — do not target competitive commercial keywords on support or trust pages. Placeholder-heavy pages must receive safe, honest, degraded SEO planning — do not fabricate confident keyword targets for unconfirmed content. seo_title must not exceed 70 characters. meta_description must not exceed 180 characters.'"
+      },
+      {
+        "step": 6,
+        "name": "LLM Synthesis: Page SEO Plan (per page)",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API for each page. Request JSON output mode. Temperature: 0.2 (SEO planning should be more deterministic than editorial content synthesis). Max tokens: 2000 per page.",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt per page",
+        "output": "raw LLM response string per page (expected to be JSON)"
+      },
+      {
+        "step": 7,
+        "name": "Parse and Enforce Hard Constraints (per page)",
+        "type": "Code node (JavaScript)",
+        "description": "For each page, parse the raw LLM response as JSON. Enforce constraint integrity: (1) PAGE ROLE: Overwrite page_role with the deterministic mapping from page_type — do not allow LLM to change page_role classification. (2) SEARCH INTENT: Overwrite search_intent with the page_role_mapping default if the LLM assigned a clearly inappropriate intent (e.g. transactional for a contact page). (3) SEO TITLE LENGTH: If seo_title exceeds 70 characters, truncate at word boundary and log. (4) META DESCRIPTION LENGTH: If meta_description exceeds 180 characters, truncate at sentence boundary and log. (5) SLUG ENFORCEMENT: Validate slug against ^[a-z0-9-]+$ pattern. Apply safe default if invalid. Flag if differs from Shopify handle as SLUG-MIGRATION-REVIEW. (6) DEGRADATION ENFORCEMENT: If page_degradation = 'heavy', check that primary_keyword is a safe navigational term (contains store_name or is from safe keyword patterns). If LLM generated a confident commercial keyword for a heavily-placeholder page, overwrite with '[store_name] [page_type]' safe default. (7) FORBIDDEN IMPRESSIONS: Scan seo_title and meta_description for forbidden_impressions. Replace violations with REQUIRES-REVIEW-COPY-VIOLATION. (8) ARRAY MINIMUMS: Ensure secondary_keywords >= 1, internal_linking_targets >= 1, answer_targets >= 1. Add minimal placeholder entries if minimum is unmet. (9) PROVISIONAL FLAG INJECTION: Inject PROVISIONAL-PENDING-AEO-STRATEGY into notes for all answer_targets. Inject PROVISIONAL-PENDING-SEO-STRATEGY into notes if provisional_mode.seo_strategy = true.",
+        "input": "raw LLM response per page + classified page metadata + page_seo_signals",
+        "output": "parsed and constrained page_seo object per page (pre-validation)"
+      },
+      {
+        "step": 8,
+        "name": "Validate Against Schema (per page)",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate each page_seo object against schemas/page-seo.schema.json using ajv. Key validations: primary_keyword non-empty string, secondary_keywords is array with minItems: 1, search_intent in enum, seo_title maxLength: 70, meta_description maxLength: 180, slug matches ^[a-z0-9-]+$ pattern, page_role in enum, internal_linking_targets minItems: 1 with required sub-fields and target_type in enum, answer_targets minItems: 1 with required sub-fields and question_type in enum. Log validation failure per page — do not halt the entire workflow for one page failure. Continue processing remaining pages.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/page-seo.schema.json",
+        "failure_behavior": "Log validation failure for the specific page. Continue processing remaining pages. At the end, report all pages that failed validation in the review-required manifest.",
+        "input": "constrained page_seo object per page",
+        "output": "validated page_seo objects or per-page validation errors"
+      },
+      {
+        "step": 9,
+        "name": "Persist page-seo.json (per page)",
+        "type": "GitHub node or Write File node",
+        "description": "Write each validated page-seo.json to projects/{project_id}/page-seo/{page_type}.json. Pages that failed validation are logged to the review-required manifest at projects/{project_id}/page-seo/_review-required.json. Commit with a message such as 'chore: generate page-seo for {store_id} — Phase 7 draft (provisional)'.",
+        "artifact_path": "projects/{project_id}/page-seo/{page_type}.json",
+        "review_manifest_path": "projects/{project_id}/page-seo/_review-required.json",
+        "git_note": "Each page-seo.json must be committed to Git. Placeholder-heavy page SEO artifacts must be clearly flagged in commit notes as requiring human review.",
+        "input": "validated page_seo objects + review manifest data",
+        "output": "confirmation of write per page + list of persisted artifact paths"
+      },
+      {
+        "step": 10,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the list of persisted page-seo artifact paths, the review-required manifest path, and provisional_mode flags to the master orchestrator. The faq-page type page-seo artifact path must be passed explicitly to build-faq-page (step 22) which uses it as context. Also signal any pages that failed validation so the orchestrator can flag them for human review before build-faq-page or build-internal-linking runs.",
+        "input": "artifact_paths list + review_required manifest path + provisional_mode flags + faq_page_seo_path",
+        "output": "workflow output payload with provisional status metadata and faq-page-seo path for downstream use"
+      }
+    ],
+
+    "assumptions": [
+      "page-content.json artifacts from build-page-content (step 20) are required inputs. This workflow cannot run before build-page-content completes. One page-seo artifact is produced for each page-content artifact.",
+      "seo-strategy.json is available in Phase 7 when this workflow runs after build-seo-strategy. If absent, provisional mode activates using market-intelligence as keyword proxy.",
+      "General pages are primarily trust and support assets — not primary SEO drivers. The keyword strategy for general pages is predominantly branded and navigational, not competitive commercial. This is intentional and correct.",
+      "Pages with heavy PLACEHOLDER-REQUIRES-REVIEW content receive conservative, degraded SEO planning. This is a safety behavior — not a workflow error. It prevents inflating placeholder content into confident keyword claims.",
+      "Legal support pages always receive heavy SEO degradation regardless of content volume. Legal content requires review before any SEO strategy can be finalized for it.",
+      "aeo-strategy.json is NOT available in Phase 7. All answer_targets are provisional AEO seeds marked PROVISIONAL-PENDING-AEO-STRATEGY.",
+      "slug is generated as the page type identifier for new pages. For existing Shopify pages, the Shopify page handle is the operational truth for the slug.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "page_role is derived deterministically from page_type using the page_role_mapping table — it is not synthesized by the LLM. The LLM synthesizes the keyword fields, copy fields, and answer targets.",
+      "Internal linking targets are structural planning recommendations — not validated internal link maps. The detailed internal linking plan is produced by build-internal-linking (step 23), which is out of Phase 7 scope."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should legal support pages (privacy policy, terms of service) be marked noindex in the page-seo artifact, or should that decision be left to a separate technical SEO checklist?",
+        "impact": "If legal pages are indexed, they may not be harmful, but they rarely serve SEO purposes. A noindex recommendation embedded in the page-seo artifact would be a useful signal for implementation.",
+        "recommended_default": "Add a legal_page_indexation_note to the notes field of legal-support-page artifacts: 'LEGAL PAGE INDEXATION: Consider noindex for template legal pages not differentiated for SEO value. Review with SEO specialist.' Do not hardcode noindex — leave as a review item."
+      },
+      {
+        "question": "Should guide pages receive a separate, more ambitious SEO planning workflow when knowledge_seo_role = 'major' in the seo-strategy?",
+        "impact": "Guide pages with a major knowledge_seo_role may deserve more intensive SEO planning (topic cluster mapping, pillar-page structure, long-form keyword strategy) than this general page-seo workflow provides.",
+        "recommended_default": "The current workflow handles guide pages with deeper treatment (content_depth = deep, richer answer_targets, more internal_linking_targets). For Phase 7, this is sufficient. A dedicated guide-page SEO workflow could be a future addition if guide pages become a primary SEO channel."
+      },
+      {
+        "question": "How should this workflow handle pages that appear in page-content but have since been decided not to publish (e.g. a legal-support-page was scoped but the store decided to use Shopify's built-in policies instead)?",
+        "impact": "SEO artifacts for unpublished pages are low risk (they stay in Git as planning artifacts) but could be confusing if they persist alongside published page SEO artifacts.",
+        "recommended_default": "If a page-content artifact has notes indicating 'NOT IN SCOPE' or 'OUT OF SCOPE', skip SEO synthesis for that page and log it in the review-required manifest as SCOPE-REVIEW-REQUIRED rather than as a validation failure."
+      },
+      {
+        "question": "What slug should be generated for guide pages whose topic is not yet determined (e.g. a guide page where the content is largely placeholder)?",
+        "impact": "An incorrect slug for a guide page that later gets published could require a URL migration.",
+        "recommended_default": "Use 'guide-[placeholder]' as the slug for guide pages with heavy placeholder content and flag as SLUG-PENDING-CONTENT-REVIEW in the notes field. The slug should be updated once the guide topic is confirmed."
+      }
+    ]
+  }
+}

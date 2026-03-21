@@ -1,0 +1,320 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, and node structure so that a future n8n implementation can be built safely. All Shopify API calls are read-only. No store data is modified. Credentials are stored only in n8n and must never appear in this file or in Git.",
+    "credential_safety_note": "Shopify credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+  "workflow": {
+    "id": "import-shopify-data",
+    "name": "import-shopify-data",
+    "category": "import",
+    "phase": "Phase 1 — Project Foundation",
+    "purpose": "Pull operational store data from Shopify using the active store connection. This workflow is triggered by the master orchestrator after intake-store-input completes. It produces structured raw datasets (shop basics, products, collections, media references) for downstream use in build-store-profile and later planning workflows. All calls are read-only. No data is modified in Shopify.",
+
+    "inputs": {
+      "from_upstream": [
+        {
+          "field": "shopify_store_selector",
+          "source": "intake-store-input → normalized_intake_payload",
+          "type": "runtime connection reference",
+          "note": "Identifies which Shopify credential/connection to use. Resolves to a specific n8n Shopify credential at runtime. Must never be stored as a domain string in Git artifacts."
+        },
+        {
+          "field": "project_id",
+          "source": "intake-store-input → project_setup_payload",
+          "type": "string",
+          "note": "Used to tag the imported datasets with the correct project context."
+        }
+      ],
+      "credential_placeholder": {
+        "name": "SHOPIFY_CREDENTIAL_PLACEHOLDER",
+        "type": "Shopify API credential",
+        "note": "Stored in n8n credential vault. Never exposed in Git. The actual credential name must be confirmed during n8n implementation. This workflow assumes a Shopify connection is already configured and active in n8n."
+      }
+    },
+
+    "outputs": {
+      "raw_shop_data": {
+        "description": "Basic shop-level metadata fetched from the Shopify Admin API.",
+        "structure": {
+          "shop_domain": "string — myshopify.com domain",
+          "shop_name": "string — store display name",
+          "shop_currency": "string — store default currency code",
+          "shop_plan_name": "string — Shopify plan name",
+          "shop_locale": "string — store locale setting",
+          "shop_country_code": "string — store country"
+        },
+        "shopify_api_source": "GET /admin/api/2024-01/shop.json"
+      },
+      "raw_products": {
+        "description": "Full product catalog fetched from Shopify. Paginated. All pages merged into a single array.",
+        "structure_per_item": {
+          "id": "Shopify product ID",
+          "title": "string",
+          "handle": "string",
+          "body_html": "string — raw description HTML",
+          "vendor": "string",
+          "product_type": "string",
+          "tags": "string[] — comma-separated tags split into array",
+          "status": "string — active | draft | archived",
+          "variants": [
+            {
+              "id": "variant ID",
+              "title": "string",
+              "price": "string",
+              "sku": "string",
+              "inventory_quantity": "integer"
+            }
+          ],
+          "images": [
+            {
+              "id": "image ID",
+              "src": "string — image URL",
+              "alt": "string | null"
+            }
+          ],
+          "metafields_global_title_tag": "string | null — SEO title if set",
+          "metafields_global_description_tag": "string | null — SEO description if set"
+        },
+        "shopify_api_source": "GET /admin/api/2024-01/products.json (paginated, limit=250)",
+        "note": "Only products with status=active should be included by default. draft and archived products may be included as a separate dataset if needed for planning."
+      },
+      "raw_collections": {
+        "description": "All collections (both custom and smart) fetched from Shopify.",
+        "structure_per_item": {
+          "id": "Shopify collection ID",
+          "type": "custom | smart",
+          "title": "string",
+          "handle": "string",
+          "body_html": "string — raw description HTML",
+          "image": {
+            "src": "string | null",
+            "alt": "string | null"
+          },
+          "sort_order": "string",
+          "metafields_global_title_tag": "string | null",
+          "metafields_global_description_tag": "string | null"
+        },
+        "shopify_api_sources": [
+          "GET /admin/api/2024-01/custom_collections.json (paginated)",
+          "GET /admin/api/2024-01/smart_collections.json (paginated)"
+        ],
+        "note": "Both custom_collections and smart_collections are fetched and merged. Each item is tagged with its type field."
+      },
+      "raw_shop_metadata": {
+        "description": "Existing store-level SEO and configuration metadata.",
+        "structure": {
+          "metafields": "array of store-level metafield objects where namespace/key is relevant to SEO or store config",
+          "existing_seo_fields": {
+            "title": "string | null — global store SEO title if set",
+            "description": "string | null — global store SEO description if set"
+          }
+        },
+        "shopify_api_source": "GET /admin/api/2024-01/metafields.json?metafield[owner_resource]=shop",
+        "note": "Store-level metafields only. Product and collection metafields are handled within their respective datasets."
+      },
+      "import_summary": {
+        "description": "Summary of what was imported — counts, timestamps, any errors or skipped items.",
+        "structure": {
+          "imported_at": "ISO 8601 timestamp",
+          "project_id": "string",
+          "shop_domain": "string",
+          "product_count": "integer",
+          "collection_count": "integer",
+          "active_product_count": "integer",
+          "skipped_product_count": "integer — draft or archived products not included in main dataset",
+          "import_errors": "array of error descriptions | []"
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "intake-store-input",
+        "provides": ["shopify_store_selector", "project_id"]
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-store-profile",
+        "receives": ["raw_shop_data", "import_summary.product_count"]
+      },
+      {
+        "workflow": "build-product-content",
+        "receives": ["raw_products"],
+        "note": "Out of scope for Phase 1. Documented for future reference."
+      },
+      {
+        "workflow": "build-collection-content",
+        "receives": ["raw_collections"],
+        "note": "Out of scope for Phase 1. Documented for future reference."
+      },
+      {
+        "workflow": "build-media-plan",
+        "receives": ["raw_products.images", "raw_collections.image"],
+        "note": "Out of scope for Phase 1. Documented for future reference."
+      }
+    ],
+
+    "schema_alignment": {
+      "store-profile.schema.json": {
+        "domain": "populated from raw_shop_data.shop_domain",
+        "store_name": "populated from raw_shop_data.shop_name",
+        "note": "store-profile.schema.json does not define a raw import schema. This workflow's output feeds build-store-profile, which is responsible for schema validation."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Accepts shopify_store_selector and project_id as inputs. This workflow is not a standalone trigger — it is always called as a subworkflow.",
+        "input": "shopify_store_selector, project_id",
+        "output": "resolved inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Fetch Shop Basics",
+        "type": "Shopify node or HTTP Request node",
+        "description": "Call Shopify Admin API to retrieve top-level shop information. Uses the Shopify credential resolved from shopify_store_selector. Returns shop_domain, shop_name, shop_currency, shop_plan_name, shop_locale, shop_country_code.",
+        "shopify_api": "GET /admin/api/2024-01/shop.json",
+        "credential": "SHOPIFY_CREDENTIAL_PLACEHOLDER",
+        "input": "Shopify connection",
+        "output": "raw_shop_data object"
+      },
+      {
+        "step": 3,
+        "name": "Fetch Products (Paginated)",
+        "type": "HTTP Request node with pagination loop or Shopify node",
+        "description": "Call Shopify products endpoint with limit=250 per page. Handle pagination by following the Link header for subsequent pages until all products are retrieved. Merge all pages into a single array. Include fields: id, title, handle, body_html, vendor, product_type, tags, status, variants, images, metafields_global_title_tag, metafields_global_description_tag.",
+        "shopify_api": "GET /admin/api/2024-01/products.json?limit=250&fields=id,title,handle,body_html,vendor,product_type,tags,status,variants,images,metafields_global_title_tag,metafields_global_description_tag",
+        "credential": "SHOPIFY_CREDENTIAL_PLACEHOLDER",
+        "pagination_note": "Shopify paginates at 250 items per page. Use cursor-based pagination via Link header (page_info parameter). Loop until no next page is returned.",
+        "rate_limit_note": "Shopify REST API has a leaky-bucket rate limit (40 calls/second for standard plans). Add delay between paginated calls if the catalog is large (>500 products).",
+        "input": "Shopify connection",
+        "output": "raw_products array (all pages merged)"
+      },
+      {
+        "step": 4,
+        "name": "Fetch Custom Collections (Paginated)",
+        "type": "HTTP Request node with pagination loop or Shopify node",
+        "description": "Call Shopify custom_collections endpoint with limit=250 per page. Handle pagination. Tag each result with type='custom'.",
+        "shopify_api": "GET /admin/api/2024-01/custom_collections.json?limit=250&fields=id,title,handle,body_html,image,sort_order,metafields_global_title_tag,metafields_global_description_tag",
+        "credential": "SHOPIFY_CREDENTIAL_PLACEHOLDER",
+        "input": "Shopify connection",
+        "output": "custom_collections array"
+      },
+      {
+        "step": 5,
+        "name": "Fetch Smart Collections (Paginated)",
+        "type": "HTTP Request node with pagination loop or Shopify node",
+        "description": "Call Shopify smart_collections endpoint with limit=250 per page. Handle pagination. Tag each result with type='smart'.",
+        "shopify_api": "GET /admin/api/2024-01/smart_collections.json?limit=250&fields=id,title,handle,body_html,image,sort_order,metafields_global_title_tag,metafields_global_description_tag",
+        "credential": "SHOPIFY_CREDENTIAL_PLACEHOLDER",
+        "input": "Shopify connection",
+        "output": "smart_collections array"
+      },
+      {
+        "step": 6,
+        "name": "Merge Collections",
+        "type": "Code node (JavaScript)",
+        "description": "Merge custom_collections and smart_collections arrays into a single raw_collections array. Preserve the type field on each item so downstream workflows can distinguish collection types.",
+        "input": "custom_collections + smart_collections",
+        "output": "raw_collections array"
+      },
+      {
+        "step": 7,
+        "name": "Fetch Shop-Level Metafields",
+        "type": "HTTP Request node",
+        "description": "Fetch store-level metafields to capture any existing SEO title, description, or store configuration metafields.",
+        "shopify_api": "GET /admin/api/2024-01/metafields.json?metafield[owner_resource]=shop",
+        "credential": "SHOPIFY_CREDENTIAL_PLACEHOLDER",
+        "input": "Shopify connection",
+        "output": "raw_shop_metadata object"
+      },
+      {
+        "step": 8,
+        "name": "Build Import Summary",
+        "type": "Code node (JavaScript)",
+        "description": "Compute import_summary: count total products, active products, skipped (non-active) products, total collections. Record the imported_at timestamp, project_id, and shop_domain. Capture any errors encountered during import steps. This summary is used by build-store-profile for catalog_type derivation.",
+        "input": "raw_products + raw_collections + raw_shop_data",
+        "output": "import_summary object"
+      },
+      {
+        "step": 9,
+        "name": "Persist Import Datasets (Optional Intermediate Artifacts)",
+        "type": "GitHub node or Write File node",
+        "description": "Optionally write the imported datasets to the project folder as intermediate artifacts. This supports the Git-first principle and provides an audit trail. Files written: projects/{project_id}/data/shopify-shop.json, projects/{project_id}/data/shopify-products.json, projects/{project_id}/data/shopify-collections.json, projects/{project_id}/data/shopify-metadata.json, projects/{project_id}/data/import-summary.json. This step is optional at MVP — the datasets can be passed directly in memory if the file write is deferred.",
+        "input": "all raw datasets + import_summary",
+        "output": "confirmation or passthrough"
+      },
+      {
+        "step": 10,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass all raw datasets (raw_shop_data, raw_products, raw_collections, raw_shop_metadata, import_summary) to the calling orchestrator for routing to build-store-profile and later workflows.",
+        "input": "all raw datasets",
+        "output": "workflow output payload"
+      }
+    ],
+
+    "assumptions": [
+      "A Shopify API credential is already configured in n8n and is active. The actual credential name is unknown at Git-definition time and must be confirmed during n8n implementation.",
+      "The shopify_store_selector from the intake resolves to a specific Shopify credential at runtime. The mechanism for this resolution depends on n8n's credential selection approach (e.g., expression-based credential selection or a fixed credential per n8n environment).",
+      "Shopify API version 2024-01 is used. This should be updated to the latest stable version at implementation time.",
+      "Only products with status=active are included in the main raw_products dataset. Draft and archived products are counted in import_summary but excluded from the primary dataset unless a specific planning need requires them.",
+      "Product metafields beyond metafields_global_title_tag and metafields_global_description_tag are not fetched in this phase. Custom metafield namespaces require a separate metafields fetch per product, which adds significant API call volume and is deferred to a later phase.",
+      "The import is read-only. No Shopify data is created, modified, or deleted by this workflow.",
+      "Large catalogs (>500 products) may require additional rate limit handling. This is documented but not implemented in the draft.",
+      "Media asset files (CDN URLs) are captured as part of product images and collection images. Downloading or processing those files is out of scope for this workflow."
+    ],
+
+    "open_questions": [
+      {
+        "question": "What is the actual n8n credential name for the Shopify connection?",
+        "impact": "Required to configure the credential field in all Shopify/HTTP nodes at implementation time.",
+        "resolution": "Must be confirmed by inspecting the n8n credential vault during implementation. Use a safe placeholder in this definition."
+      },
+      {
+        "question": "Does n8n's Shopify node support cursor-based pagination automatically, or must pagination be implemented manually with a loop?",
+        "impact": "Determines node type for steps 3–5. n8n's built-in Shopify node may handle pagination automatically for some resources.",
+        "recommended_default": "Use HTTP Request node with a manual pagination loop for full control and visibility. Switch to Shopify node if it reliably handles pagination for all needed endpoints."
+      },
+      {
+        "question": "Should imported raw datasets be persisted to Git (via GitHub node) or kept in memory only?",
+        "impact": "File persistence aligns with Git-first principles and provides an audit trail, but adds GitHub API calls and repo size. In-memory keeps the workflow faster but leaves no trace.",
+        "recommended_default": "Persist to project folder as intermediate artifacts (step 9). This aligns with repo-rules and n8n-conventions. Defer the GitHub write to a post-import step if performance is a concern."
+      },
+      {
+        "question": "How should the shopify_store_selector resolve to a Shopify n8n credential when multiple Shopify stores may be connected?",
+        "impact": "n8n credential selection can be done statically (one credential per environment) or dynamically (expression-based). Dynamic selection requires n8n v1.x+ features.",
+        "recommended_default": "For MVP, use a single configured Shopify credential per n8n environment. Document the multi-store pattern for future expansion."
+      },
+      {
+        "question": "Should product metafields (beyond SEO title/description) be fetched in this phase?",
+        "impact": "Custom metafields (e.g., product specs, custom badges) may be useful for later content planning but require N+1 API calls (one per product).",
+        "recommended_default": "Defer custom metafield fetching to the build-product-content phase when the data is actually needed. Keep this import lean."
+      }
+    ],
+
+    "runtime_dependencies": [
+      "n8n Execute Workflow Trigger node — receives subworkflow call from master orchestrator",
+      "n8n Shopify node OR HTTP Request node — for Shopify API calls",
+      "n8n Code node (JavaScript) — for merging and summarizing datasets",
+      "n8n GitHub node OR Write Binary File node — optional, for persisting datasets to repo",
+      "Shopify Admin API credential — stored in n8n, never in Git",
+      "Shopify API version: 2024-01 (confirm latest stable version at implementation time)",
+      "Shopify API rate limit: leaky-bucket, 40 calls/sec for standard plans — pagination loops must account for this"
+    ]
+  }
+}

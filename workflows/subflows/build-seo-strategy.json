@@ -1,0 +1,644 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. The SEO strategy output is a planning artifact — not validated keyword research, not a confirmed search performance baseline, and not a finalized search optimization plan. All strategic directions produced here are planning-level hypotheses informed by available store context, market intelligence, and provisional SEO artifacts. Human review and keyword research validation are required before any SEO strategy artifact is used to make production decisions.",
+    "ordering_context_note": "IMPORTANT — ORDERING CONTEXT: In the intended workflow chain, build-seo-strategy is step 11 — it was designed to run BEFORE product-seo (step 14), collection-seo (step 18), and page-seo (step 21). However, Phase 7 implements build-seo-strategy after phases 4, 5, and 6 have already produced provisional product-seo, collection-seo, and collection-navigation artifacts. As a result, this workflow serves a dual purpose: (1) synthesize a store-level SEO strategy from available strategic context and upstream planning artifacts, and (2) generate revision recommendations for the provisional product-seo and collection-seo artifacts produced without this strategy. When this workflow runs for the first time in a chain where steps 14-20 have already executed, the output seo-strategy.json should trigger re-runs of build-product-seo, build-collection-seo, and build-page-seo to incorporate strategic alignment. This out-of-order implementation is a documented architecture constraint — not a workflow error.",
+    "provisional_seo_strategy_note": "IMPORTANT — SEO STRATEGY IS NOT KEYWORD RESEARCH: This workflow does not perform actual keyword research. It synthesizes a store-level SEO direction from: store profile (market, vertical, catalog type), market intelligence (search intents, content opportunities), brand positioning (positioning goals, tone, differentiators), and patterns observed in provisional product-seo and collection-seo artifacts. The output is a strategic planning layer — a framework for making consistent SEO decisions across the store. It must not claim keyword volume certainty, ranking feasibility, competitive difficulty estimates, or search performance projections. All strategic directions must be explicitly provisional until validated by a human with access to actual keyword research data.",
+    "revision_mandate_note": "IMPORTANT — REVISION MANDATE: Because build-seo-strategy was implemented after provisional product-seo and collection-seo artifacts were already generated (in phases 4-6 without this strategy), this workflow must produce revision recommendations alongside the seo-strategy.json artifact. These recommendations indicate which provisional SEO artifacts should be re-run against the new strategy. The revision recommendations are not a separate schema artifact — they are included in the notes field and in a strategy-revisions.md guidance document written alongside seo-strategy.json.",
+    "aeo_boundary_note": "This workflow intentionally does not define AEO strategy. build-aeo-strategy (step 12) is out of Phase 7 scope. The SEO strategy artifact produced here may inform future AEO strategy development, but must not pre-empt or substitute for it. The seo-strategy.json output does not include answer engine optimization direction — that is reserved for the separate aeo-strategy.json artifact.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/seo-strategy.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-seo-strategy",
+    "name": "build-seo-strategy",
+    "category": "planning",
+    "phase": "Phase 7 — Page SEO, FAQ Page, and SEO Strategy Planning",
+    "purpose": "Synthesize a schema-validated store-level SEO strategy artifact from available strategic context (store-profile, market-intelligence, brand-positioning) and patterns observed in provisional product-seo and collection-seo artifacts. The seo-strategy.json output defines: primary SEO goal (transactional-growth, category-discovery, brand-plus-category-growth, knowledge-plus-commerce, or hybrid), keyword focus direction (primary and secondary keyword type families, long-tail priority), content depth stance (light, balanced, deep), page priority ordering, internal linking strategy posture, collection/product/knowledge SEO role assignments, and technical SEO priority levels. This strategy is the store-level planning framework that enables: (1) consistent keyword decisions across all page types, (2) content depth calibration per page role, (3) internal linking planning direction, and (4) structured data prioritization. Because this workflow is implemented in Phase 7 after provisional product-seo and collection-seo artifacts already exist, it also generates revision recommendations to bring those provisional artifacts into alignment with the finalized strategy. All outputs are planning-level hypotheses — not validated keyword research, not search performance predictions, not confirmed SEO plans.",
+
+    "seo_strategy_vs_aeo_strategy_boundary": "SEO strategy (this workflow) defines how the store targets discovery through search engines — keyword families, content roles, linking posture, and technical priorities. AEO strategy (build-aeo-strategy, step 12, out of Phase 7 scope) defines how the store targets answer engine visibility — question taxonomy, answer format strategy, and featured snippet targeting. These are complementary but distinct. This workflow sets the SEO foundation that AEO strategy should build upon. The seo-strategy.json output intentionally does not include AEO-specific direction.",
+
+    "inputs": {
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "data_treatment": "FOUNDATIONAL CONTEXT LAYER — store profile provides the market, catalog, and maturity signals that determine which SEO goal and keyword focus families are appropriate for this store",
+        "fields_used": [
+          {
+            "field": "vertical",
+            "treatment": "SEO GOAL SIGNAL — the store vertical (fashion, wellness, home, technology, etc.) informs whether category-discovery or transactional-growth is more realistic as the primary SEO goal. Mature verticals with established category vocabulary support category-discovery. Novel or niche verticals may require brand-plus-category-growth.",
+            "note": "vertical is operational truth — it is not a strategy classification itself, but strongly constrains which strategies are realistic."
+          },
+          {
+            "field": "brand_maturity",
+            "treatment": "STRATEGY CALIBRATION — brand maturity (new, growing, established, mature) calibrates ambition. A new brand should prioritize long-tail and niche keyword families rather than broad category terms. An established brand can target competitive category terms. Maturity level also informs technical_seo_priority (new stores on default Shopify setup → platform-default is acceptable; established stores need more deliberate crawl and indexation control).",
+            "note": "brand_maturity is not a hard constraint — it is a strong calibration signal. A new brand with strong editorial content positioning may justify knowledge-plus-commerce SEO goal even early in its lifecycle."
+          },
+          {
+            "field": "catalog_type",
+            "treatment": "KEYWORD TYPE SIGNAL — catalog type (single-product, focused-range, broad-catalogue, curated-collection) determines keyword family shape. Single-product or focused-range → product-type keywords are primary. Broad-catalogue → category keywords are primary. Curated-collection → brand + editorial vocabulary is primary.",
+            "note": "Catalog type is the most direct determinant of primary_keyword_type in the keyword_focus output."
+          },
+          {
+            "field": "price_positioning",
+            "treatment": "CONTENT DEPTH AND KEYWORD MODIFIER SIGNAL — premium price positioning supports deeper content and more differentiated keyword modifiers (best, premium, professional-grade). Value positioning supports high-volume category and comparison keywords.",
+            "note": "Directional signal — does not mechanically determine keyword type."
+          },
+          {
+            "field": "business_model",
+            "treatment": "PAGE PRIORITY SIGNAL — DTC (direct-to-consumer) models should prioritize product pages and collection pages. Marketplace or wholesale hybrid models may deprioritize individual product SEO. Subscription models may need knowledge content as a primary acquisition channel.",
+            "note": "Informs page_priority ordering and content depth stance."
+          },
+          {
+            "field": "operating_mode",
+            "treatment": "TECHNICAL SEO CONTEXT — a store in development or planning mode should produce technical_seo_priority values that reflect planning intent, not current implementation state. A live production store would require higher urgency on crawl and indexation control.",
+            "note": "In draft/dev mode (typical in this system): technical SEO priorities should be set to reflect what the production store should achieve — not the current dev environment state."
+          }
+        ]
+      },
+
+      "from_market_intelligence": {
+        "source": "build-market-intelligence → market-intelligence.json",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "data_treatment": "PRIMARY SEARCH INTENT AND CONTENT OPPORTUNITY LAYER — market intelligence provides the strongest available proxy for keyword demand direction in the absence of actual keyword research tools",
+        "fields_used": [
+          {
+            "field": "search_intents",
+            "treatment": "PRIMARY KEYWORD FAMILY SIGNAL — the intent types (informational, commercial, transactional, comparison) and their relative presence in market_intelligence.search_intents inform the primary_seo_goal and keyword_focus derivation. A market with dominant commercial and transactional intents → transactional-growth or category-discovery goal. A market with strong informational intents → knowledge-plus-commerce goal.",
+            "note": "CRITICAL PLANNING PROXY: search_intents in market intelligence are the most actionable substitute for keyword research in this system. They represent buyer behavior patterns — not confirmed search volume data. They should heavily influence strategy direction."
+          },
+          {
+            "field": "search_intents[].example_queries",
+            "treatment": "KEYWORD VOCABULARY SIGNAL — example queries within each intent type reveal the actual vocabulary buyers use. These are the best available planning proxies for keyword families without access to keyword research tools.",
+            "note": "Example queries are illustrative planning proxies — not confirmed search queries with volume data. Use as directional vocabulary signals to inform keyword_focus type choices."
+          },
+          {
+            "field": "content_opportunities",
+            "treatment": "KNOWLEDGE SEO ROLE SIGNAL — the presence and richness of content_opportunities determines whether knowledge_seo_role should be 'none', 'supporting', 'balanced', or 'major'. Many rich content opportunities → knowledge is a meaningful SEO channel. Absence of content opportunities → knowledge SEO is a low priority.",
+            "note": "knowledge_seo_role is a schema-required field. content_opportunities provides the primary basis for assigning it."
+          },
+          {
+            "field": "seo_considerations",
+            "treatment": "DIRECT SEO STRATEGY INPUT — if market intelligence includes explicit SEO considerations (e.g. 'category terms are highly competitive', 'long-tail product queries show high commercial intent'), these should be directly incorporated into strategy notes and keyword focus decisions.",
+            "note": "Optional field — may be absent. Use when present as a high-signal strategic hint."
+          },
+          {
+            "field": "competitor_types",
+            "treatment": "COMPETITIVE LANDSCAPE SIGNAL — understanding whether competitors are mass-market, specialist, direct, or indirect helps calibrate the keyword focus realism. Competing against Amazon or major retailers on broad category terms requires a niche or long-tail strategy.",
+            "note": "Competitive landscape shapes the realism layer of the strategy — what keyword territory is actually contestable for this store."
+          },
+          {
+            "field": "trust_factors",
+            "treatment": "CONTENT DEPTH SIGNAL — markets where trust is a primary purchase driver (health, premium goods, high-consideration purchases) benefit from deeper content (guide pages, FAQ content, review integration). This informs content_depth and knowledge_seo_role.",
+            "note": "Supporting signal for content depth calibration."
+          }
+        ]
+      },
+
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "data_treatment": "STRATEGIC TONE AND POSITIONING LAYER — brand positioning constrains which keyword types and content depth stances are consistent with the brand's competitive identity",
+        "fields_used": [
+          {
+            "field": "positioning_goals",
+            "treatment": "PRIMARY SEO GOAL ALIGNMENT — brand positioning goals (market share, awareness, loyalty, premium perception, etc.) should be consistent with the primary_seo_goal. A brand targeting awareness → brand-plus-category-growth. A brand targeting market share in a specific niche → category-discovery or transactional-growth.",
+            "note": "Positioning goals provide the strategic rationale layer for the primary_seo_goal choice."
+          },
+          {
+            "field": "brand_role",
+            "treatment": "KEYWORD TYPE SHAPE SIGNAL — brand_role (specialist, curator, problem-solver, premium-innovator, editorial-guide, value-leader) informs keyword family preference. Specialist → product-type primary. Editorial-guide → problem-solution or mixed. Value-leader → category or comparison primary.",
+            "note": "brand_role does not mechanically determine keyword type — it contextualizes the choice."
+          },
+          {
+            "field": "differentiators",
+            "treatment": "KEYWORD MODIFIER POOL — brand differentiators may surface as keyword modifiers (premium, handcrafted, sustainable, clinical-grade, etc.) that distinguish keyword targeting from generic category terms.",
+            "note": "Differentiators as keyword modifiers must be realistic — they should reflect actual store attributes, not wishful framing."
+          },
+          {
+            "field": "seo_tone_hint",
+            "treatment": "DIRECT SEO STRATEGY HINT — if brand positioning includes an explicit SEO tone hint, incorporate it directly into strategy notes as a copy guardrail for keyword-bearing content.",
+            "note": "Optional field — may be absent."
+          },
+          {
+            "field": "forbidden_impressions",
+            "treatment": "STRATEGY EXCLUSION — any impressions the brand explicitly forbids must be reflected in the keyword focus notes. Strategy must not target keyword families that would create forbidden impressions.",
+            "note": "Hard exclusion — applied to keyword vocabulary signals during strategy synthesis."
+          }
+        ]
+      },
+
+      "from_product_seo_artifacts": {
+        "source": "build-product-seo → product-seo.json (per product, provisional)",
+        "artifact_path": "projects/{project_id}/product-seo/{product_handle}.json",
+        "data_treatment": "PATTERN ANALYSIS INPUT — provisional product-seo artifacts from Phase 5 are analyzed as a pattern set to understand: what search intents dominate the product catalog, what keyword types were most commonly assigned, what content depth patterns emerged, what entity clarity gaps exist. This analysis informs the product_seo_role assignment and helps identify coherence gaps.",
+        "availability": "AVAILABLE FROM PHASE 5 — product-seo artifacts were generated provisionally in Phase 5 without seo-strategy.json guidance. This workflow consumes them as pattern inputs, not as authoritative strategy.",
+        "pattern_analysis": {
+          "search_intent_distribution": "Aggregate search_intent values across all product-seo artifacts. If transactional dominates → product_seo_role = primary-driver is supported. If commercial or informational dominates → product pages may need enrichment.",
+          "keyword_coherence": "Do primary_keywords across product-seo artifacts reflect a coherent product vocabulary, or are they scattered across unrelated concepts? Incoherence → strategy notes should flag the need for a keyword taxonomy revision pass.",
+          "content_depth_distribution": "What is the distribution of content_depth values (light, balanced, deep) across product-seo artifacts? Heavy light → product SEO may be under-resourced. Heavy deep → resources may be overcommitted.",
+          "entity_clarity_gap_rate": "What percentage of product-seo artifacts show entity_clarity gaps (product_type_clear = false, brand_relation_clear = false)? High gap rates → entity clarity work needed before strategy revisions will be effective.",
+          "sparse_product_rate": "What percentage of product-seo artifacts have PLACEHOLDER-REQUIRES-REVIEW or SPARSE-DATA flags in their notes? High sparse rate → strategy should account for data enrichment as a prerequisite."
+        },
+        "note": "Product-seo pattern analysis is used to calibrate strategy realism — not to change individual product-seo decisions in this workflow. Individual revisions happen when build-product-seo is re-run with seo-strategy.json available."
+      },
+
+      "from_collection_seo_artifacts": {
+        "source": "build-collection-seo → collection-seo.json (per collection, provisional)",
+        "artifact_path": "projects/{project_id}/collection-seo/{collection_handle}.json",
+        "data_treatment": "PATTERN ANALYSIS INPUT — provisional collection-seo artifacts from Phase 6 are analyzed as a pattern set to understand: what page_role types dominate the collection catalog, what search intents were assigned, what internal linking patterns were suggested. This informs the collection_seo_role assignment.",
+        "availability": "AVAILABLE FROM PHASE 6 — collection-seo artifacts were generated provisionally in Phase 6 without seo-strategy.json guidance.",
+        "pattern_analysis": {
+          "page_role_distribution": "Aggregate page_role values across all collection-seo artifacts. Predominance of category-entry-page → the store primarily drives category discovery. Predominance of category-guide-page → knowledge and editorial content play a strong role in this catalog. Predominance of comparison-entry-page → comparison shopping is a key buyer behavior.",
+          "search_intent_distribution": "Aggregate search_intent values across collection-seo artifacts. Commercial + comparison intent dominance → collection_seo_role = primary-driver. Hybrid or mixed → collection_seo_role = balanced-driver.",
+          "empty_sparse_collection_rate": "What percentage of collections were EMPTY-COLLECTION or SPARSE-COLLECTION? High rate → collection SEO is under-resourced and may not justify primary-driver assignment.",
+          "internal_linking_pattern": "Are internal linking targets coherent across collections? Do they generally point to complementary collections, homepage, and guide pages? Pattern analysis informs internal_linking_strategy recommendations."
+        },
+        "note": "Collection-seo pattern analysis is used to calibrate strategy realism — not to change individual collection-seo decisions in this workflow."
+      },
+
+      "from_intake": {
+        "source": "intake-store-input → normalized intake payload",
+        "artifact_path": "projects/{project_id}/intake.json",
+        "data_treatment": "PREFERENCES AND CONSTRAINTS LAYER — intake SEO and AEO preference fields directly influence strategy direction where explicitly stated by the user",
+        "fields_used": [
+          {
+            "field": "seo_priority",
+            "treatment": "DIRECT STRATEGY INPUT — if the user indicated a primary SEO priority in intake (e.g. product pages, collection pages, content/knowledge), this should be reflected in page_priority ordering.",
+            "note": "User-stated preferences take precedence over derived strategy decisions where they are explicit."
+          },
+          {
+            "field": "long_tail_preference",
+            "treatment": "DIRECT KEYWORD FOCUS INPUT — if the user indicated long-tail keyword preference (relevant for niche stores or new brands), this should override the default long_tail_priority derivation.",
+            "note": "Optional intake field — use when present."
+          },
+          {
+            "field": "content_marketing_intent",
+            "treatment": "KNOWLEDGE SEO ROLE SIGNAL — if the user indicated intent to invest in content marketing (guides, blog, educational content), knowledge_seo_role should be at least 'supporting' even if content_opportunities in market intelligence are limited.",
+            "note": "User intent signals override conservative defaults for knowledge_seo_role."
+          }
+        ]
+      }
+    },
+
+    "outputs": {
+      "primary_output": "seo-strategy.json",
+      "artifact_path": "projects/{project_id}/seo-strategy.json",
+      "revision_guidance_path": "projects/{project_id}/seo-strategy-revisions.md",
+      "schema": "schemas/seo-strategy.schema.json",
+      "output_fields": {
+        "strategy_name": {
+          "source": "LLM synthesis — a human-readable name for this store's SEO strategy",
+          "type": "LLM-synthesized string",
+          "format_guidance": "Recommended pattern: '[Store Vertical] SEO Strategy — [Primary Goal]'. Example: 'Sustainable Apparel SEO Strategy — Category Discovery + Brand Differentiation'. Should reflect the actual store type and strategic direction — not a generic template name.",
+          "note": "strategy_name is a planning label for human orientation — it is not used computationally downstream."
+        },
+        "primary_seo_goal": {
+          "source": "Derived from market_intelligence.search_intents + brand_positioning.positioning_goals + store_profile.catalog_type + store_profile.brand_maturity",
+          "type": "constrained enum",
+          "schema_enum": ["transactional-growth", "category-discovery", "brand-plus-category-growth", "knowledge-plus-commerce", "hybrid"],
+          "derivation_logic": {
+            "transactional-growth": "Focused catalog + strong transactional search intent in market + established brand. The store's primary SEO opportunity is to win transactional queries that directly convert. Appropriate for focused-range or single-product stores with clear buyer intent.",
+            "category-discovery": "Broad or curated catalogue + commercial search intent dominant + clear category vocabulary in the market. The store's primary opportunity is to own category entry points and drive discovery of its product range.",
+            "brand-plus-category-growth": "New or growing brand + needs both brand awareness and category presence. Common for brands entering established category markets without an existing search footprint.",
+            "knowledge-plus-commerce": "Rich content opportunities in market intelligence + informational intent significant + brand role = editorial-guide or problem-solver. The store's SEO opportunity is to earn search authority through educational content that flows into commerce.",
+            "hybrid": "Multiple significant opportunities exist that cannot be reduced to a single primary goal. Use when two or more goals are closely balanced and a combined approach is the honest strategy."
+          },
+          "note": "primary_seo_goal is the most important output field — it anchors all downstream strategy decisions. It must be chosen honestly based on available signals, not aspirationally."
+        },
+        "keyword_focus": {
+          "primary_keyword_type": {
+            "source": "Derived from store_profile.catalog_type + brand_positioning.brand_role + market_intelligence search intent vocabulary",
+            "type": "constrained enum",
+            "schema_enum": ["brand", "category", "problem-solution", "product-type", "comparison", "mixed"],
+            "derivation_logic": {
+              "brand": "Established brand with significant brand-name search equity. Appropriate when brand searches are a meaningful search channel.",
+              "category": "Broad catalogue with clear category structure. The store's opportunity is to rank for category terms buyers use before knowing which brand to choose.",
+              "problem-solution": "Market intelligence shows informational and how-to intents dominating. Buyers search for solutions before products.",
+              "product-type": "Focused catalogue where buyers already know the product type they want and search for it by type.",
+              "comparison": "Market shows high comparison intent. The store can capture buyers actively comparing options.",
+              "mixed": "Multiple keyword types contribute meaningfully. The store cannot define a single dominant keyword type."
+            }
+          },
+          "secondary_keyword_type": {
+            "source": "Derived from the secondary dominant keyword opportunity after primary type is assigned",
+            "type": "constrained enum — same options as primary_keyword_type",
+            "note": "Secondary keyword type should complement — not duplicate — the primary type."
+          },
+          "long_tail_priority": {
+            "source": "Derived from store_profile.brand_maturity + catalog specificity + intake preference",
+            "type": "constrained enum",
+            "schema_enum": ["low", "medium", "high"],
+            "derivation_logic": {
+              "high": "New or growing brand with limited domain authority. Long-tail, niche, and specific queries are the realistic early SEO opportunity.",
+              "medium": "Growing or established brand with moderate domain authority. Long-tail remains important but broader category terms are increasingly contestable.",
+              "low": "Established or mature brand with strong domain authority. Broad category terms are within reach — long-tail is a supplement, not the primary focus."
+            }
+          }
+        },
+        "content_depth": {
+          "source": "Derived from market_intelligence.content_opportunities richness + brand_positioning.brand_role + trust_factors importance in the market",
+          "type": "constrained enum",
+          "schema_enum": ["light", "balanced", "deep"],
+          "derivation_logic": {
+            "light": "Transactional store with limited content opportunity. Buyers know what they want and search with high commercial or transactional intent. Deep content would not serve the buyer journey.",
+            "balanced": "Most stores fall here. A mix of commercial and informational intent. Product and collection pages carry most SEO weight with some supporting guide or FAQ content.",
+            "deep": "Editorial, educational, or high-consideration purchase markets. Content is a meaningful discovery channel. Knowledge articles, guides, and FAQ content serve real buyer needs."
+          }
+        },
+        "page_priority": {
+          "source": "Derived from primary_seo_goal + catalog_type + business_model + content_depth",
+          "type": "ordered array (minItems: 1) of constrained enum values",
+          "schema_enum": ["homepage", "product-pages", "collection-pages", "guide-pages", "faq-pages", "blog-articles"],
+          "ordering_logic": "The first item in the array is the highest-priority page type for SEO investment. Ordering should reflect where the store's greatest SEO opportunity lies — not generic best practices. A transactional-growth store most likely prioritizes product-pages. A category-discovery store prioritizes collection-pages. A knowledge-plus-commerce store prioritizes guide-pages or blog-articles.",
+          "note": "page_priority directly informs how page-seo planning should allocate depth of effort across page types."
+        },
+        "internal_linking_strategy": {
+          "link_depth": {
+            "source": "Derived from catalog size + content depth stance",
+            "type": "constrained enum",
+            "schema_enum": ["simple", "balanced", "rich"],
+            "derivation_logic": {
+              "simple": "Small catalog or light content depth. Linking structure is straightforward — homepage to collections to products. Minimal cross-linking.",
+              "balanced": "Standard catalog. A moderate linking structure with collection-to-product links, some collection-to-collection, and key page-to-collection links.",
+              "rich": "Large catalog or deep content stance. Complex linking structure with guide-to-product, guide-to-collection, FAQ-to-product, and collection-to-subcollection links."
+            }
+          },
+          "cross_linking_intensity": {
+            "source": "Derived from content_depth + page_priority + knowledge_seo_role",
+            "type": "constrained enum",
+            "schema_enum": ["low", "medium", "high"],
+            "note": "cross_linking_intensity reflects how aggressively different page types should link to each other. High intensity is appropriate when knowledge content is a major SEO driver."
+          },
+          "knowledge_to_commerce_links": {
+            "source": "Derived from knowledge_seo_role (supporting, balanced, or major → true; none → false)",
+            "type": "boolean",
+            "note": "When true, guide pages and FAQ content must include links to relevant collection or product pages. This is the core mechanism of knowledge-plus-commerce SEO."
+          }
+        },
+        "collection_seo_role": {
+          "source": "Derived from collection_seo pattern analysis + primary_seo_goal + page_priority ordering",
+          "type": "constrained enum",
+          "schema_enum": ["light-support", "balanced-driver", "primary-driver"],
+          "derivation_logic": {
+            "light-support": "Collection pages are not a primary SEO driver. Product pages or content pages are more important. May occur in single-product stores or highly brand-keyword-oriented stores.",
+            "balanced-driver": "Collection pages carry meaningful SEO weight alongside product pages. The most common assignment for general commerce stores.",
+            "primary-driver": "Collection pages are the most important SEO asset. Appropriate for broad-catalogue stores where category discovery is the dominant search behavior."
+          }
+        },
+        "product_seo_role": {
+          "source": "Derived from product_seo pattern analysis + primary_seo_goal + catalog_type",
+          "type": "constrained enum",
+          "schema_enum": ["light-support", "balanced-driver", "primary-driver"],
+          "derivation_logic": {
+            "light-support": "Product pages serve a secondary role — discovery happens at collection or knowledge level, and products are the conversion destination, not the discovery entry point.",
+            "balanced-driver": "Product pages are important SEO assets alongside collections. Standard for focused-range stores where product type searches are common.",
+            "primary-driver": "Product pages are the dominant SEO entry point. Appropriate for single-product stores, niche product specialists, or stores with strong product-type keyword demand."
+          }
+        },
+        "knowledge_seo_role": {
+          "source": "Derived from market_intelligence.content_opportunities + market_intelligence.trust_factors + brand_positioning.brand_role + intake content_marketing_intent",
+          "type": "constrained enum",
+          "schema_enum": ["none", "supporting", "balanced", "major"],
+          "derivation_logic": {
+            "none": "No meaningful content opportunity in this market. Buyers search with commercial or transactional intent and do not want educational content. Knowledge pages would not serve SEO goals.",
+            "supporting": "Some informational intent exists but is not dominant. A few guide pages or a FAQ page can capture supplementary traffic and build trust. Not a primary SEO investment.",
+            "balanced": "Informational and commercial intents are both meaningful. Knowledge content (guides, FAQ, educational pages) can drive discovery and qualify buyers before commercial intent emerges.",
+            "major": "Informational intent is strong or the store's brand positioning is explicitly editorial or educational. Knowledge content is a primary SEO channel alongside commerce pages."
+          }
+        },
+        "technical_seo_priority": {
+          "performance_priority": {
+            "source": "Derived from store_profile.platform (Shopify default → medium; heavy custom build → high or critical)",
+            "type": "constrained enum",
+            "schema_enum": ["medium", "high", "critical"],
+            "note": "Performance priority in a standard Shopify store defaults to medium — Shopify handles most core performance. Custom storefronts or theme-heavy implementations may require high or critical."
+          },
+          "crawl_clarity_priority": {
+            "source": "Derived from catalog_type + collection structure complexity + pagination and filter presence",
+            "type": "constrained enum",
+            "schema_enum": ["medium", "high", "critical"],
+            "note": "Broad catalogues with many collections, filter pages, and pagination → high or critical. Simple catalogues with few collections → medium."
+          },
+          "indexation_control_priority": {
+            "source": "Derived from catalog size + duplicate content risk + policy pages and search pages that should be noindexed",
+            "type": "constrained enum",
+            "schema_enum": ["medium", "high", "critical"],
+            "note": "Stores with large catalogues, variant pages, and many utility pages (search, cart, account) → high. Small focused stores with clean URL structures → medium."
+          }
+        },
+        "structured_data_priority": {
+          "source": "Derived from page_priority + knowledge_seo_role + primary_seo_goal",
+          "type": "optional array of constrained enum values",
+          "schema_enum": ["product", "faq", "breadcrumb", "article", "review", "item-list", "organization"],
+          "derivation_logic": {
+            "product": "Include when product_seo_role = primary-driver or balanced-driver. Product schema supports rich results for product queries.",
+            "faq": "Include when knowledge_seo_role is supporting or higher. FAQ schema enables featured snippet and FAQ rich result opportunities.",
+            "breadcrumb": "Include for all stores with collection hierarchy. Breadcrumb schema improves navigational clarity in SERPs.",
+            "article": "Include when knowledge_seo_role = balanced or major and guide/blog content is planned.",
+            "review": "Include when trust_factors in the market are high and the store has review infrastructure.",
+            "item-list": "Include for collection pages when collection_seo_role = balanced-driver or primary-driver.",
+            "organization": "Include for all stores — basic organizational schema supports brand knowledge panel development."
+          },
+          "note": "structured_data_priority is a planning direction — the detailed structured data plan is produced by build-structured-data-plan (step 24), which is out of Phase 7 scope."
+        },
+        "notes": {
+          "source": "Workflow-generated synthesis metadata and revision recommendations",
+          "type": "machine-generated string",
+          "required_content": "Must include: synthesis timestamp, strategy version label (e.g. Phase-7-draft), list of inputs used (store-profile, market-intelligence, brand-positioning, product-seo pattern summary, collection-seo pattern summary), provisional flag (PROVISIONAL-SEO-STRATEGY: This artifact was synthesized from planning inputs without validated keyword research. All strategic directions require human review and keyword data validation before production use.), revision mandate notice (REVISION MANDATE: build-product-seo and build-collection-seo artifacts from earlier phases should be re-run with this seo-strategy.json as input to update their provisional keyword decisions against this strategy.), and aeo boundary note (AEO STRATEGY NOT INCLUDED: build-aeo-strategy is out of Phase 7 scope. Answer engine optimization direction must be defined in a separate aeo-strategy.json artifact)."
+        }
+      }
+    },
+
+    "revision_guidance_output": {
+      "artifact": "seo-strategy-revisions.md",
+      "path": "projects/{project_id}/seo-strategy-revisions.md",
+      "purpose": "Produced alongside seo-strategy.json. A human-readable guidance document that lists which provisional SEO artifacts should be re-run and what changed assumptions they should now incorporate. This document is not a schema artifact — it is an operational handoff note for the engineer or operator running the next workflow pass.",
+      "sections": [
+        "Summary: what the SEO strategy decided and why",
+        "Product SEO revision recommendations: which product-seo artifacts have keyword or intent decisions that contradict the strategy; which should be prioritized for re-run",
+        "Collection SEO revision recommendations: which collection-seo artifacts have page_role or keyword decisions that contradict the strategy; which should be prioritized for re-run",
+        "Page SEO guidance: what the strategy implies for build-page-seo (step 21)",
+        "FAQ page guidance: what the strategy implies for build-faq-page (step 22)",
+        "Open items requiring human validation before strategy is finalized"
+      ]
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-store-profile",
+        "provides": ["store-profile.json"],
+        "required": true,
+        "note": "store-profile.json (step 3) is the foundational context for all strategy decisions — vertical, catalog type, brand maturity, and business model are all required inputs."
+      },
+      {
+        "workflow": "build-market-intelligence",
+        "provides": ["market-intelligence.json"],
+        "required": true,
+        "note": "market-intelligence.json (step 4) provides the search intent signals and content opportunity data that are the primary proxy for keyword demand direction. Without this input, the strategy would lack market grounding."
+      },
+      {
+        "workflow": "build-brand-positioning",
+        "provides": ["brand-positioning.json"],
+        "required": true,
+        "note": "brand-positioning.json (step 5) provides positioning goals, brand role, differentiators, and tone constraints that shape keyword family selection and content depth stance."
+      },
+      {
+        "workflow": "build-product-seo",
+        "provides": ["product-seo.json artifacts (per product)"],
+        "required": false,
+        "note": "PHASE 7 CONTEXT: product-seo artifacts from Phase 5 are available as provisional pattern inputs. If none exist yet (first-run without prior phases), the workflow operates without product pattern analysis and defaults product_seo_role based on store-profile and market-intelligence signals alone. When available, product-seo artifacts enrich the strategy derivation."
+      },
+      {
+        "workflow": "build-collection-seo",
+        "provides": ["collection-seo.json artifacts (per collection)"],
+        "required": false,
+        "note": "PHASE 7 CONTEXT: collection-seo artifacts from Phase 6 are available as provisional pattern inputs. Same fallback logic as product-seo: when absent, strategy derives collection_seo_role from store-profile and market-intelligence signals."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-page-seo",
+        "receives": ["seo-strategy.json"],
+        "note": "Workflow step 21. build-page-seo now has access to seo-strategy.json as a strategy alignment layer. Page SEO decisions should be consistent with primary_seo_goal, keyword_focus, content_depth, and page_priority from this artifact."
+      },
+      {
+        "workflow": "build-faq-page",
+        "receives": ["seo-strategy.json"],
+        "note": "Workflow step 22. build-faq-page uses knowledge_seo_role and page_priority to determine the depth and trust role of the FAQ page artifact."
+      },
+      {
+        "workflow": "build-aeo-strategy",
+        "receives": ["seo-strategy.json"],
+        "note": "Workflow step 12 — NOT IMPLEMENTED IN PHASE 7. When implemented, build-aeo-strategy should use seo-strategy.json as its foundational SEO context and build answer engine optimization direction on top of it."
+      },
+      {
+        "workflow": "build-product-seo (revision pass)",
+        "receives": ["seo-strategy.json"],
+        "note": "Revision pass — not a new implementation. When build-product-seo is re-run with seo-strategy.json as an available input, it should use the keyword taxonomy, content depth stance, and technical priorities to revise provisional keyword decisions. The revision mandate is documented in seo-strategy-revisions.md."
+      },
+      {
+        "workflow": "build-collection-seo (revision pass)",
+        "receives": ["seo-strategy.json"],
+        "note": "Revision pass — same logic as product-seo revision pass."
+      },
+      {
+        "workflow": "build-internal-linking",
+        "receives": ["seo-strategy.json"],
+        "note": "Workflow step 23 — out of Phase 7 scope. When implemented, build-internal-linking should use internal_linking_strategy from this artifact as its structural foundation."
+      },
+      {
+        "workflow": "build-structured-data-plan",
+        "receives": ["seo-strategy.json"],
+        "note": "Workflow step 24 — out of Phase 7 scope. structured_data_priority from this artifact seeds the detailed structured data plan."
+      },
+      {
+        "workflow": "run-validation",
+        "receives": ["seo-strategy.json"],
+        "note": "Out of Phase 7 scope (workflow step 28). Validates seo-strategy.json against schema and cross-validates strategy-level decisions against product/collection/page SEO artifact alignment."
+      }
+    ],
+
+    "schema_alignment": {
+      "seo-strategy.schema.json": {
+        "required_fields_covered": [
+          "strategy_name",
+          "primary_seo_goal",
+          "keyword_focus",
+          "content_depth",
+          "page_priority",
+          "internal_linking_strategy",
+          "collection_seo_role",
+          "product_seo_role",
+          "knowledge_seo_role",
+          "technical_seo_priority"
+        ],
+        "optional_fields_covered": [
+          "structured_data_priority",
+          "notes"
+        ],
+        "schema_enum_notes": {
+          "primary_seo_goal": "enum: transactional-growth | category-discovery | brand-plus-category-growth | knowledge-plus-commerce | hybrid",
+          "keyword_focus.primary_keyword_type": "enum: brand | category | problem-solution | product-type | comparison | mixed",
+          "keyword_focus.secondary_keyword_type": "enum: brand | category | problem-solution | product-type | comparison | mixed",
+          "keyword_focus.long_tail_priority": "enum: low | medium | high",
+          "content_depth": "enum: light | balanced | deep",
+          "page_priority items": "enum: homepage | product-pages | collection-pages | guide-pages | faq-pages | blog-articles",
+          "internal_linking_strategy.link_depth": "enum: simple | balanced | rich",
+          "internal_linking_strategy.cross_linking_intensity": "enum: low | medium | high",
+          "collection_seo_role": "enum: light-support | balanced-driver | primary-driver",
+          "product_seo_role": "enum: light-support | balanced-driver | primary-driver",
+          "knowledge_seo_role": "enum: none | supporting | balanced | major",
+          "technical_seo_priority.performance_priority": "enum: medium | high | critical",
+          "technical_seo_priority.crawl_clarity_priority": "enum: medium | high | critical",
+          "technical_seo_priority.indexation_control_priority": "enum: medium | high | critical",
+          "structured_data_priority items": "enum: product | faq | breadcrumb | article | review | item-list | organization"
+        },
+        "validation_note": "seo-strategy.json is a single-instance artifact (one per store, not per product or collection). All required fields must be present. All enum values must be validated before writing. The schema does not permit additionalProperties."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: store_profile (object), market_intelligence (object), brand_positioning (object). Optional: product_seo_artifacts (array of product-seo.json objects or paths), collection_seo_artifacts (array of collection-seo.json objects or paths), intake_preferences (object with SEO preference fields). Logs which optional inputs are present — absence of product_seo or collection_seo artifacts is handled gracefully.",
+        "input": "store_profile + market_intelligence + brand_positioning + optional product_seo_artifacts + optional collection_seo_artifacts + optional intake_preferences",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present and minimally complete. store_profile must have: vertical, brand_maturity, catalog_type, business_model. market_intelligence must have: search_intents (non-empty array), content_opportunities. brand_positioning must have: positioning_goals, brand_role. Log which optional inputs are absent: product_seo_artifacts, collection_seo_artifacts, intake_preferences. Set availability flags: has_product_seo_patterns, has_collection_seo_patterns, has_intake_preferences. Fail with clear error if required inputs are missing or malformed.",
+        "input": "all inputs",
+        "output": "validated inputs + availability flags or halt error"
+      },
+      {
+        "step": 3,
+        "name": "Extract Store-Level SEO Context",
+        "type": "Code node (JavaScript)",
+        "description": "Extract and organize the store-level context signals for strategy synthesis. Produce a store_seo_context object containing: (1) STORE SIGNALS: vertical, catalog_type, brand_maturity, business_model, price_positioning, operating_mode from store_profile. (2) MARKET INTENT SIGNALS: search_intents array with intent_type and example_queries from market_intelligence — classify dominance of informational vs commercial vs transactional vs comparison intents. (3) CONTENT OPPORTUNITY SIGNALS: content_opportunities from market_intelligence — assess richness (none, sparse, moderate, rich). (4) COMPETITIVE LANDSCAPE: competitor_types and trust_factors from market_intelligence. (5) BRAND POSITIONING SIGNALS: positioning_goals, brand_role, differentiators, seo_tone_hint (optional), forbidden_impressions from brand_positioning. (6) INTAKE PREFERENCES: seo_priority, long_tail_preference, content_marketing_intent from intake_preferences if available.",
+        "input": "validated store_profile + market_intelligence + brand_positioning + optional intake_preferences",
+        "output": "store_seo_context object"
+      },
+      {
+        "step": 4,
+        "name": "Analyze Product SEO Patterns (if available)",
+        "type": "Code node (JavaScript)",
+        "description": "If has_product_seo_patterns = true: load all product-seo artifacts. Compute pattern summary: (1) search_intent_distribution: count of each search_intent value across all artifacts. (2) keyword_type_distribution: infer primary keyword type frequency from primary_keyword vocabulary analysis (brand terms, category terms, product-type terms, problem-solution terms). (3) content_depth_distribution: count of light / balanced / deep. (4) entity_clarity_gap_rate: percentage of artifacts with entity_clarity.product_type_clear = false OR brand_relation_clear = false. (5) sparse_rate: percentage of artifacts with PLACEHOLDER-REQUIRES-REVIEW or SPARSE-DATA in notes. (6) Identify top 3-5 primary keyword themes as vocabulary clusters. If has_product_seo_patterns = false: set product_seo_pattern_summary = null and log that product-seo artifacts were not available for pattern analysis.",
+        "input": "product_seo_artifacts (if available)",
+        "output": "product_seo_pattern_summary object or null"
+      },
+      {
+        "step": 5,
+        "name": "Analyze Collection SEO Patterns (if available)",
+        "type": "Code node (JavaScript)",
+        "description": "If has_collection_seo_patterns = true: load all collection-seo artifacts. Compute pattern summary: (1) page_role_distribution: count of category-entry-page / category-guide-page / comparison-entry-page / hybrid-category-page. (2) search_intent_distribution: count of each search_intent value. (3) empty_sparse_rate: percentage of artifacts with EMPTY-COLLECTION or SPARSE-COLLECTION flags. (4) internal_linking_pattern_summary: most common target_types across all internal_linking_targets arrays. If has_collection_seo_patterns = false: set collection_seo_pattern_summary = null and log accordingly.",
+        "input": "collection_seo_artifacts (if available)",
+        "output": "collection_seo_pattern_summary object or null"
+      },
+      {
+        "step": 6,
+        "name": "Derive Strategy Direction (Pre-LLM)",
+        "type": "Code node (JavaScript)",
+        "description": "Compute deterministic pre-LLM strategy derivations from the structured signals. These derivations constrain what the LLM can output: (1) CANDIDATE primary_seo_goal: apply derivation logic from the output fields specification — use search_intent_distribution, brand_maturity, catalog_type, and positioning_goals to narrow to 1-2 candidates. (2) CANDIDATE keyword_focus.primary_keyword_type: apply catalog_type + brand_role + intent vocabulary mapping. (3) CANDIDATE long_tail_priority: apply brand_maturity + intake preference. (4) CANDIDATE content_depth: apply content_opportunities richness + trust_factors significance. (5) CANDIDATE knowledge_seo_role: apply content_opportunities richness + content_marketing_intent. (6) CANDIDATE technical_seo_priority levels: apply platform (Shopify = moderate defaults), catalog_type, and operating_mode. Include reasoning notes for each candidate decision — these will be included in the LLM prompt as grounding context.",
+        "input": "store_seo_context + product_seo_pattern_summary + collection_seo_pattern_summary",
+        "output": "pre_llm_strategy_candidates object with candidate values and reasoning notes"
+      },
+      {
+        "step": 7,
+        "name": "Build LLM SEO Strategy Prompt",
+        "type": "Code node (JavaScript)",
+        "description": "Assemble the structured LLM prompt for store-level SEO strategy synthesis. The prompt must: (1) Present the store context layer: vertical, catalog_type, brand_maturity, business_model, price_positioning. (2) Present market intelligence signals: search_intent types and example queries, content_opportunities richness, trust_factors significance, competitive landscape summary. (3) Present brand positioning signals: positioning_goals, brand_role, differentiators, seo_tone_hint, forbidden_impressions. (4) Present the pre-LLM strategy candidate reasoning as grounding context — instruct the LLM to use this reasoning or explicitly justify why it disagrees. (5) If product and collection pattern summaries are available: present them so the LLM can calibrate strategy against what the provisional artifacts actually reflect. (6) Request output as valid JSON conforming to schemas/seo-strategy.schema.json. Include all enum values for all constrained enum fields. (7) Instruct explicitly: 'Do not claim keyword volume certainty, ranking feasibility, competitive difficulty estimates, or search performance projections. All strategy decisions are planning hypotheses that require human validation.' (8) Instruct to include a notes field with required content per the output_fields specification. (9) Include schema field requirements: required fields list, enum values, nested object requirements for keyword_focus, internal_linking_strategy, and technical_seo_priority.",
+        "input": "store_seo_context + pre_llm_strategy_candidates + product_seo_pattern_summary + collection_seo_pattern_summary",
+        "output": "assembled LLM prompt string",
+        "prompt_safety_note": "Prompt must explicitly state: 'This SEO strategy is a planning artifact — not validated keyword research. Do not invent keyword volume data, ranking predictions, or competitive difficulty estimates. All strategy fields are planning hypotheses that require human review and keyword research validation before production use.'"
+      },
+      {
+        "step": 8,
+        "name": "LLM Synthesis: SEO Strategy",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API. Request JSON output mode. Temperature: 0.1 (SEO strategy synthesis should be highly deterministic — the pre-LLM candidates already narrow the decision space). Max tokens: 3000.",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt",
+        "output": "raw LLM response string (expected to be JSON conforming to seo-strategy schema)"
+      },
+      {
+        "step": 9,
+        "name": "Parse and Enforce Strategy Constraints",
+        "type": "Code node (JavaScript)",
+        "description": "Parse the raw LLM response as JSON. Enforce constraint integrity: (1) ENUM VALIDATION: All enum fields must match the allowed schema values. Any unrecognized enum value → reject and substitute the pre-LLM candidate value from step 6. Log substitutions. (2) REQUIRED FIELD COMPLETENESS: All required schema fields must be present. If missing, attempt to derive from pre-LLM candidates. If cannot derive, halt and report the missing field. (3) ARRAY MINIMUM: page_priority minItems = 1. If absent or empty, substitute a safe default based on catalog_type (e.g. ['homepage', 'collection-pages', 'product-pages'] for broad catalogue). (4) FORBIDDEN IMPRESSION CHECK: Scan strategy_name and notes for any forbidden_impressions strings from brand_positioning. Replace with REQUIRES-REVIEW-COPY-VIOLATION if found. (5) PROVISIONAL FLAG INJECTION: Inject 'PROVISIONAL-SEO-STRATEGY' flag into the notes field if not already present. (6) REVISION MANDATE INJECTION: Inject revision mandate notice into the notes field if not already present.",
+        "input": "raw LLM response + pre_llm_strategy_candidates + store_seo_context",
+        "output": "parsed and constrained seo_strategy object (pre-validation)"
+      },
+      {
+        "step": 10,
+        "name": "Validate Against Schema",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate the seo_strategy object against schemas/seo-strategy.schema.json using ajv. Key validations: strategy_name non-empty string, primary_seo_goal in enum, keyword_focus is object with required primary_keyword_type and secondary_keyword_type in enum, content_depth in enum, page_priority is non-empty array with items in enum, internal_linking_strategy is object with required link_depth and cross_linking_intensity in enum, collection_seo_role in enum, product_seo_role in enum, knowledge_seo_role in enum, technical_seo_priority is object with all three required performance fields in enum. Halt workflow on validation failure — log exact field violation. seo-strategy.json is a critical dependency for page-seo and faq-page workflows in Phase 7; validation failure must block downstream.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/seo-strategy.schema.json",
+        "failure_behavior": "Halt workflow on any validation failure. Log the exact field and value causing the failure. Do not write a partially valid strategy artifact.",
+        "input": "constrained seo_strategy object",
+        "output": "validated seo_strategy object or halt error"
+      },
+      {
+        "step": 11,
+        "name": "Generate Revision Recommendations",
+        "type": "Code node (JavaScript)",
+        "description": "Generate the seo-strategy-revisions.md content as a structured document. Sections: (1) Summary: restate the strategy decisions in plain English — primary_seo_goal, keyword_focus types, content_depth, page_priority order, and role assignments. (2) Product SEO revision recommendations: if product_seo_pattern_summary is available, identify specific coherence gaps between the finalized strategy and the provisional artifacts. Note which product-seo artifacts should be re-run first (highest discrepancy). If product_seo_pattern_summary is null: note that revision recommendations cannot be made without pattern analysis. (3) Collection SEO revision recommendations: same pattern as product SEO revisions. (4) Page SEO guidance: what the strategy means for build-page-seo — which page types are highest priority per page_priority, what content_depth stance to apply, what internal linking intensity. (5) FAQ page guidance: what knowledge_seo_role implies for faq-page depth and trust_role. (6) Open validation items: list any strategy decisions that require human keyword data validation before finalization.",
+        "input": "validated seo_strategy object + product_seo_pattern_summary + collection_seo_pattern_summary",
+        "output": "revision_guidance_markdown string"
+      },
+      {
+        "step": 12,
+        "name": "Persist seo-strategy.json and revision guidance",
+        "type": "GitHub node or Write File node",
+        "description": "Write seo-strategy.json to projects/{project_id}/seo-strategy.json. Write revision guidance to projects/{project_id}/seo-strategy-revisions.md. Commit with a message such as 'chore: generate seo-strategy for {store_id} — Phase 7 draft (provisional, requires keyword validation)'. The provisional nature of all strategy decisions must be visible in the commit message.",
+        "artifact_path": "projects/{project_id}/seo-strategy.json",
+        "revision_guidance_path": "projects/{project_id}/seo-strategy-revisions.md",
+        "git_note": "Both files must be committed together. The revision guidance document explains the strategy decisions and lists downstream artifacts that should be revised.",
+        "input": "validated seo_strategy object + revision_guidance_markdown",
+        "output": "confirmation of write + persisted artifact paths"
+      },
+      {
+        "step": 13,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass seo-strategy.json (as object or path) to the master orchestrator. The orchestrator must make seo-strategy.json available to: build-page-seo (step 21), build-faq-page (step 22), and any revision passes on build-product-seo and build-collection-seo. Also pass the revision_guidance_path so the orchestrator or human operator can review the revision recommendations.",
+        "input": "seo-strategy.json path + revision_guidance_path",
+        "output": "workflow output payload with seo-strategy path and revision guidance path"
+      }
+    ],
+
+    "assumptions": [
+      "store-profile.json, market-intelligence.json, and brand-positioning.json are all required inputs. This workflow cannot run without them.",
+      "product-seo and collection-seo artifacts from earlier phases are available as optional pattern inputs. Their absence degrades pattern analysis quality but does not halt the workflow.",
+      "This workflow is implemented in Phase 7, after phases 4-6 have generated provisional product-seo and collection-seo artifacts without seo-strategy guidance. The revision mandate is a known and documented consequence of this ordering.",
+      "The SEO strategy produced here is a planning-level artifact — not validated keyword research. All strategy decisions are planning hypotheses requiring human review with actual keyword research data before production use.",
+      "AEO strategy (build-aeo-strategy, step 12) is intentionally out of Phase 7 scope. The SEO strategy does not include AEO direction.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "Shopify is the platform. Shopify's default technical SEO behavior (canonical tags, robots.txt management, sitemap generation) is factored into technical_seo_priority defaults. Stores on headless or custom Shopify frontends may require higher technical SEO priority values.",
+      "A single seo-strategy.json is produced per store (not per product or collection). It is a store-level singleton artifact.",
+      "The revision guidance document (seo-strategy-revisions.md) is not a schema artifact. It is an operational handoff note. It does not need schema validation.",
+      "Strategy pre-LLM candidate derivations in step 6 are the primary quality control layer. The LLM is used for synthesis and coherent articulation — the deterministic logic in step 6 constrains what the LLM can safely decide."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should build-product-seo and build-collection-seo be re-run automatically when seo-strategy.json is produced, or should the revision be a manual human-triggered step?",
+        "impact": "Automatic re-runs would keep all artifacts aligned with the strategy but increase computation cost and risk overwriting deliberate human edits to provisional artifacts. Manual re-runs give more control but risk strategy artifacts and SEO artifacts becoming inconsistent.",
+        "recommended_default": "Manual re-run with clear revision guidance. The seo-strategy-revisions.md document provides the human operator with clear prioritization. Automatic re-runs should be a future option configured via intake preference, not the default behavior."
+      },
+      {
+        "question": "How should build-seo-strategy handle a store where no market intelligence search_intents are present (e.g. a very novel market with no recognizable intent vocabulary)?",
+        "impact": "search_intents are the primary planning proxy for keyword demand. Their absence significantly degrades strategy quality.",
+        "recommended_default": "If search_intents is absent or empty: set primary_seo_goal = 'hybrid', primary_keyword_type = 'mixed', and add a prominent note: 'STRATEGY-LOW-CONFIDENCE: market intelligence search_intents are absent. Strategy is a minimum viable planning scaffold. Market research is required before strategy is usable for production SEO decisions.'"
+      },
+      {
+        "question": "Should the SEO strategy explicitly distinguish between Shopify Online Store 2.0 capabilities (which affect structured data and technical SEO options) and legacy Shopify theme capabilities?",
+        "impact": "Some technical_seo_priority decisions and structured_data_priority recommendations depend on which Shopify capabilities are available. OS2.0 apps and native metafield support change the feasibility of structured data implementation.",
+        "recommended_default": "Yes — if store_profile includes Shopify OS version or theme type information, use it to calibrate technical_seo_priority. If not available, note: 'SHOPIFY-VERSION-UNKNOWN: Technical SEO priorities assume Shopify Online Store 2.0 default. Verify theme capabilities before finalizing technical SEO implementation plan.'"
+      },
+      {
+        "question": "Should build-seo-strategy output a secondary 'keyword_taxonomy' field (not currently in the schema) that maps keyword families to page types, for use by build-product-seo and build-collection-seo revision passes?",
+        "impact": "Without a keyword_taxonomy, revision passes on product-seo and collection-seo artifacts still lack specific keyword direction. They would use the same provisional market intelligence signals they used in phases 4-6.",
+        "recommended_default": "Recommend adding keyword_taxonomy as an optional field in a future schema version. For Phase 7, the notes field and seo-strategy-revisions.md should contain keyword family guidance in human-readable form. Keyword taxonomy as a structured field is a Phase 8+ schema evolution candidate."
+      }
+    ]
+  }
+}

@@ -1,0 +1,600 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. Product structured data outputs are planning artifacts — not emitted JSON-LD markup, not runtime theme code, and not deployed structured data. This workflow determines which structured data schema types are appropriate per product and which fields are available from real data. It does not produce schema.org-formatted markup. The goal is a planning artifact that a future theme implementation, structured data plan, and validation workflow can consume.",
+    "planning_artifact_note": "IMPORTANT — THIS IS A PLANNING ARTIFACT, NOT IMPLEMENTED STRUCTURED DATA: The output of this workflow (product-structured-data.json) describes the structured data planning intent for each product. Fields marked 'required' in this artifact mean they are planning-required for a complete structured data implementation — not that the data currently exists in the store theme. No structured data is deployed by this workflow. Theme implementation, data injection, and validation are out of Phase 5 scope.",
+    "review_schema_safety_note": "IMPORTANT — REVIEW SCHEMA MUST NOT BE ENABLED WITHOUT REAL REVIEW SIGNALS: review_schema_enabled must only be set to true if the Shopify product data contains actual review signals (e.g. rating metafield, review count metafield from an installed review app). It must never be set to true by default or based on the assumption that a review app will be installed later. Enabling review schema without real data creates a structured data trust violation.",
+    "sku_gtin_mpn_note": "SKU, GTIN, and MPN fields must be handled conservatively. sku_priority is only 'required' if Shopify variants consistently have SKU values. gtin_priority is only 'recommended' or 'required' if Shopify barcode fields are consistently populated. mpn_priority is only elevated if an MPN metafield is explicitly present. Do not mark these as 'required' based on assumption.",
+    "structured_data_plan_note": "The store-level structured-data-plan.json (workflow 24) is out of Phase 5 scope. When it becomes available, it should be used to align per-product structured data decisions with the store-wide structured data strategy. Until then, this workflow derives structured data planning from available per-product signals.",
+    "credential_safety_note": "This workflow is primarily deterministic — it does not require LLM synthesis for core field derivations. An optional LLM step for contextual notes generation references OpenAI credentials by PLACEHOLDER name. The actual n8n credential name must be confirmed at runtime if that step is implemented.",
+    "output_schema": "schemas/product-structured-data.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-product-structured-data",
+    "name": "build-product-structured-data",
+    "category": "planning",
+    "phase": "Phase 5 — Commerce Content Planning (Extended)",
+    "purpose": "Derive schema-validated product structured data planning artifacts for each product. This workflow determines which schema.org schema types are appropriate (Product, Offer, Review, FAQ, Breadcrumb), which fields are available from real Shopify operational data, and which fields require enrichment. The derivation is primarily deterministic — based on what data is actually present in the Shopify import, product-seo, and product-faq artifacts. LLM synthesis is not required for the core planning decisions. This is a planning artifact: it describes intent and data availability, not deployed structured data. Because structured-data-plan.json (workflow 24) is out of Phase 5 scope, per-product decisions are derived locally from available signals.",
+
+    "design_principle_note": "Unlike most other Phase 5 workflows, build-product-structured-data is intentionally deterministic. The key questions it answers — which schema types to plan, which fields are available, what the validation priority is — can be derived from data availability checks, not LLM synthesis. This makes the workflow faster, more predictable, and easier to validate. An optional LLM step may be added for contextual notes generation, but it is not required for the core planning artifact.",
+
+    "inputs": {
+      "from_shopify_import": {
+        "source": "import-shopify-data → raw product dataset",
+        "artifact_path": "projects/{project_id}/shopify-import/products.json",
+        "data_treatment": "OPERATIONAL TRUTH — Shopify product data is the primary source for structured data field availability assessment",
+        "fields_used_per_product": [
+          {
+            "field": "id",
+            "treatment": "OPERATIONAL TRUTH — Shopify product ID is the canonical identifier for this artifact. Maps to product_id via the handle pattern.",
+            "note": "Use the handle (not the numeric ID) as the product_id in the artifact, for consistency with other planning artifacts."
+          },
+          {
+            "field": "title",
+            "treatment": "OPERATIONAL TRUTH — Product title is always available. entity_fields.name_required = true for all products.",
+            "note": "The Product schema name field is always required — no decision needed."
+          },
+          {
+            "field": "body_html / description",
+            "treatment": "OPERATIONAL TRUTH — Description availability determines entity_fields.description_required. If description is non-empty → description_required = true (recommended field). If absent → description_required = true but flagged as MISSING-DESCRIPTION-REVIEW.",
+            "note": "Product schema description is always a planning requirement — but absence must be flagged."
+          },
+          {
+            "field": "vendor",
+            "treatment": "OPERATIONAL TRUTH — Vendor availability determines entity_fields.brand_required. Non-empty vendor AND brand_relation_clear (from product-seo entity_clarity) = true → brand_required = true. Empty vendor → brand_required = false with MISSING-VENDOR-REVIEW flag.",
+            "note": "brand_required = false does not mean brand is absent — it means the vendor signal is weak and must be reviewed before implementing brand in schema."
+          },
+          {
+            "field": "images",
+            "treatment": "OPERATIONAL TRUTH — Image presence determines entity_fields.image_required. image_count > 0 → image_required = true. image_count = 0 → image_required = true but flagged as MISSING-IMAGES-REVIEW (images are required for valid Product schema, not optional).",
+            "note": "All products require at least one image for valid Product schema. Zero images is a data gap, not a schema opt-out."
+          },
+          {
+            "field": "variants[].sku",
+            "treatment": "OPERATIONAL TRUTH — SKU availability across variants determines entity_fields.sku_priority. All variants have non-empty SKU → sku_priority = 'required'. Some variants have SKU → sku_priority = 'recommended'. No variants have SKU → sku_priority = 'optional'.",
+            "note": "sku_priority = 'optional' does not mean SKU should be omitted — it means implementation must decide whether to add SKUs before launch."
+          },
+          {
+            "field": "variants[].barcode",
+            "treatment": "OPERATIONAL TRUTH — Barcode (GTIN/EAN/UPC) availability determines entity_fields.gtin_priority. Consistently populated barcodes → gtin_priority = 'recommended'. Some barcodes present → gtin_priority = 'optional' with note. No barcodes → gtin_priority = 'optional'.",
+            "note": "GTIN is valuable for Google Product listings and Shopping ads. Consistent barcode data should be elevated to 'recommended'."
+          },
+          {
+            "field": "metafields (MPN)",
+            "treatment": "OPERATIONAL TRUTH — MPN (Manufacturer Part Number) availability in Shopify metafields determines entity_fields.mpn_priority. MPN metafield present → mpn_priority = 'recommended'. Absent → mpn_priority = 'optional'.",
+            "note": "MPN is optional in Product schema but valuable for electronics and hardware categories."
+          },
+          {
+            "field": "variants[].price",
+            "treatment": "OPERATIONAL TRUTH — Price presence determines offer_fields.price_required. Almost always present in Shopify. If absent, flag as MISSING-PRICE-REVIEW.",
+            "note": "Offer schema requires price. Price absence is a critical gap."
+          },
+          {
+            "field": "metafields (review_rating / review_count)",
+            "treatment": "OPERATIONAL TRUTH — Review rating and count metafields (typically from a Shopify review app like Judge.me, Yotpo, or Okendo) determine review_schema_enabled. If both rating and count metafields are present and non-empty → review_schema_enabled = true. Otherwise → review_schema_enabled = false.",
+            "note": "CRITICAL: review_schema_enabled must NEVER default to true. It must only be true when actual review data exists in Shopify. Enabling review schema without data is a structured data policy violation."
+          }
+        ]
+      },
+
+      "from_product_seo": {
+        "source": "build-product-seo → product-seo.json (per product)",
+        "artifact_path": "projects/{project_id}/product-seo/{product_handle}.json",
+        "data_treatment": "SECONDARY INPUT — product SEO plan provides entity clarity signals and structured data target selections that orient the planning artifact",
+        "fields_used": [
+          {
+            "field": "entity_clarity.product_type_clear",
+            "treatment": "ENTITY FIELD SIGNAL — product_type_clear from product-seo confirms whether the Shopify product_type provides a usable category signal. Used to inform whether the Product schema category/type field can be populated reliably.",
+            "note": "If product_type_clear = false, add a note to the artifact: PRODUCT-TYPE-REVIEW: Product schema category field may need manual specification."
+          },
+          {
+            "field": "entity_clarity.brand_relation_clear",
+            "treatment": "ENTITY FIELD SIGNAL — brand_relation_clear confirms whether the vendor-brand relationship is clear. Used to finalize entity_fields.brand_required determination (cross-validates the raw vendor check from Shopify).",
+            "note": "brand_required is true only if both Shopify vendor is non-empty AND brand_relation_clear = true."
+          },
+          {
+            "field": "structured_data_targets",
+            "treatment": "STRUCTURED DATA TYPE CONFIRMATION — the structured_data_targets list from product-seo (e.g. ['product', 'faq', 'breadcrumb', 'offer']) provides a prior planning decision about which schema types are relevant. This workflow uses it as a starting point and validates it against actual data availability.",
+            "note": "structured_data_targets from product-seo may be provisional. This workflow overrides specific targets based on data reality (e.g. review schema is removed if no review data exists, regardless of whether it appeared in the product-seo targets)."
+          },
+          {
+            "field": "canonical_strategy",
+            "treatment": "BREADCRUMB SIGNAL — canonical_strategy from product-seo (self-canonical, variant-aware, platform-default) informs breadcrumb schema planning. variant-aware → breadcrumb schema needs to account for variant URL structure. platform-default → standard Shopify breadcrumb applies.",
+            "note": "breadcrumb_schema_enabled is always true — this signal influences implementation complexity notes, not the enabled flag."
+          },
+          {
+            "field": "search_intent",
+            "treatment": "VALIDATION PRIORITY SIGNAL — search_intent contributes to validation_priority derivation. informational or comparison intent + rich structured data → higher validation_priority.",
+            "note": "Cross-referenced with price_positioning for final validation_priority."
+          },
+          {
+            "field": "content_depth",
+            "treatment": "VALIDATION PRIORITY SIGNAL — deep content_depth in the product-seo plan suggests this is a high-consideration product, increasing validation_priority.",
+            "note": "Optional field in product-seo — handle gracefully if absent."
+          }
+        ]
+      },
+
+      "from_product_faq": {
+        "source": "build-product-faq → product-faq.json (per product)",
+        "artifact_path": "projects/{project_id}/product-faq/{product_handle}.json",
+        "data_treatment": "TERTIARY INPUT — product FAQ plan provides FAQ item availability and schema priority for FAQ schema planning",
+        "fields_used": [
+          {
+            "field": "faq_items",
+            "treatment": "FAQ SCHEMA ENABLEMENT — faq_items presence and quality determines faq_schema_enabled. If faq_items is non-empty AND no items are pure PLACEHOLDER-REQUIRES-REVIEW (i.e. at least some items have real questions and answers) → faq_schema_enabled = true. If all items are placeholders → faq_schema_enabled = false with PLACEHOLDER-FAQ-REVIEW flag.",
+            "note": "faq_schema_enabled = false does not mean FAQ schema should never be used — it means the FAQ content is not ready for structured data implementation."
+          },
+          {
+            "field": "faq_items (count)",
+            "treatment": "MINIMUM FAQ ITEMS DERIVATION — the count of non-placeholder faq_items determines faq_fields.minimum_faq_items. This informs how many FAQ items must be ready before FAQ schema can be implemented.",
+            "note": "minimum_faq_items should equal the count of valid (non-placeholder) faq_items in the product-faq artifact."
+          },
+          {
+            "field": "faq_schema_priority",
+            "treatment": "VALIDATION PRIORITY SIGNAL — faq_schema_priority from product-faq (high, medium, low) contributes to the overall validation_priority for this product's structured data plan.",
+            "note": "high faq_schema_priority + offer schema + product schema → validation_priority may be elevated to 'high' or 'strict'."
+          }
+        ]
+      },
+
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "data_treatment": "CONTEXTUAL SIGNALS — store profile provides currency and catalog context for offer schema planning",
+        "fields_used": [
+          {
+            "field": "primary_currency",
+            "treatment": "OFFER FIELD DIRECT INPUT — primary_currency from store-profile is the canonical currency code for offer schema planning. offer_fields.currency_required = true, and the currency value is known.",
+            "note": "currency_required is always true. The primary_currency value from store-profile confirms which currency code will be used."
+          },
+          {
+            "field": "price_positioning",
+            "treatment": "VALIDATION PRIORITY SIGNAL — premium or luxury price positioning elevates validation_priority, as high-ticket products benefit more from complete, validated structured data.",
+            "note": "Combined with faq_schema_priority and content_depth to determine final validation_priority."
+          },
+          {
+            "field": "catalog_type",
+            "treatment": "CONTEXT — single-product catalog → full structured data effort per product. broad-catalog → validation_priority may be 'balanced' as a trade-off between coverage and depth.",
+            "note": "Used as a context modifier for validation_priority, not a hard decision rule."
+          },
+          {
+            "field": "brand_maturity",
+            "treatment": "OFFER SELLER FIELD SIGNAL — established or legacy brand maturity + brand_relation_clear = true → offer_fields.seller_required = true. new brand → offer_fields.seller_required = false unless vendor is clearly defined.",
+            "note": "seller_required in offer schema is relevant when the store wants to specify the seller entity explicitly (useful for marketplace disambiguation)."
+          }
+        ]
+      },
+
+      "from_structured_data_plan": {
+        "source": "build-structured-data-plan → structured-data-plan.json (OPTIONAL — NOT AVAILABLE IN PHASE 5)",
+        "artifact_path": "projects/{project_id}/structured-data-plan.json",
+        "availability": "NOT AVAILABLE IN PHASE 5 — build-structured-data-plan (workflow 24) is far out of Phase 5 scope",
+        "treatment_when_absent": "All structured data decisions are derived per-product from available signals. There is no store-level structured data strategy to align against. Decisions are marked PROVISIONAL-PENDING-STRUCTURED-DATA-PLAN in the output notes where relevant.",
+        "treatment_when_present": "If structured-data-plan.json is passed as an optional input in a later phase run, use it to: align schema type selections with the store-wide structured data strategy, confirm validation_priority against the store's declared structured data quality standards, and ensure breadcrumb schema is consistent with the store's navigation planning.",
+        "fields_that_would_be_used": [
+          "schema_types_priority (would constrain which schema types are planned per product)",
+          "validation_standards (would constrain validation_priority levels)",
+          "breadcrumb_strategy (would inform breadcrumb schema implementation complexity)"
+        ]
+      }
+    },
+
+    "outputs": {
+      "product_structured_data_set": {
+        "description": "A set of product-structured-data.json artifacts, one per imported Shopify product. Each artifact conforms to schemas/product-structured-data.schema.json. These are planning artifacts describing which structured data schema types are appropriate and which fields are available — not deployed JSON-LD markup.",
+        "artifact_path": "projects/{project_id}/product-structured-data/{product_handle}.json",
+        "schema": "schemas/product-structured-data.schema.json",
+        "field_mapping": {
+          "product_id": {
+            "source": "Shopify product handle (operational truth)",
+            "type": "operational truth string",
+            "note": "Must conform to pattern ^[a-z0-9-]+$. Consistent with product-content.json, product-seo.json, and product-faq.json for the same product."
+          },
+          "product_schema_enabled": {
+            "source": "Always true — every Shopify product is a candidate for Product schema",
+            "type": "hardcoded boolean: true",
+            "note": "Product schema (schema.org/Product) is the universal baseline for all product pages. Never false."
+          },
+          "offer_schema_enabled": {
+            "source": "Derived from Shopify variant price availability",
+            "type": "derived boolean",
+            "derivation_logic": "true if any variant has a non-null, non-zero price. false only if Shopify product has no pricing data at all (extremely rare) — flag as MISSING-PRICE-REVIEW."
+          },
+          "review_schema_enabled": {
+            "source": "Derived from Shopify review metafield availability — ONLY",
+            "type": "derived boolean (strict — defaults to false)",
+            "derivation_logic": "true ONLY if Shopify product metafields contain both a review rating value AND a review count from an installed review app. false in all other cases.",
+            "safety_note": "NEVER default to true. NEVER enable based on assumption that reviews will be collected later. A false positive here violates Google's structured data quality guidelines."
+          },
+          "faq_schema_enabled": {
+            "source": "Derived from product-faq faq_items availability and quality",
+            "type": "derived boolean",
+            "derivation_logic": "true if product-faq faq_items contains at least 1 item where both question and answer are non-empty and answer does not start with PLACEHOLDER-REQUIRES-REVIEW. false if all items are placeholders or faq_items is empty."
+          },
+          "breadcrumb_schema_enabled": {
+            "source": "Always true — Breadcrumb schema is standard for all product pages in a Shopify store with collections",
+            "type": "hardcoded boolean: true",
+            "note": "Breadcrumb schema (schema.org/BreadcrumbList) is a universal planning requirement for all product pages. It is always planned, even if the breadcrumb implementation detail depends on the navigation structure defined later."
+          },
+          "entity_fields": {
+            "name_required": {
+              "source": "Always true",
+              "type": "hardcoded: true",
+              "note": "Product name (title) is always required in Product schema."
+            },
+            "brand_required": {
+              "source": "Derived from Shopify vendor non-empty AND product-seo entity_clarity.brand_relation_clear = true",
+              "type": "derived boolean",
+              "derivation_logic": "true if Shopify vendor is non-empty AND brand_relation_clear = true. false if vendor is empty or brand_relation_clear = false. Flag false cases as MISSING-VENDOR-REVIEW."
+            },
+            "description_required": {
+              "source": "Always true (planning requirement)",
+              "type": "hardcoded: true",
+              "note": "Product description is always a planning requirement. If Shopify description is absent, flag MISSING-DESCRIPTION-REVIEW but still set true — absence indicates a gap to resolve, not an opt-out."
+            },
+            "image_required": {
+              "source": "Always true (planning requirement)",
+              "type": "hardcoded: true",
+              "note": "Product image is always required for valid Product schema. If Shopify product has zero images, flag MISSING-IMAGES-REVIEW but still set true."
+            },
+            "sku_priority": {
+              "source": "Derived from Shopify variants[].sku field population",
+              "type": "derived enum",
+              "derivation_logic": {
+                "required": "All variants have non-empty SKU values",
+                "recommended": "Some but not all variants have SKU values",
+                "optional": "No variants have SKU values"
+              },
+              "schema_enum": ["optional", "recommended", "required"]
+            },
+            "gtin_priority": {
+              "source": "Derived from Shopify variants[].barcode field population",
+              "type": "derived enum",
+              "derivation_logic": {
+                "recommended": "All or most variants have non-empty barcode values (GTIN/EAN/UPC)",
+                "optional": "Some or no variants have barcode values"
+              },
+              "schema_enum": ["optional", "recommended", "required"],
+              "note": "'required' is only appropriate if a store-level policy mandates GTIN — which requires structured-data-plan.json input. Default maximum in Phase 5 is 'recommended'."
+            },
+            "mpn_priority": {
+              "source": "Derived from Shopify product metafields for MPN",
+              "type": "derived enum",
+              "derivation_logic": {
+                "recommended": "MPN metafield is present and non-empty",
+                "optional": "MPN metafield is absent"
+              },
+              "schema_enum": ["optional", "recommended", "required"]
+            }
+          },
+          "offer_fields": {
+            "price_required": {
+              "source": "Always true (if offer_schema_enabled = true)",
+              "type": "hardcoded: true",
+              "note": "Price is required for Offer schema."
+            },
+            "currency_required": {
+              "source": "Always true — store-profile.primary_currency provides the value",
+              "type": "hardcoded: true"
+            },
+            "availability_required": {
+              "source": "Always true — Shopify inventory_policy provides availability signals",
+              "type": "hardcoded: true",
+              "note": "Availability (InStock / OutOfStock / PreOrder) is always required for Offer schema. Shopify inventory_policy and inventory_quantity determine the appropriate value."
+            },
+            "seller_required": {
+              "source": "Derived from store-profile.brand_maturity + product-seo entity_clarity.brand_relation_clear",
+              "type": "derived boolean",
+              "derivation_logic": "true if brand_maturity = established or legacy AND brand_relation_clear = true. false for new or growing brands unless vendor is clearly defined.",
+              "note": "seller_required specifies whether the Offer schema should explicitly name the seller entity. Useful for brand disambiguation in Google Shopping."
+            },
+            "condition_required": {
+              "source": "Derived from product type and catalog context",
+              "type": "derived boolean",
+              "derivation_logic": "false by default for standard new-product ecommerce. true only if catalog includes refurbished, used, or certified pre-owned products.",
+              "note": "Most Shopify ecommerce stores sell new products. condition_required = false is the safe default. Flag true only if refurbished or used products are confirmed in the catalog."
+            }
+          },
+          "review_fields": {
+            "source": "Conditional — only populated if review_schema_enabled = true",
+            "note": "If review_schema_enabled = false, review_fields should be omitted from the artifact or set to null.",
+            "rating_required": {
+              "derivation_logic": "true if review_schema_enabled = true (aggregate rating is required for valid Review schema)"
+            },
+            "review_count_required": {
+              "derivation_logic": "true if review_schema_enabled = true (review count is required alongside aggregate rating)"
+            }
+          },
+          "faq_fields": {
+            "source": "Conditional — only populated if faq_schema_enabled = true",
+            "note": "If faq_schema_enabled = false, faq_fields should be omitted or set to null.",
+            "minimum_faq_items": {
+              "source": "Count of non-placeholder faq_items in the product-faq artifact",
+              "type": "derived integer",
+              "note": "Represents the minimum number of FAQ items that must be present and non-placeholder before FAQ schema implementation is viable."
+            }
+          },
+          "validation_priority": {
+            "source": "Derived from: product-seo content_depth + search_intent + faq_schema_priority + store-profile price_positioning + catalog_type",
+            "type": "derived enum",
+            "derivation_logic": {
+              "strict": "price_positioning = premium or luxury AND faq_schema_enabled = true AND review_schema_enabled = true AND content_depth = deep — full structured data suite required for high-value SEO",
+              "high": "price_positioning = premium or luxury OR (faq_schema_enabled = true AND offer_schema_enabled = true) OR content_depth = deep",
+              "balanced": "standard product with commercial or transactional intent, moderate price positioning — default for most products"
+            },
+            "schema_enum": ["balanced", "high", "strict"],
+            "note": "'balanced' is the safe default. 'strict' should be rare and reserved for flagship products where structured data quality directly impacts search performance."
+          },
+          "notes": {
+            "source": "Workflow-generated synthesis metadata per product",
+            "type": "machine-generated string",
+            "required_content": "Must include: synthesis timestamp, Shopify product handle, data availability summary (which fields were present vs absent), list of REVIEW flags triggered (MISSING-IMAGES-REVIEW, MISSING-VENDOR-REVIEW, etc.), PROVISIONAL-PENDING-STRUCTURED-DATA-PLAN note, and instructions for implementation team on which fields require data enrichment before implementation."
+          }
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "import-shopify-data",
+        "provides": ["raw product dataset"],
+        "required": true,
+        "note": "Primary data source. All field availability decisions (SKU, GTIN, MPN, images, vendor, price, review metafields) are derived directly from Shopify product data. This workflow cannot run without the Shopify import."
+      },
+      {
+        "workflow": "build-product-seo",
+        "provides": ["product-seo.json per product"],
+        "required": true,
+        "note": "Provides entity_clarity signals (brand_relation_clear, product_type_clear), structured_data_targets (starting point for schema type planning), canonical_strategy (breadcrumb complexity signal), search_intent, and content_depth (validation_priority contributors)."
+      },
+      {
+        "workflow": "build-product-faq",
+        "provides": ["product-faq.json per product"],
+        "required": true,
+        "note": "Provides faq_items (presence and quality → faq_schema_enabled and faq_fields.minimum_faq_items) and faq_schema_priority (validation_priority contributor). build-product-structured-data must run after build-product-faq."
+      },
+      {
+        "workflow": "build-store-profile",
+        "provides": ["store-profile.json"],
+        "required": true,
+        "note": "Provides primary_currency (offer schema currency), price_positioning (validation_priority signal), catalog_type (context), and brand_maturity (offer seller_required signal)."
+      },
+      {
+        "workflow": "build-structured-data-plan",
+        "provides": ["structured-data-plan.json"],
+        "required": false,
+        "note": "OPTIONAL — NOT AVAILABLE IN PHASE 5. build-structured-data-plan (workflow 24) is far out of Phase 5 scope. When available, it should be used to align per-product structured data decisions with the store-wide strategy."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "run-validation",
+        "receives": ["product-structured-data.json"],
+        "note": "Out of Phase 5 scope (workflow 28). Validates structured data planning artifacts against schema and structured data standards."
+      },
+      {
+        "workflow": "build-structured-data-plan",
+        "receives": ["product-structured-data.json set"],
+        "note": "Out of Phase 5 scope (workflow 24). The store-level structured data plan aggregates per-product structured data decisions. There is a circular dependency risk: this workflow uses structured-data-plan as an optional input, and structured-data-plan uses this workflow's outputs as an input. Resolution: this workflow runs first with structured-data-plan absent (Phase 5). Structured-data-plan runs later (workflow 24) after all per-product artifacts are available."
+      }
+    ],
+
+    "schema_alignment": {
+      "product-structured-data.schema.json": {
+        "required_fields_covered": [
+          "product_id",
+          "product_schema_enabled",
+          "offer_schema_enabled",
+          "review_schema_enabled",
+          "faq_schema_enabled",
+          "breadcrumb_schema_enabled",
+          "entity_fields",
+          "offer_fields",
+          "validation_priority"
+        ],
+        "optional_fields_covered": [
+          "review_fields",
+          "faq_fields",
+          "notes"
+        ],
+        "entity_fields_note": "entity_fields is a required object with required sub-fields: name_required, brand_required, description_required, image_required, sku_priority. Optional sub-fields: gtin_priority, mpn_priority. All required sub-fields must be present.",
+        "offer_fields_note": "offer_fields is a required object with required sub-fields: price_required, currency_required, availability_required. Optional: seller_required, condition_required.",
+        "sku_priority_enum": ["optional", "recommended", "required"],
+        "validation_priority_enum": ["balanced", "high", "strict"],
+        "validation_note": "Each product-structured-data object must be validated against schemas/product-structured-data.schema.json using ajv. All required fields must be present. All enum fields must use valid values. review_fields and faq_fields are only required when their corresponding schema_enabled flags are true."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: shopify_products (array of raw Shopify product objects), product_seo_paths (list of product-seo artifact paths or objects), product_faq_paths (list of product-faq artifact paths or objects), store_profile. Optional: structured_data_plan.",
+        "input": "shopify_products + product_seo_paths + product_faq_paths + store_profile + optional structured_data_plan",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify all required inputs are present. shopify_products must be a non-empty array. product_seo_paths and product_faq_paths must each be non-empty and match shopify_products by product handle. store_profile must have primary_currency, price_positioning, catalog_type, and brand_maturity. Check whether structured_data_plan is present — if absent, set provisional_mode.structured_data_plan = true and log it. If product_seo or product_faq are missing for a given Shopify product, flag that product as UPSTREAM-MATCH-REQUIRED and continue processing others with degraded signals.",
+        "input": "all inputs",
+        "output": "validated inputs + provisional_mode flags or halt error"
+      },
+      {
+        "step": 3,
+        "name": "Extract Store-Level Derivation Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Extract store-level signals used across all products: primary_currency (from store_profile), price_positioning (from store_profile), catalog_type (from store_profile), brand_maturity (from store_profile). These are shared inputs for offer_fields and validation_priority derivation. Also resolve any structured_data_plan signals if available.",
+        "input": "validated store_profile + optional structured_data_plan",
+        "output": "store_signals object"
+      },
+      {
+        "step": 4,
+        "name": "Load and Match Per-Product Data",
+        "type": "Code node (JavaScript)",
+        "description": "For each Shopify product, load and merge: the raw Shopify product data (all fields), the corresponding product-seo artifact (entity_clarity, structured_data_targets, canonical_strategy, search_intent, content_depth), and the corresponding product-faq artifact (faq_items, faq_schema_priority). Produce a merged per-product input object. Log any products where product-seo or product-faq could not be matched.",
+        "input": "shopify_products + product_seo list + product_faq list",
+        "output": "merged per-product input objects array"
+      },
+      {
+        "step": 5,
+        "name": "Derive Schema Enable Flags (per product)",
+        "type": "Code node (JavaScript)",
+        "description": "For each product, deterministically derive the five schema enable flags: (1) product_schema_enabled = always true. (2) offer_schema_enabled = true if any variant has non-null non-zero price. (3) review_schema_enabled = true ONLY IF Shopify product metafields contain both a review rating value AND a review count from an installed review app — false in all other cases, with no exceptions. (4) faq_schema_enabled = true if product-faq faq_items contains at least 1 non-placeholder item. (5) breadcrumb_schema_enabled = always true. Log each decision and flag any data gaps (missing price, missing images, etc.) as REVIEW flags.",
+        "input": "merged per-product input + store_signals",
+        "output": "per-product schema_enable_flags object + review_flags list"
+      },
+      {
+        "step": 6,
+        "name": "Derive Entity Fields (per product)",
+        "type": "Code node (JavaScript)",
+        "description": "For each product, derive entity_fields: name_required = true (always). brand_required = Shopify vendor non-empty AND brand_relation_clear = true. description_required = true (always; flag MISSING-DESCRIPTION-REVIEW if Shopify description is absent). image_required = true (always; flag MISSING-IMAGES-REVIEW if image count = 0). sku_priority = 'required' if all variants have SKU, 'recommended' if some do, 'optional' if none do. gtin_priority = 'recommended' if all/most variants have barcode, 'optional' otherwise. mpn_priority = 'recommended' if MPN metafield present, 'optional' otherwise.",
+        "input": "merged per-product Shopify data + product-seo entity_clarity",
+        "output": "per-product entity_fields object + entity review_flags"
+      },
+      {
+        "step": 7,
+        "name": "Derive Offer Fields (per product)",
+        "type": "Code node (JavaScript)",
+        "description": "For each product (where offer_schema_enabled = true), derive offer_fields: price_required = true. currency_required = true (currency = store_signals.primary_currency). availability_required = true. seller_required = true if brand_maturity = established or legacy AND brand_relation_clear = true. condition_required = false by default; true only if product tags or metafields indicate refurbished or used condition. Log any MISSING-PRICE-REVIEW flags.",
+        "input": "merged per-product Shopify data + store_signals + product-seo entity_clarity",
+        "output": "per-product offer_fields object"
+      },
+      {
+        "step": 8,
+        "name": "Derive Review Fields and FAQ Fields (per product)",
+        "type": "Code node (JavaScript)",
+        "description": "For each product: (A) REVIEW FIELDS — only populated if review_schema_enabled = true. If true: rating_required = true, review_count_required = true. (B) FAQ FIELDS — only populated if faq_schema_enabled = true. If true: minimum_faq_items = count of non-placeholder faq_items in the product-faq artifact. If either flag is false, set the corresponding fields to null or omit from the output object.",
+        "input": "merged per-product input + schema_enable_flags",
+        "output": "per-product conditional review_fields and faq_fields objects"
+      },
+      {
+        "step": 9,
+        "name": "Derive Validation Priority (per product)",
+        "type": "Code node (JavaScript)",
+        "description": "For each product, derive validation_priority: 'strict' if price_positioning = premium or luxury AND faq_schema_enabled = true AND review_schema_enabled = true AND product-seo content_depth = deep. 'high' if price_positioning = premium or luxury OR (faq_schema_enabled = true AND offer_schema_enabled = true) OR content_depth = deep. 'balanced' otherwise (default). The safe default is 'balanced' — only elevate if signals clearly support it.",
+        "input": "store_signals + per-product schema_enable_flags + product-seo signals",
+        "output": "per-product validation_priority value"
+      },
+      {
+        "step": 10,
+        "name": "Assemble Structured Data Planning Artifact (per product)",
+        "type": "Code node (JavaScript)",
+        "description": "For each product, assemble the full product-structured-data object from all derived components: product_id, product_schema_enabled, offer_schema_enabled, review_schema_enabled, faq_schema_enabled, breadcrumb_schema_enabled, entity_fields, offer_fields, review_fields (conditional), faq_fields (conditional), validation_priority, and notes. The notes field must include: synthesis timestamp, Shopify product handle, data availability summary (which fields were present vs absent), list of REVIEW flags triggered, PROVISIONAL-PENDING-STRUCTURED-DATA-PLAN flag if applicable.",
+        "input": "all per-product derived components",
+        "output": "assembled product_structured_data object per product (pre-validation)"
+      },
+      {
+        "step": 11,
+        "name": "Validate Against Schema (per product)",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate each product_structured_data object against schemas/product-structured-data.schema.json using ajv. Key validations: all required fields present, all boolean fields are actually boolean, all enum fields use valid values (sku_priority in ['optional','recommended','required'], validation_priority in ['balanced','high','strict']), entity_fields contains all required sub-fields, offer_fields contains all required sub-fields. Log validation failures per product without halting the entire workflow.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/product-structured-data.schema.json",
+        "failure_behavior": "Log validation failure for the specific product. Continue processing remaining products. Report all failed products in the review-required manifest.",
+        "input": "assembled product_structured_data object per product",
+        "output": "validated product_structured_data objects or per-product validation errors"
+      },
+      {
+        "step": 12,
+        "name": "Persist product-structured-data.json (per product)",
+        "type": "GitHub node or Write File node",
+        "description": "Write each validated product-structured-data.json to projects/{project_id}/product-structured-data/{product_handle}.json. Commit with a message such as 'chore: generate product-structured-data for {store_id} — Phase 5 draft (planning artifact)'. Products that failed validation are logged to projects/{project_id}/product-structured-data/_review-required.json.",
+        "artifact_path": "projects/{project_id}/product-structured-data/{product_handle}.json",
+        "review_manifest_path": "projects/{project_id}/product-structured-data/_review-required.json",
+        "git_note": "Each product-structured-data.json must be committed to Git. These are planning artifacts consumed by build-structured-data-plan (workflow 24) and run-validation (workflow 28) in later phases.",
+        "input": "validated product_structured_data object per product",
+        "output": "confirmation of write per product + list of persisted artifact paths"
+      },
+      {
+        "step": 13,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the list of persisted product-structured-data artifact paths and the review-required manifest path to the master orchestrator. Include a summary of review flags triggered across the product set (e.g. count of MISSING-IMAGES-REVIEW, MISSING-VENDOR-REVIEW, review_schema_disabled products).",
+        "input": "artifact_paths list + review_required manifest path + review_flags summary",
+        "output": "workflow output payload with data gap summary"
+      }
+    ],
+
+    "assumptions": [
+      "This workflow is primarily deterministic. LLM synthesis is not required for any core field derivation. All decisions are made from data availability checks on Shopify data, product-seo, and product-faq inputs.",
+      "review_schema_enabled MUST default to false. It is only true when actual review rating and count data exists in Shopify metafields. This is a hard rule — never assume review data will exist or will be added later.",
+      "product_schema_enabled and breadcrumb_schema_enabled are always true for all products. These are universal structured data planning requirements.",
+      "offer_schema_enabled is true for virtually all Shopify products since pricing is nearly always present. MISSING-PRICE-REVIEW is an exceptional flag, not the common case.",
+      "structured-data-plan.json is NOT available in Phase 5. All structured data decisions are derived per-product. When structured-data-plan.json is implemented (workflow 24), a revision pass may be needed to align per-product decisions with store-wide strategy.",
+      "The circular dependency between this workflow (16) and structured-data-plan (24) is resolved by ordering: this workflow runs first in Phase 5 without structured-data-plan. Structured-data-plan runs later and aggregates these artifacts.",
+      "product_id in the structured data artifact matches the Shopify product handle, consistent with all other Phase 4 and Phase 5 artifacts for the same product.",
+      "SKU, GTIN, and MPN priority assignments are conservative. 'required' is only assigned when data is consistently present — never as an aspirational target.",
+      "The OpenAI credential is referenced as a PLACEHOLDER for an optional notes-generation step only. The core workflow does not require LLM synthesis.",
+      "seller_required in offer_fields is relevant primarily for stores where the seller entity needs to be disambiguated (e.g. multi-brand marketplaces). For single-brand stores, seller_required = false is typically acceptable."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should the workflow generate an implementation checklist per product (a list of data gaps that must be resolved before structured data can be deployed)?",
+        "impact": "A structured implementation checklist would make this planning artifact more actionable for development teams.",
+        "recommended_default": "Yes — an optional implementation_checklist array field per artifact would be valuable. Each entry would describe a specific data gap or action required. This could be generated either deterministically (from REVIEW flags) or with a lightweight LLM summary step. Propose as an optional schema addition to product-structured-data.schema.json."
+      },
+      {
+        "question": "How should variant-level structured data (e.g. separate Offer entities per variant) be planned in this artifact?",
+        "impact": "Products with many variants may require per-variant Offer schema entries, which significantly increases structured data complexity.",
+        "recommended_default": "In Phase 5, this artifact plans at the product level. Variant-level offer planning should be flagged in notes if variant count > 5 and variants differ meaningfully in price or availability. Detailed variant-level structured data planning is out of Phase 5 scope."
+      },
+      {
+        "question": "Should products with MISSING-IMAGES-REVIEW be excluded from product_schema_enabled = true given that images are required for valid Product schema?",
+        "impact": "Products without images cannot technically have valid Product schema. Planning them as enabled creates a misleading artifact.",
+        "recommended_default": "No — keep product_schema_enabled = true but flag the image gap prominently in notes. The planning intent is correct (all products should have Product schema) even if the current data state has a gap. The MISSING-IMAGES-REVIEW flag communicates the gap without changing the planning intent."
+      },
+      {
+        "question": "Should this workflow output a store-level aggregate summary (e.g. how many products have review_schema_enabled = true, how many have full SKU coverage)?",
+        "impact": "An aggregate summary would help identify store-wide data quality patterns rather than requiring review of individual artifacts.",
+        "recommended_default": "Yes — an aggregate summary artifact at projects/{project_id}/product-structured-data/_summary.json would be valuable. It would include counts of schema_enabled flags, review flags, and validation_priority distributions. Out of strict Phase 5 scope but low-effort to add as an additional output in the same workflow run."
+      }
+    ],
+
+    "evidence_boundaries": {
+      "direct_operational_truth_from_shopify": [
+        "product_schema_enabled (always true — Shopify product existence is operational truth)",
+        "offer_schema_enabled (derived from Shopify variant price availability — direct)",
+        "review_schema_enabled (derived from Shopify review metafield presence — direct operational check)",
+        "entity_fields.name_required (always true — Shopify product title always exists)",
+        "entity_fields.image_required (always true — Shopify image availability checked directly)",
+        "entity_fields.sku_priority (derived from Shopify variant.sku field population — direct)",
+        "entity_fields.gtin_priority (derived from Shopify variant.barcode field population — direct)",
+        "entity_fields.mpn_priority (derived from Shopify MPN metafield presence — direct)",
+        "offer_fields.price_required (always true — Shopify variant price presence checked directly)",
+        "offer_fields.currency_required (always true — store-profile.primary_currency is known)",
+        "offer_fields.availability_required (always true — Shopify inventory data is present)"
+      ],
+      "derived_from_planning_artifacts": [
+        "entity_fields.brand_required (cross-derived from Shopify vendor + product-seo brand_relation_clear)",
+        "faq_schema_enabled (derived from product-faq faq_items quality check)",
+        "faq_fields.minimum_faq_items (derived from product-faq faq_items count)",
+        "offer_fields.seller_required (derived from store_profile brand_maturity + product-seo brand_relation_clear)",
+        "validation_priority (derived from multiple planning artifact signals — not operational truth)"
+      ],
+      "not_available_in_this_phase": [
+        "Store-level structured-data-plan.json (workflow 24 — far out of Phase 5 scope)",
+        "Validated review data integration (review app configuration and real review counts)",
+        "Theme-level implementation details (how JSON-LD is injected is outside this workflow)",
+        "SEO impact assessment of structured data choices (requires search performance data)",
+        "Competitor structured data benchmarking"
+      ],
+      "labeling_requirement": "The notes field per product-structured-data artifact must include: 'PRODUCT STRUCTURED DATA — PLANNING ARTIFACT: This artifact describes structured data planning intent for Phase 5. It is not deployed JSON-LD markup. review_schema_enabled = false means no review data was found in Shopify — this is not a judgment about whether reviews should be collected. All REVIEW flags indicate data gaps requiring resolution before implementation. PROVISIONAL-PENDING-STRUCTURED-DATA-PLAN: This artifact was generated without structured-data-plan.json (workflow 24). When the store-level structured data plan becomes available, this artifact should be reviewed for alignment.'"
+    }
+  }
+}

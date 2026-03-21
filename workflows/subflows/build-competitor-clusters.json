@@ -1,0 +1,388 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, and node structure so that a future n8n implementation can be built safely. Competitor cluster outputs are planning artifacts — not confirmed competitive intelligence. Do not treat as production workflow.",
+    "evidence_boundary_note": "This workflow produces competitor clusters from user-provided URLs (if any) and LLM archetype inference. No live competitor crawling, no page fetching, no external competitive intelligence API calls are performed. If competitor URLs are provided via intake, they are used only as naming and labeling hints. All strengths, weaknesses, patterns, and opportunities are LLM inferences — not verified observations from actual competitor analysis. Cluster outputs must be treated as planning hypotheses requiring human review.",
+    "schema_note": "schemas/competitor-cluster.schema.json defines the structure of a single cluster object. This workflow produces an array of cluster objects. The output artifact competitor-clusters.json is an array. Each item in the array must individually validate against schemas/competitor-cluster.schema.json.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/competitor-cluster.schema.json (applied per-item in output array)",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+  "workflow": {
+    "id": "build-competitor-clusters",
+    "name": "build-competitor-clusters",
+    "category": "planning",
+    "phase": "Phase 2 — Strategic Intelligence",
+    "purpose": "Group competitors into pattern-relevant clusters based on user-provided competitor URLs (if any) and market intelligence context. The output is an array of schema-validated competitor cluster objects, each describing a cluster role, competitor examples, shared strengths, shared weaknesses, shared patterns, and adaptation opportunities. This workflow operates in two modes: URL-seeded mode (when intake.competitor_urls is non-empty) and archetype mode (when no competitor URLs are provided). In both modes, all analytical content is LLM-inferred — not crawled from live competitors. Clusters are designed to inform the pattern manifest in a later phase.",
+
+    "inputs": {
+      "from_market_intelligence": {
+        "source": "build-market-intelligence → market-intelligence.json",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "fields_used": [
+          "market_category",
+          "competitor_types",
+          "positioning_goals",
+          "audience_segments",
+          "trust_factors",
+          "purchase_motivators"
+        ],
+        "note": "Market intelligence provides the competitor type archetypes and market context used as the basis for clustering. competitor_types from market-intelligence are the primary clustering seed — they describe the archetypes present in the market."
+      },
+      "from_intake": {
+        "source": "intake-store-input → normalized_intake_payload",
+        "fields_used": [
+          {
+            "field": "competitor_urls",
+            "treatment": "If non-empty: URL-seeded mode. URLs are used as labels and naming hints only. No live requests made against these URLs.",
+            "note": "The array may be empty. If empty, workflow enters archetype mode."
+          }
+        ],
+        "note": "competitor_urls is the key intake field for this workflow. All other intake signals are consumed indirectly via market_intelligence."
+      },
+      "from_store_profile": {
+        "source": "build-store-profile → store-profile.json",
+        "artifact_path": "projects/{project_id}/store-profile.json",
+        "fields_used": [
+          "store_id",
+          "vertical",
+          "price_positioning",
+          "primary_market",
+          "store_type"
+        ],
+        "note": "Store profile provides the market positioning context against which clusters are framed — what role the store plays relative to each cluster."
+      },
+      "external_competitive_intelligence": {
+        "status": "NOT AVAILABLE IN THIS PHASE",
+        "note": "Live competitor page crawling, domain analysis tools, SimilarWeb, SEMrush, Ahrefs, or similar competitive intelligence platforms are not integrated in Phase 2. If future phases add external competitive research, this workflow must be extended with a competitor data enrichment step before the LLM clustering step. Until then, all cluster content is inference-only."
+      }
+    },
+
+    "output_structure_note": "The output is an array of cluster objects. Each object conforms to schemas/competitor-cluster.schema.json. The artifact file is competitor-clusters.json and contains the array at the root level. Minimum 1 cluster is always produced. Recommended 2–4 clusters to cover the market adequately without overclaiming.",
+
+    "outputs": {
+      "competitor_clusters": {
+        "description": "Validated competitor-clusters.json — an array of cluster objects, each conforming to schemas/competitor-cluster.schema.json. Each cluster groups competitors by archetype role and describes shared strengths, weaknesses, patterns, and adaptation opportunities.",
+        "artifact_path": "projects/{project_id}/competitor-clusters.json",
+        "schema": "schemas/competitor-cluster.schema.json (applied per-item)",
+        "output_modes": {
+          "url_seeded_mode": {
+            "trigger": "intake.competitor_urls is non-empty (at least 1 URL provided)",
+            "behavior": "The LLM uses the provided URLs as named examples when building cluster_examples. URLs are used as labels only — no fetching. The LLM groups provided URLs into clusters based on their apparent type (inferred from domain name and vertical context). Each cluster's competitor_examples list includes the user-provided URL(s) that belong to that cluster. If a URL cannot be assigned to a known archetype cluster, it is placed in a 'mixed' or 'uncategorized' cluster.",
+            "evidence_label": "URL-SEEDED: Competitor examples reflect user-provided URLs. All strength, weakness, pattern, and opportunity analysis is LLM inference, not verified competitor research."
+          },
+          "archetype_mode": {
+            "trigger": "intake.competitor_urls is empty or null",
+            "behavior": "When no competitor URLs are provided, the workflow generates representative hypothetical clusters based on the competitor_types identified in market-intelligence.json. Each cluster_example in archetype mode uses a clearly labeled placeholder: name is a descriptive archetype label (e.g. 'Typical Large Marketplace'), url is 'ARCHETYPE-PLACEHOLDER — no real competitor provided'. The cluster content (strengths, weaknesses, patterns) is LLM inference from archetype patterns in the vertical.",
+            "evidence_label": "ARCHETYPE-MODE: No competitor URLs were provided. Clusters are hypothetical archetypes derived from market intelligence and vertical context. No real competitors are referenced.",
+            "minimum_clusters": 2,
+            "note": "Even in archetype mode, the clusters must be useful planning artifacts. They should represent the realistic competitive landscape the store will face, not generic filler."
+          }
+        },
+        "per_cluster_field_mapping": {
+          "cluster_name": {
+            "source": "LLM synthesis — descriptive name for the cluster archetype",
+            "type": "LLM-synthesized",
+            "example": "Premium Specialist Cluster, Budget Marketplace Cluster, Editorial Brand Cluster"
+          },
+          "cluster_role": {
+            "source": "LLM selection from schema enum based on vertical + competitor_types context",
+            "type": "LLM-selected enum",
+            "schema_enum": ["premium-brand-cluster", "value-cluster", "editorial-cluster", "marketplace-like-cluster", "trend-driven-cluster", "problem-solver-cluster", "specialist-cluster"]
+          },
+          "description": {
+            "source": "LLM synthesis — description of this cluster's market role and target audience",
+            "type": "LLM-synthesized"
+          },
+          "competitor_examples": {
+            "source": "URL-seeded mode: user-provided URLs grouped by cluster | Archetype mode: ARCHETYPE-PLACEHOLDER entries",
+            "type": "user-provided (seeded) or placeholder (archetype)",
+            "schema_requirements": "minItems: 1 — at least one example per cluster. In archetype mode, placeholder entries must clearly indicate they are hypothetical.",
+            "archetype_placeholder_format": {
+              "name": "Descriptive archetype name, e.g. 'Typical Premium Specialist in [vertical]'",
+              "url": "ARCHETYPE-PLACEHOLDER",
+              "notes": "ARCHETYPE-MODE: No real competitor URL was provided for this entry. This is a hypothetical example representing this cluster archetype."
+            }
+          },
+          "shared_strengths": {
+            "source": "LLM inference from cluster_role + vertical + price tier context",
+            "type": "LLM-inferred — NOT verified competitor research",
+            "note": "minItems: 1. These are inferred typical strengths of competitors in this cluster archetype — not observed facts."
+          },
+          "shared_weaknesses": {
+            "source": "LLM inference from cluster_role + store positioning_goals context",
+            "type": "LLM-inferred — NOT verified competitor research",
+            "note": "minItems: 1. Inferred typical weaknesses that may represent differentiation opportunities for the store."
+          },
+          "shared_patterns": {
+            "source": "LLM inference from cluster_role + vertical + market_category",
+            "type": "LLM-inferred — NOT verified",
+            "note": "minItems: 1. Each pattern has pattern_type (enum), description, why_it_works, and optional risk_if_overused. Pattern types are constrained to schema enum: layout, navigation, pdp-structure, collection-strategy, seo-pattern, aeo-pattern, trust-pattern, media-pattern, motion-pattern, offer-pattern, copy-pattern."
+          },
+          "non_copyable_elements": {
+            "source": "LLM inference from cluster strengths + store's differentiation goals",
+            "type": "LLM-inferred",
+            "note": "minItems: 1. Elements this cluster relies on that the store should not copy (e.g. brand equity, proprietary content, scale-dependent features)."
+          },
+          "adaptation_opportunities": {
+            "source": "LLM inference from cluster weaknesses + store positioning_goals + purchase_motivators",
+            "type": "LLM-inferred",
+            "note": "minItems: 1. Opportunities to adapt the cluster's strengths without inheriting its weaknesses."
+          },
+          "seo_relevance": {
+            "source": "LLM inference from cluster seo-pattern + vertical + store seo_goal",
+            "type": "LLM-inferred optional output"
+          },
+          "aeo_relevance": {
+            "source": "LLM inference from cluster aeo-pattern + vertical + store aeo_goal",
+            "type": "LLM-inferred optional output"
+          },
+          "notes": {
+            "source": "workflow-generated metadata per cluster",
+            "type": "machine-generated",
+            "note": "Each cluster's notes field contains the mode label (URL-SEEDED or ARCHETYPE-MODE), synthesis timestamp, and evidence boundary reminder."
+          }
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-market-intelligence",
+        "provides": ["market-intelligence.json"],
+        "required": true,
+        "note": "competitor_types from market intelligence are the primary clustering seed. Without market intelligence, the workflow cannot produce meaningful cluster archetypes."
+      },
+      {
+        "workflow": "build-store-profile",
+        "provides": ["store-profile.json"],
+        "required": true
+      },
+      {
+        "workflow": "intake-store-input",
+        "provides": ["normalized_intake_payload (competitor_urls)"],
+        "required": true,
+        "note": "competitor_urls may be an empty array. The workflow handles both states. The field itself must be present (even if empty) to determine the operating mode."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-pattern-manifest",
+        "receives": ["competitor-clusters.json"],
+        "note": "Out of scope for Phase 2. The pattern manifest uses clusters to decide which patterns to approve, adapt, or reject. Documented for future reference."
+      }
+    ],
+
+    "schema_alignment": {
+      "competitor-cluster.schema.json": {
+        "applied_to": "Each item in the output array",
+        "required_fields_per_cluster": [
+          "cluster_name",
+          "cluster_role",
+          "description",
+          "competitor_examples",
+          "shared_strengths",
+          "shared_weaknesses",
+          "shared_patterns",
+          "non_copyable_elements",
+          "adaptation_opportunities"
+        ],
+        "optional_fields_per_cluster": [
+          "seo_relevance",
+          "aeo_relevance",
+          "media_relevance",
+          "recommended_use_cases",
+          "notes"
+        ],
+        "validation_note": "Every cluster object in the output array must individually pass schema validation against schemas/competitor-cluster.schema.json. The validation step must loop over the array and validate each item. A single invalid cluster must cause the entire workflow to halt — partial arrays must not be persisted.",
+        "array_vs_single_note": "The schema defines a single cluster object, not an array. The output file competitor-clusters.json wraps multiple cluster objects in a top-level array. This is intentional and documented — the file is not a single cluster. Consumers of this file must iterate over the array."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects market_intelligence (or path), store_profile (or path), and normalized_intake_payload. All three must be present.",
+        "input": "market_intelligence + store_profile + normalized_intake_payload",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs. market_intelligence must have: competitor_types (non-empty array), market_category (non-empty string), positioning_goals (non-empty array). store_profile must have: store_id, vertical, price_positioning. normalized_intake_payload.competitor_urls must exist (array, may be empty). Halt with a clear error if any required input is missing.",
+        "input": "all upstream inputs",
+        "output": "validated inputs or error"
+      },
+      {
+        "step": 3,
+        "name": "Resolve Input Mode",
+        "type": "Code node (JavaScript)",
+        "description": "Determine the operating mode based on intake.competitor_urls: if competitor_urls is a non-empty array with at least 1 valid-looking string → set mode = 'url-seeded'. If competitor_urls is null, undefined, or an empty array → set mode = 'archetype'. Log the resolved mode and the number of competitor URLs provided (if any). This mode flag is passed to subsequent steps to control prompt construction and output labeling.",
+        "input": "normalized_intake_payload.competitor_urls",
+        "output": "mode string ('url-seeded' or 'archetype') + competitor_urls array (or empty)"
+      },
+      {
+        "step": 4,
+        "name": "Extract Clustering Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Extract the signals needed for the LLM clustering prompt. From market_intelligence: competitor_types (full array with type_name, description, strengths, weaknesses), positioning_goals, audience_segments (summary), trust_factors (summary). From store_profile: vertical, price_positioning, primary_market, store_type. Produce a lean clustering_context object. If mode is 'url-seeded', include the competitor_urls list. If mode is 'archetype', note that no URLs are available and clustering must use archetype archetypes only.",
+        "input": "validated market_intelligence + store_profile + mode + competitor_urls",
+        "output": "clustering_context object"
+      },
+      {
+        "step": 5,
+        "name": "Build LLM Clustering Prompt",
+        "type": "Code node (JavaScript)",
+        "description": "Assemble the structured LLM prompt for competitor cluster synthesis. The prompt must: (1) State the operating mode clearly ('URL-SEEDED' or 'ARCHETYPE'). (2) In URL-seeded mode: ask the model to group the provided URLs into 2–4 clusters based on their inferred type, using the competitor_types from market_intelligence as a reference framework. (3) In archetype mode: ask the model to produce 2–3 representative archetype clusters based on the competitor_types from market_intelligence, using ARCHETYPE-PLACEHOLDER as the URL for all competitor_examples. (4) For each cluster, request all required schema fields. (5) Provide the cluster_role enum values explicitly. (6) Provide the shared_patterns.pattern_type enum values explicitly. (7) Instruct the model that all strengths, weaknesses, and patterns are inferences — not verified competitor research. (8) Request output as a JSON array where each item matches schemas/competitor-cluster.schema.json.",
+        "input": "clustering_context + mode",
+        "output": "assembled LLM prompt string",
+        "prompt_safety_note": "The prompt must include: 'Do not invent specific traffic figures, conversion rates, revenue data, or factual competitive metrics. All cluster content should describe inferred archetype patterns, not verified competitor facts.'"
+      },
+      {
+        "step": 6,
+        "name": "LLM Synthesis: Competitor Clusters",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API. Request JSON output mode if supported. Temperature: 0.3. Max tokens: 3000 (higher than other workflows due to producing multiple cluster objects). Expected output: a JSON array of 2–4 cluster objects.",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt",
+        "output": "raw LLM response string (expected to be a JSON array)"
+      },
+      {
+        "step": 7,
+        "name": "Parse LLM Response",
+        "type": "Code node (JavaScript)",
+        "description": "Parse the raw LLM response as a JSON array. Handle common issues: strip markdown code fences, normalize null vs missing optional fields. Verify the response is an array (not a single object). If the model returned a single object instead of an array, wrap it in an array. If the model returned an object with a 'clusters' key containing the array, extract it. Log the number of clusters returned.",
+        "input": "raw LLM response string",
+        "output": "parsed clusters array (pre-validation)"
+      },
+      {
+        "step": 8,
+        "name": "Apply Evidence Boundary Flags",
+        "type": "Code node (JavaScript)",
+        "description": "Iterate over each cluster in the parsed array and apply evidence boundary labels. For each cluster: set the notes field to include the operating mode label (URL-SEEDED or ARCHETYPE-MODE), synthesis timestamp, and evidence boundary reminder. In archetype mode: verify that all competitor_examples use the ARCHETYPE-PLACEHOLDER URL format — if the LLM returned a real-looking URL instead of a placeholder, replace it with 'ARCHETYPE-PLACEHOLDER' and log the replacement. In URL-seeded mode: verify that the competitor_examples reflect the URLs provided by the user — if the LLM invented additional URLs not in the input list, remove them and log the removal.",
+        "input": "parsed clusters array + mode + original competitor_urls",
+        "output": "labeled clusters array with enforced evidence boundaries"
+      },
+      {
+        "step": 9,
+        "name": "Validate Each Cluster Against Schema",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate each cluster object in the array individually against schemas/competitor-cluster.schema.json using ajv. If any cluster fails validation, halt the entire workflow and report the cluster index, field name, and violation. Do not persist a partially valid array — all clusters must pass validation before the file is written. Common failure modes: cluster_role not in enum, shared_patterns[*].pattern_type not in enum, minItems violations on required arrays.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/competitor-cluster.schema.json",
+        "failure_behavior": "Halt workflow. Report which cluster (by index) failed and the exact schema violation. Do not persist partial output.",
+        "input": "labeled clusters array",
+        "output": "validated clusters array or validation error"
+      },
+      {
+        "step": 10,
+        "name": "Persist competitor-clusters.json",
+        "type": "GitHub node or Write File node",
+        "description": "Write the validated clusters array to the project artifacts path: projects/{project_id}/competitor-clusters.json. The file content is a JSON array at the root level. Commit with a message such as 'chore: generate competitor-clusters for {store_id} ({mode} mode, {count} clusters)'. Include the mode and cluster count in the commit message for auditability.",
+        "artifact_path": "projects/{project_id}/competitor-clusters.json",
+        "git_note": "competitor-clusters.json must be committed to Git. It is consumed by the pattern manifest phase.",
+        "input": "validated clusters array",
+        "output": "confirmation of write + artifact path"
+      },
+      {
+        "step": 11,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the artifact path, operating mode, cluster count, and a reference to the validated clusters array to the master orchestrator.",
+        "input": "artifact_path + validated clusters array + mode + cluster_count",
+        "output": "workflow output payload"
+      }
+    ],
+
+    "assumptions": [
+      "competitor_urls from intake are stored as-is from the user. They are not validated as reachable, correct, or relevant URLs. The workflow trusts the user's input.",
+      "In URL-seeded mode, the LLM is expected to infer the competitor's type and cluster assignment from the domain name and the vertical context. This inference may be inaccurate for obscure or generic domain names.",
+      "In archetype mode, clusters are pure LLM archetypes and must be reviewed critically by a human before being used to make design or pattern decisions.",
+      "The minimum viable output is 1 cluster. The recommended output is 2–4 clusters. More than 5 clusters is likely excessive for typical commerce verticals and may indicate over-splitting.",
+      "Each cluster must have at least 1 competitor_example per schema (minItems: 1). In archetype mode, this is satisfied by the ARCHETYPE-PLACEHOLDER entry.",
+      "competitor-clusters.json is an array at the root level, not wrapped in an object. Consumers must parse it as an array.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "No live competitor analysis is performed in this phase. Future phases may add a competitor enrichment step that crawls provided URLs and feeds real data into a second pass of this workflow."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should the workflow fail gracefully or produce archetype clusters when competitor_urls contains only 1 URL?",
+        "impact": "A single URL is not enough to define multiple clusters. The workflow would group it into one URL-seeded cluster and fill the remaining clusters with archetypes.",
+        "recommended_default": "If fewer than 2 competitor URLs are provided, produce a hybrid: 1 URL-seeded cluster (using the provided URL) and 1–2 archetype clusters for the remaining competitive landscape. Label each cluster with its mode individually."
+      },
+      {
+        "question": "What should happen if the LLM assigns a provided competitor URL to an ambiguous or incorrect cluster archetype?",
+        "impact": "Without live competitor research, the LLM may misclassify a competitor based on domain name alone.",
+        "recommended_default": "Allow the misclassification to persist as a planning hypothesis and note it in the cluster's notes field. A human reviewer must validate cluster assignments before the pattern manifest phase consumes them."
+      },
+      {
+        "question": "Should competitor-clusters.json be an array at the root level, or an object with a clusters key?",
+        "impact": "An array at root is simpler to consume. An object with a clusters key allows adding metadata (e.g. mode, generated_at) at the top level.",
+        "recommended_default": "Use a root-level object with a clusters array and a metadata object: { 'generated_at': '...', 'mode': '...', 'cluster_count': N, 'evidence_boundary': '...', 'clusters': [...] }. This allows consumers to read the mode and evidence boundary without parsing individual cluster notes. Update schemas/competitor-cluster.schema.json to reflect this wrapper structure in a future schema iteration."
+      },
+      {
+        "question": "Should future phases add a competitor URL crawling step to enrich clusters with real data before the pattern manifest phase?",
+        "impact": "Real competitor analysis would significantly improve the quality of pattern and adaptation recommendations.",
+        "recommended_default": "Yes, design for a future 'enrich-competitor-clusters' workflow that accepts competitor-clusters.json as input, crawls provided URLs, and produces an enriched version. This is out of scope for Phase 2 but should be documented as a planned extension."
+      }
+    ],
+
+    "sparse_input_handling": {
+      "no_competitor_urls": {
+        "behavior": "Archetype mode — see output_modes.archetype_mode",
+        "minimum_output": "2 archetype clusters based on competitor_types from market-intelligence.json",
+        "labeling": "Each cluster explicitly labeled as ARCHETYPE-MODE"
+      },
+      "one_competitor_url": {
+        "behavior": "Hybrid mode — 1 URL-seeded cluster + 1–2 archetype clusters for remaining landscape",
+        "note": "Hybrid mode is not explicitly defined above but should be implemented at runtime as a special case of URL-seeded mode with archetype fill"
+      },
+      "no_market_intelligence_competitor_types": {
+        "behavior": "Should not occur — market-intelligence is a required upstream. But if competitor_types array is empty despite passing earlier validation, halt and report the data quality issue.",
+        "note": "This is a defensive check only."
+      }
+    },
+
+    "evidence_boundaries": {
+      "what_is_internal_signal": [
+        "market_intelligence.competitor_types (LLM-synthesized archetypes from Phase 2)",
+        "intake.competitor_urls (user-provided labels only, not crawled)",
+        "store_profile.vertical + price_positioning (framing context)"
+      ],
+      "what_is_not_available": [
+        "live competitor website content",
+        "competitor traffic or SEO metrics",
+        "competitor conversion rates",
+        "competitor pricing data",
+        "competitor ad spend or keyword strategy",
+        "external competitive intelligence tools"
+      ],
+      "labeling_requirement": "Every cluster's notes field must include: 'COMPETITOR CLUSTER — [URL-SEEDED|ARCHETYPE-MODE]: All strength, weakness, pattern, and opportunity analysis is LLM inference. No live competitor research was performed. Treat all values as planning hypotheses requiring human verification.'"
+    },
+
+    "runtime_dependencies": [
+      "n8n Execute Workflow Trigger node — receives subworkflow call from master orchestrator",
+      "n8n Code node (JavaScript) — for mode resolution, signal extraction, prompt building, response parsing, evidence boundary enforcement, and per-cluster schema validation",
+      "n8n OpenAI node OR HTTP Request node (OpenAI API) — for LLM cluster synthesis",
+      "n8n GitHub node OR Write File node — for persisting competitor-clusters.json",
+      "ajv (Ajv JSON Schema Validator) — for per-cluster schema validation inside Code node",
+      "schemas/competitor-cluster.schema.json — must be accessible to the validation step",
+      "OpenAI API credential — stored in n8n, never in Git",
+      "build-market-intelligence and build-store-profile must complete successfully before this workflow runs"
+    ]
+  }
+}

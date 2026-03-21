@@ -1,0 +1,459 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. Collection navigation outputs are planning artifacts — not live storefront menu configurations, not deployed navigation structures, and not finalized information architecture decisions. The collection-navigation.json artifacts produced here define how each collection should be considered for navigation placement, visibility, and hierarchy in planning terms. They do not directly configure Shopify menus or storefront navigation. Implementation of actual navigation requires a separate theme or storefront configuration step outside the scope of this workflow.",
+    "navigation_planning_boundary_note": "IMPORTANT — NAVIGATION PLANNING IS NOT NAVIGATION IMPLEMENTATION: This workflow produces a navigation planning artifact that defines each collection's intended navigation role, visibility level, and hierarchy signals. It does NOT configure actual Shopify menus, navigation links, or storefront theme settings. The output of this workflow is a planning document that informs a future navigation build or theme setup step. Do not treat collection-navigation.json as a Shopify menu configuration.",
+    "shopify_structure_boundary_note": "IMPORTANT — SHOPIFY NAVIGATION DATA MAY BE UNAVAILABLE: The Shopify import may or may not include actual navigation/menu data from the live store. If Shopify menu data is unavailable (which is common — Shopify menus are often configured in the theme editor, not accessible via standard API exports), this workflow must use conservative planning logic based on collection structure signals only. Do not invent navigation hierarchy certainty when actual Shopify menu data is not available.",
+    "ia_certainty_boundary_note": "IMPORTANT — DO NOT INVENT INFORMATION ARCHITECTURE CERTAINTY: The navigation planning decisions made here are strategic recommendations based on available signals (collection SEO, content richness, homepage strategy, product count, product type). They are not final information architecture decisions. A human strategist or UX designer must review and confirm the navigation plan before any storefront navigation is implemented.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/collection-navigation.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-collection-navigation",
+    "name": "build-collection-navigation",
+    "category": "planning",
+    "phase": "Phase 6 — Collection SEO and Navigation Planning",
+    "purpose": "Synthesize schema-validated collection navigation planning artifacts for each Shopify collection. This workflow determines each collection's intended navigation role (primary navigation, secondary navigation, supporting navigation, landing page, or hybrid), visibility level, parent-child hierarchy signals, homepage support status, and cross-link relationships. It draws on: collection-content (for content richness and category framing), collection-seo (for page_role and search intent), homepage-strategy (for featured collection sections and catalog navigation role), and Shopify collection structure (for product count, collection hierarchy hints, and any available menu signals). Navigation planning decisions are strategic recommendations, not final storefront configurations. Sparse, empty, or ambiguously positioned collections receive conservative planning defaults. The workflow explicitly avoids inventing information architecture certainty when input signals are insufficient.",
+
+    "navigation_role_definitions": {
+      "primary-navigation": "Collection should appear in the main site navigation (top-level menu or primary navigation area). Typically: high traffic potential, strong page_role = category-entry-page or comparison-entry-page, meaningful product count, clearly distinct from other primary navigation items.",
+      "secondary-navigation": "Collection belongs in a secondary navigation area (sub-menu, sidebar, or secondary menu group). Typically: narrower category scope, child of a primary category, supporting the primary navigation structure.",
+      "supporting-navigation": "Collection supports the navigation experience but does not appear in the primary menu. Examples: featured on homepage as a collection link, visible in footer, or linked from category pages. Typically: lower product count, niche scope, or subcategory of an existing navigation item.",
+      "landing-page": "Collection functions as a destination page rather than a navigation node. Typically: campaign-specific collections, promotional collections, or editorial collections that are linked to directly but not part of the persistent navigation structure.",
+      "hybrid": "Collection plays multiple navigation roles (e.g. appears in both primary navigation and as a featured homepage link). Use when signals clearly indicate more than one role is appropriate."
+    },
+
+    "inputs": {
+      "from_collection_seo": {
+        "source": "build-collection-seo → collection-seo.json (per collection)",
+        "artifact_path": "projects/{project_id}/collection-seo/{collection_handle}.json",
+        "data_treatment": "PRIMARY NAVIGATION SIGNAL — collection SEO artifacts provide page_role and search_intent as key classification signals for navigation planning",
+        "fields_used": [
+          {
+            "field": "slug",
+            "treatment": "IDENTIFIER — the collection slug (Shopify handle) is the canonical collection identifier for cross-referencing.",
+            "note": "Used as the primary key for matching collection-seo data to collection-content and Shopify data."
+          },
+          {
+            "field": "page_role",
+            "treatment": "NAVIGATION ROLE SIGNAL — page_role is a primary input for determining navigation_role. category-entry-page → strong candidate for primary or secondary navigation. category-guide-page → may belong in secondary or supporting navigation with a guide-oriented position. comparison-entry-page → strong candidate for primary navigation if comparison is a core store behavior. hybrid-category-page → may warrant hybrid navigation role.",
+            "note": "page_role is a provisional decision from build-collection-seo. It informs but does not mechanically determine navigation_role."
+          },
+          {
+            "field": "search_intent",
+            "treatment": "VISIBILITY LEVEL SIGNAL — search_intent helps determine visibility_level. commercial or transactional intent → high visibility (buyers are actively looking). informational intent → may warrant medium visibility if the collection serves a discovery rather than purchase role.",
+            "note": "Used as a supporting signal for visibility_level classification."
+          },
+          {
+            "field": "internal_linking_targets",
+            "treatment": "CROSS-LINK PLANNING SIGNAL — internal linking targets from collection-seo indicate which other content types this collection should link to. Used to inform cross_links in the navigation artifact.",
+            "note": "Used to populate cross_links — the navigation artifact should be consistent with the SEO-level linking targets."
+          },
+          {
+            "field": "primary_keyword",
+            "treatment": "MENU GROUP SIGNAL — the primary keyword may suggest a natural menu group or category label if it differs meaningfully from the Shopify collection title.",
+            "note": "Informational signal — menu_group decisions should prefer Shopify title over SEO keyword reframes."
+          }
+        ]
+      },
+
+      "from_collection_content": {
+        "source": "build-collection-content → collection-content.json (per collection)",
+        "artifact_path": "projects/{project_id}/collection-content/{collection_handle}.json",
+        "data_treatment": "CONTENT RICHNESS SIGNAL — collection content richness informs visibility level and navigation prominence decisions",
+        "fields_used": [
+          {
+            "field": "collection_title",
+            "treatment": "NAVIGATION LABEL — the collection_title (from Shopify) is the canonical navigation display label. Navigation planning must use the Shopify collection title as the menu item label — not a rewritten SEO keyword label.",
+            "note": "Operational truth from Shopify. Do not rename for navigation purposes."
+          },
+          {
+            "field": "category_promise",
+            "treatment": "NAVIGATION PROMINENCE SIGNAL — a clear, strong category_promise indicates this collection has well-defined value in the store. Supports higher navigation prominence.",
+            "note": "Planning signal — used to calibrate visibility_level."
+          },
+          {
+            "field": "selection_guidance",
+            "treatment": "CONTENT DEPTH SIGNAL — rich selection_guidance indicates this collection can support a guide-page or comparison-page navigation role. Thin or absent selection_guidance suggests the collection may be better positioned as a secondary navigation item.",
+            "note": "Content richness signal for navigation role classification."
+          },
+          {
+            "field": "notes",
+            "treatment": "SPARSE/EMPTY FLAG — if the collection-content notes field contains EMPTY-COLLECTION or SPARSE-COLLECTION flags, this workflow must apply conservative navigation defaults: visibility_level = low, navigation_role = supporting-navigation (default safe), featured_on_homepage = false.",
+            "note": "Conservative fallback triggered by sparse/empty collection signals."
+          }
+        ]
+      },
+
+      "from_homepage_strategy": {
+        "source": "build-homepage-strategy → homepage-strategy.json",
+        "artifact_path": "projects/{project_id}/homepage-strategy.json",
+        "data_treatment": "HOMEPAGE VISIBILITY CONSTRAINT — homepage strategy defines whether and how collections are featured on the homepage, and what role catalog navigation plays in the overall homepage experience",
+        "fields_used": [
+          {
+            "field": "section_sequence",
+            "treatment": "HOMEPAGE FEATURE SIGNAL — if section_sequence contains a 'featured-collections' or 'category-navigation' section marked as 'core' or 'supporting', then collections are explicitly part of the homepage plan. This informs featured_on_homepage and homepage_priority decisions.",
+            "note": "Only collections with strong category_promise and sufficient product count should be marked featured_on_homepage = true. The homepage section plan constrains how many collections can realistically be featured."
+          },
+          {
+            "field": "homepage_goal",
+            "treatment": "CATALOG ROLE SIGNAL — homepage_goal = 'catalog-navigation' or 'editorial-discovery' → collections play a central navigation role → higher visibility levels. homepage_goal = 'conversion-first' or 'brand-introduction' → collections may be secondary to hero/flagship product features.",
+            "note": "homepage_goal shapes the ceiling for how prominently any collection should be positioned in navigation."
+          },
+          {
+            "field": "cta_strategy.primary_cta_focus",
+            "treatment": "COLLECTION PROMINENCE SIGNAL — if primary_cta_focus = 'explore-collections', then collection navigation is a high-priority homepage behavior → primary navigation role is strongly supported.",
+            "note": "Confirms or strengthens primary navigation role decisions."
+          }
+        ]
+      },
+
+      "from_shopify_import": {
+        "source": "import-shopify-data → raw collection dataset",
+        "artifact_path": "projects/{project_id}/shopify-import/collections.json",
+        "data_treatment": "OPERATIONAL TRUTH — Shopify collection structure provides the factual basis for navigation planning",
+        "fields_used_per_collection": [
+          {
+            "field": "handle",
+            "treatment": "OPERATIONAL TRUTH — the Shopify collection handle is the collection_id in the navigation artifact.",
+            "note": "Used as the canonical identifier."
+          },
+          {
+            "field": "title",
+            "treatment": "OPERATIONAL TRUTH — the Shopify collection title is the canonical navigation display label. Do not substitute a keyword-optimized label.",
+            "note": "Navigation label must reflect the Shopify title."
+          },
+          {
+            "field": "product_count",
+            "treatment": "VISIBILITY THRESHOLD — product_count directly gates navigation visibility. Empty collections (0 products): navigation_role defaults to supporting-navigation, visibility_level = low, featured_on_homepage = false. Sparse collections (1-2 products): conservative defaults apply. Standard collections (3+): standard navigation synthesis applies.",
+            "note": "Hard threshold behavior — not overridable by LLM synthesis for empty/sparse collections."
+          },
+          {
+            "field": "sort_order",
+            "treatment": "MERCHANDISING INTENT SIGNAL — manual sort order suggests the collection is actively curated → higher confidence in navigation prominence. Automated sort orders (best-selling, price) suggest a more passive collection.",
+            "note": "Supporting signal only."
+          },
+          {
+            "field": "shopify_menu_data (if available)",
+            "treatment": "OPTIONAL OPERATIONAL TRUTH — if the Shopify import includes existing menu configurations, treat them as operational truth for current navigation state. Do not contradict existing menus without flagging the difference.",
+            "availability": "COMMONLY UNAVAILABLE — Shopify navigation menus are often configured in the theme editor and may not be accessible via the standard API export. When unavailable, document this as a gap and proceed with planning-only mode.",
+            "note": "When absent: document in artifact notes that 'Shopify menu data was not available. Navigation plan is based on collection structure signals only. Verify against actual Shopify navigation before implementation.'"
+          }
+        ],
+        "sparse_collection_navigation_behavior": {
+          "empty_collection": "product_count = 0 → navigation_role = supporting-navigation, visibility_level = low, featured_on_homepage = false, homepage_priority = low (if field exists), footer_visibility = none. Notes: 'EMPTY COLLECTION: Navigation planning deferred. Review when products are added.'",
+          "sparse_collection": "product_count = 1 or 2 → navigation_role = supporting-navigation (default — may be upgraded with justification), visibility_level = low, featured_on_homepage = false. Notes: 'SPARSE COLLECTION: Navigation plan is conservative. Review when product count increases.'",
+          "standard_collection": "product_count >= 3 → standard navigation synthesis applies"
+        }
+      }
+    },
+
+    "outputs": {
+      "primary_output": "collection-navigation.json per collection",
+      "artifact_path": "projects/{project_id}/collection-navigation/{collection_handle}.json",
+      "review_manifest_path": "projects/{project_id}/collection-navigation/_review-required.json",
+      "schema": "schemas/collection-navigation.schema.json",
+      "output_fields": {
+        "collection_id": {
+          "source": "OPERATIONAL TRUTH — direct from Shopify collection handle",
+          "type": "string (lowercase alphanumeric + hyphens)",
+          "note": "Must match the Shopify handle exactly."
+        },
+        "navigation_role": {
+          "source": "LLM synthesis guided by page_role + search_intent + product_count + homepage_strategy signals",
+          "type": "constrained enum",
+          "schema_enum": ["primary-navigation", "secondary-navigation", "supporting-navigation", "landing-page", "hybrid"],
+          "derivation_guidance": {
+            "primary-navigation": "page_role = category-entry-page or comparison-entry-page AND product_count >= 3 AND homepage_strategy indicates catalog navigation role AND collection represents a top-level product category",
+            "secondary-navigation": "page_role = category-entry-page with narrower scope OR category-guide-page AND collection is a sub-category of a primary navigation collection",
+            "supporting-navigation": "page_role = category-guide-page (editorial role) OR low product count OR campaign/promotional collection OR collection that serves as a supporting link from another page rather than a top-level nav item",
+            "landing-page": "collection serves a specific campaign, offer, or promotional purpose that makes it a destination rather than a persistent navigation node",
+            "hybrid": "collection clearly qualifies for more than one role (e.g. primary navigation item that is also featured on homepage as a dedicated card)"
+          }
+        },
+        "visibility_level": {
+          "source": "Derived from product_count + search_intent + category_promise strength + homepage_strategy prominence",
+          "type": "constrained enum",
+          "schema_enum": ["high", "medium", "low"],
+          "derivation_guidance": "high: product_count >= 5 + commercial/transactional intent + strong category_promise + homepage_strategy supports catalog navigation. medium: product_count = 3-4 + commercial intent + standard category_promise. low: sparse/empty collection OR niche scope OR supporting content-only role."
+        },
+        "parent_relation": {
+          "has_parent": {
+            "source": "Derived from Shopify collection structure + category hierarchy signals. If the collection clearly belongs under a broader category collection, has_parent = true.",
+            "type": "boolean",
+            "note": "If Shopify has no explicit collection hierarchy, derive from category_promise and collection_title context. When uncertain, default to false and flag for review."
+          },
+          "has_children": {
+            "source": "Derived from whether other collections in the set are plausibly sub-categories of this collection.",
+            "type": "boolean",
+            "note": "When uncertain, default to false. A true value should be supported by at least one identifiable child collection."
+          }
+        },
+        "parent_collection_id": {
+          "source": "LLM synthesis — derived if has_parent = true. Must reference a collection_handle that exists in the Shopify collection set.",
+          "type": "optional string",
+          "constraint": "Must reference a valid Shopify collection handle from the imported collection set. Do not invent parent collection IDs.",
+          "note": "If no plausible parent exists, omit this field."
+        },
+        "child_collection_ids": {
+          "source": "LLM synthesis — derived if has_children = true. Must reference collection_handles that exist in the Shopify collection set.",
+          "type": "optional array of strings",
+          "constraint": "Each entry must reference a valid Shopify collection handle from the imported collection set. Do not invent child collection IDs.",
+          "note": "If no plausible children exist, omit this field."
+        },
+        "homepage_support": {
+          "featured_on_homepage": {
+            "source": "Derived from homepage_strategy.section_sequence (featured-collections section presence and priority) + product_count + page_role + visibility_level",
+            "type": "boolean",
+            "derivation_logic": "true only if: homepage_strategy contains a core or supporting featured-collections or category-navigation section AND product_count >= 3 AND visibility_level = high or medium AND collection is a strong category candidate. false for empty/sparse collections and supporting-navigation or landing-page role collections.",
+            "note": "The number of collections that can realistically be featured on the homepage is constrained by the homepage_strategy section design. Do not mark all collections as featured_on_homepage = true."
+          },
+          "homepage_priority": {
+            "source": "Derived from visibility_level + page_role + category_promise strength",
+            "type": "string enum (constrained)",
+            "guidance": "Values should reflect relative priority among featured collections. Confirm exact enum from schemas/collection-navigation.schema.json.",
+            "schema_enum_note": "Confirm homepage_priority allowed values from schemas/collection-navigation.schema.json before implementation."
+          }
+        },
+        "menu_group": {
+          "source": "LLM synthesis — optional grouping label for collections that share a menu section. Derived from shared product types, category themes, or homepage_strategy section groupings.",
+          "type": "optional string",
+          "note": "menu_group is a planning label, not a Shopify menu handle. It represents a logical grouping concept for navigation planning purposes."
+        },
+        "footer_visibility": {
+          "source": "Derived from navigation_role + visibility_level + page_role",
+          "type": "optional constrained enum",
+          "schema_enum": ["none", "supporting", "visible"],
+          "derivation_logic": "primary-navigation collections with high visibility: footer_visibility = visible. supporting-navigation collections with medium visibility: footer_visibility = supporting. landing-page or empty/sparse collections: footer_visibility = none.",
+          "note": "Footer visibility is optional in the schema. Only set when there is clear evidence of intended footer presence."
+        },
+        "cross_links": {
+          "source": "LLM synthesis from internal_linking_targets in collection-seo + collection relationship signals",
+          "type": "array of objects (minItems: 1)",
+          "constraint": "Each cross_link must have target_type (confirm exact enum from schemas/collection-navigation.schema.json) and reason (non-empty string). Must reference target types that exist or are planned in the store. Do not invent cross-link targets.",
+          "schema_enum_note": "Confirm target_type allowed values from schemas/collection-navigation.schema.json before implementation.",
+          "guidance": "Cross-links should be consistent with the internal_linking_targets from the corresponding collection-seo artifact. At minimum, include a cross_link to the homepage (every collection should link back to the brand authority layer).",
+          "minimum": "At minimum 1 cross_link must be produced. The homepage cross_link is a safe universal minimum."
+        },
+        "notes": {
+          "source": "Workflow-generated synthesis metadata per collection",
+          "type": "machine-generated string",
+          "note": "Must include: synthesis timestamp, Shopify collection handle, collection_state (empty/sparse/standard), whether Shopify menu data was available or absent, evidence boundary label, any CONSERVATIVE-FALLBACK flags, instructions for human review before navigation implementation. Must explicitly state: 'Collection navigation plan is a planning artifact — not a Shopify menu configuration. Human review required before implementation.'"
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-collection-seo",
+        "provides": ["collection-seo.json per collection (page_role, search_intent, internal_linking_targets)"],
+        "required": true,
+        "note": "build-collection-seo (workflow step 18) must complete before this workflow runs. collection-seo page_role is a primary signal for navigation_role classification."
+      },
+      {
+        "workflow": "build-collection-content",
+        "provides": ["collection-content.json per collection (collection_title, category_promise, selection_guidance richness, sparse/empty flags)"],
+        "required": true,
+        "note": "build-collection-content (workflow step 17) must complete before this workflow runs. Content richness signals inform visibility_level and navigation prominence."
+      },
+      {
+        "workflow": "build-homepage-strategy",
+        "provides": ["homepage-strategy.json (section_sequence, homepage_goal, cta_strategy)"],
+        "required": true,
+        "note": "build-homepage-strategy (workflow step 9) must be available. Homepage strategy constrains which collections can be featured on the homepage and what catalog navigation role is supported."
+      },
+      {
+        "workflow": "import-shopify-data",
+        "provides": ["Shopify collection data including handle, title, product_count, sort_order, optional menu data"],
+        "required": true,
+        "note": "Shopify collection data provides operational truth for collection_id, navigation labels, and product count thresholds."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "run-validation",
+        "receives": ["collection-navigation.json"],
+        "note": "Out of Phase 6 scope (workflow step 28). Validates collection-navigation artifacts against schema and store-level navigation consistency."
+      },
+      {
+        "workflow": "future navigation build / theme setup",
+        "receives": ["collection-navigation.json"],
+        "note": "Outside the current system scope. The collection-navigation.json artifacts are the planning input for a future step that configures actual Shopify menus, theme navigation, or storefront navigation structure. This step is not yet defined in the workflow chain."
+      }
+    ],
+
+    "schema_alignment": {
+      "collection-navigation.schema.json": {
+        "required_fields_covered": [
+          "collection_id",
+          "navigation_role",
+          "visibility_level",
+          "parent_relation",
+          "homepage_support",
+          "cross_links"
+        ],
+        "optional_fields_covered": [
+          "parent_collection_id",
+          "child_collection_ids",
+          "menu_group",
+          "footer_visibility",
+          "notes"
+        ],
+        "schema_enum_confirmation_required": [
+          "homepage_support.homepage_priority — confirm allowed values from schemas/collection-navigation.schema.json before implementation",
+          "cross_links[].target_type — confirm enum from schemas/collection-navigation.schema.json before implementation"
+        ],
+        "collection_id_note": "Schema pattern: ^[a-z0-9-]+$. Must match the Shopify collection handle exactly.",
+        "cross_links_note": "Schema requires minItems: 1. At least one cross_link must be produced per collection. The homepage cross_link is a safe universal minimum.",
+        "validation_note": "Each collection-navigation object must be validated against schemas/collection-navigation.schema.json using ajv. All required fields must be present. Enum values must be confirmed from the schema."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: collection_seo_paths (list of collection-seo artifact paths or objects), collection_content_paths (list of collection-content artifact paths or objects), homepage_strategy, shopify_collections. All required inputs must be present before this workflow begins.",
+        "input": "collection_seo_paths + collection_content_paths + homepage_strategy + shopify_collections",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present. collection_seo list must be non-empty. collection_content list must be non-empty. homepage_strategy must have section_sequence (non-empty array) and homepage_goal. shopify_collections must be non-empty array. Check whether shopify_menu_data is present in the Shopify import — log its availability status. If absent, set shopify_navigation_available = false and log prominently. Verify that collection_seo and collection_content collections are aligned (same set of collection handles). Flag any mismatches.",
+        "input": "all inputs",
+        "output": "validated inputs + shopify_navigation_available flag or halt error"
+      },
+      {
+        "step": 3,
+        "name": "Extract Navigation Planning Context",
+        "type": "Code node (JavaScript)",
+        "description": "Extract and prepare navigation planning signals. Produce a navigation_context object: (1) HOMEPAGE CATALOG ROLE: Derive from homepage_strategy.homepage_goal and section_sequence — does the homepage explicitly feature collections? Which section types are core vs supporting vs optional? Count of featured-collections or category-navigation sections in the section_sequence. (2) CTA COLLECTION PROMINENCE: homepage_strategy.cta_strategy.primary_cta_focus — if 'explore-collections', flag collections as high-prominence candidates. (3) COLLECTION SET OVERVIEW: Total collection count, product_count distribution across collections — used to prioritize which collections are primary navigation candidates vs secondary/supporting. (4) SHOPIFY NAVIGATION STATUS: shopify_navigation_available true/false — if false, log and set navigation_mode = 'planning-only'. (5) HOMEPAGE FEATURE BUDGET: Estimate realistic number of homepage-featured collections based on section_sequence (typically 1 featured-collections section can feature 3-6 collections; more than that is a design constraint violation).",
+        "input": "validated homepage_strategy + shopify_collections + shopify_navigation_available flag",
+        "output": "navigation_context object"
+      },
+      {
+        "step": 4,
+        "name": "Load and Merge Collection Signals (per collection)",
+        "type": "Code node (JavaScript)",
+        "description": "For each collection, merge signals from all three sources: (1) From collection-seo: slug (used as collection_id), page_role, search_intent, internal_linking_targets, primary_keyword. (2) From collection-content: collection_title, category_promise, selection_guidance count, notes (sparse/empty flags). (3) From shopify_collections: handle, product_count, sort_order, any menu position data if available. Compute collection_state: 'empty' if product_count = 0, 'sparse' if 1-2, 'standard' if 3+. Identify any collections where collection-seo and collection-content handles do not match — flag as MATCH-REQUIRED. Attach navigation_context to all per-collection inputs.",
+        "input": "collection_seo list + collection_content list + shopify_collections + navigation_context",
+        "output": "merged per-collection navigation input objects with collection_state"
+      },
+      {
+        "step": 5,
+        "name": "Apply Conservative Fallback for Empty and Sparse Collections",
+        "type": "Code node (JavaScript)",
+        "description": "Before LLM synthesis, apply deterministic fallback logic for empty and sparse collections. For each collection where collection_state = 'empty': set navigation_role = supporting-navigation, visibility_level = low, featured_on_homepage = false, footer_visibility = none, cross_links = [{target_type: 'homepage', reason: 'EMPTY-COLLECTION: minimal fallback link only'}], notes = 'EMPTY COLLECTION: Navigation plan is a minimal scaffold. Review when products are added.' For each collection where collection_state = 'sparse': set navigation_role = supporting-navigation (default — may be upgraded with strong justification), visibility_level = low, featured_on_homepage = false, notes = 'SPARSE COLLECTION: Conservative navigation defaults applied. Review when product count increases.' Pass empty/sparse collections directly to the persist step — they do not require LLM synthesis.",
+        "input": "merged per-collection navigation input objects",
+        "output": "fallback-processed collections + standard collections list for LLM synthesis"
+      },
+      {
+        "step": 6,
+        "name": "Build LLM Collection Navigation Prompt (per standard collection)",
+        "type": "Code node (JavaScript)",
+        "description": "For each standard collection (product_count >= 3), assemble a structured LLM prompt for navigation planning. The prompt must: (1) Present the collection's merged signals (title, page_role, search_intent, category_promise strength, product_count, selection_guidance presence). (2) Present the navigation_context (homepage catalog role, CTA prominence, homepage feature budget, total collection count). (3) Describe the navigation role options and their selection criteria (from the navigation_role_definitions above). (4) Request: navigation_role classification with justification; visibility_level with justification; parent_relation (has_parent, has_children) with justification; homepage_support (featured_on_homepage, homepage_priority); menu_group if applicable; footer_visibility if applicable; cross_links (minimum 1, consistent with collection-seo internal_linking_targets). (5) Enforce: collection_id = Shopify handle (exact). Do not invent parent/child collection IDs that don't exist in the collection set. Keep featured_on_homepage budget realistic — not all collections should be homepage-featured. Navigation role planning note must appear in output notes. (6) Request output as valid JSON conforming to schemas/collection-navigation.schema.json. (7) Include schema enum values for all enum fields. (8) Instruct that the output is a planning artifact — not a Shopify menu configuration.",
+        "input": "merged per-collection navigation input + navigation_context",
+        "output": "assembled LLM prompt string per standard collection",
+        "prompt_safety_note": "Prompt must explicitly state: 'This is a navigation planning artifact. Do not configure actual Shopify menus. Do not invent parent or child collection IDs that do not exist in the provided collection list. Keep featured_on_homepage selections realistic — a typical homepage features 3-6 collections at most. Collection navigation plans require human review before implementation.'"
+      },
+      {
+        "step": 7,
+        "name": "LLM Synthesis: Collection Navigation Plan (per standard collection)",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API for each standard collection. Request JSON output mode. Temperature: 0.3 (navigation planning benefits from some flexibility to identify groupings and hierarchy, but should remain anchored to available signals). Max tokens: 1500 per collection.",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt per standard collection",
+        "output": "raw LLM response string per collection (expected to be JSON)"
+      },
+      {
+        "step": 8,
+        "name": "Parse and Enforce Hard Constraints (per collection)",
+        "type": "Code node (JavaScript)",
+        "description": "For each collection, parse the raw LLM response as JSON. Enforce constraint integrity: (1) COLLECTION ID: Overwrite collection_id with the Shopify collection handle — do not allow LLM to change the identifier. (2) EMPTY/SPARSE ENFORCEMENT: If collection_state = 'empty' or 'sparse' (should already be handled by step 5, but double-check), apply fallback overrides. (3) HOMEPAGE FEATURE BUDGET: Count total collections where featured_on_homepage = true across all processed collections. If the count exceeds the homepage feature budget (estimated in navigation_context), flag the excess as HOMEPAGE-FEATURE-OVER-BUDGET and set the lowest-priority over-budget collections to featured_on_homepage = false. (4) PARENT-CHILD VALIDATION: If has_parent = true, verify that parent_collection_id references a collection handle that exists in the Shopify collection set. If it does not exist, set parent_collection_id = null, has_parent = false, and add note: 'PARENT-COLLECTION-NOT-FOUND: Proposed parent {parent_collection_id} not found in collection set. Has_parent reset to false.' Same for child_collection_ids. (5) SHOPIFY NAVIGATION CONFLICT: If shopify_navigation_available = true and the proposed navigation_role contradicts the existing Shopify menu position, flag as SHOPIFY-NAVIGATION-CONFLICT-REVIEW. (6) CROSS LINKS MINIMUM: Verify cross_links >= 1. If empty, add minimal homepage cross_link. (7) NAVIGATION PLANNING NOTE: Ensure notes field contains the planning artifact disclaimer.",
+        "input": "raw LLM response per collection + navigation_context + shopify_collections + collection_state",
+        "output": "parsed and constrained collection_navigation object per collection (pre-validation)"
+      },
+      {
+        "step": 9,
+        "name": "Validate Against Schema (per collection)",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate each collection_navigation object against schemas/collection-navigation.schema.json using ajv. Key validations: collection_id matches ^[a-z0-9-]+$, navigation_role in enum, visibility_level in enum, parent_relation object present with has_parent and has_children booleans, homepage_support object present with featured_on_homepage boolean, cross_links minItems = 1 with required sub-fields. footer_visibility in enum if present. Halt per-collection on validation failure — log exact field violation and collection handle.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/collection-navigation.schema.json",
+        "failure_behavior": "Log validation failure for the specific collection. Do not halt the entire workflow for one collection's failure — continue processing remaining collections. Report all failed collections in the review-required manifest.",
+        "input": "constrained collection_navigation object per collection",
+        "output": "validated collection_navigation objects or per-collection validation errors"
+      },
+      {
+        "step": 10,
+        "name": "Persist collection-navigation.json (per collection)",
+        "type": "GitHub node or Write File node",
+        "description": "Write each validated collection-navigation.json to projects/{project_id}/collection-navigation/{collection_handle}.json. Commit with a message such as 'chore: generate collection-navigation for {store_id} — Phase 6 draft (planning)'. Collections that failed validation are logged to a review-required manifest at projects/{project_id}/collection-navigation/_review-required.json. The planning-only nature of these artifacts must be visible in the commit message.",
+        "artifact_path": "projects/{project_id}/collection-navigation/{collection_handle}.json",
+        "review_manifest_path": "projects/{project_id}/collection-navigation/_review-required.json",
+        "git_note": "Each collection-navigation.json must be committed to Git. These are planning artifacts — they do not configure live Shopify navigation. The commit message must reflect the planning status.",
+        "input": "validated collection_navigation object per collection",
+        "output": "confirmation of write per collection + list of persisted artifact paths"
+      },
+      {
+        "step": 11,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the list of persisted collection-navigation artifact paths, the review-required manifest path, the shopify_navigation_available flag, and the homepage_feature_budget status to the master orchestrator. Flag if the shopify menu data was unavailable, as this may affect later navigation implementation steps.",
+        "input": "artifact_paths list + review_required manifest path + shopify_navigation_available flag + homepage_feature_budget status",
+        "output": "workflow output payload with navigation planning metadata"
+      }
+    ],
+
+    "assumptions": [
+      "build-collection-seo must complete before this workflow runs. collection-seo page_role is a primary input for navigation_role classification.",
+      "build-collection-content must complete before this workflow runs. Collection content richness signals inform navigation prominence.",
+      "build-homepage-strategy must have completed before this workflow runs. Homepage strategy constrains which collections can be featured on the homepage.",
+      "Shopify navigation/menu data is commonly unavailable via the Shopify API export. When absent, navigation planning proceeds in 'planning-only' mode based on collection structure signals only. This is a known, documented limitation — not a workflow error.",
+      "Empty collections (product_count = 0) and sparse collections (1-2 products) receive deterministic conservative fallback behavior without LLM synthesis. This is a safety behavior.",
+      "The parent-child collection hierarchy is derived from available signals — Shopify does not natively support parent-child collection relationships in most standard configurations. Any hierarchy decisions here are planning constructs and must be confirmed against the actual store's intended information architecture.",
+      "The homepage feature budget (typically 3-6 collections) is estimated from the homepage_strategy section_sequence. The actual number of featured collections is a design decision that must be confirmed by a human reviewer.",
+      "Navigation planning decisions are strategic recommendations, not final information architecture decisions. Human review is required before implementing any storefront navigation based on these artifacts.",
+      "The exact enum values for cross_links[].target_type and homepage_support.homepage_priority must be confirmed from schemas/collection-navigation.schema.json before implementation.",
+      "One collection-navigation.json artifact is produced per Shopify collection (including empty and sparse collections, which receive conservative scaffold artifacts)."
+    ],
+
+    "open_questions": [
+      {
+        "question": "What are the exact allowed enum values for cross_links[].target_type and homepage_support.homepage_priority in schemas/collection-navigation.schema.json?",
+        "impact": "The LLM prompt engineering and constraint enforcement depend on these exact values. Using values outside the schema enum will cause validation failures.",
+        "recommended_default": "Read schemas/collection-navigation.schema.json directly before implementing. The schema is the authoritative source."
+      },
+      {
+        "question": "Should the Shopify import workflow be updated to explicitly attempt to retrieve Shopify navigation/menu data via the Admin API (menus endpoint), and include a 'navigation_available' flag in the import output?",
+        "impact": "Without Shopify menu data, collection navigation planning is based entirely on inferred signals. If Shopify menus are available, they should be treated as operational truth and aligned with the planning output.",
+        "recommended_default": "Yes — the import-shopify-data workflow should attempt to retrieve menus data from the Shopify Admin API. Document this as an enhancement request for the import workflow. The navigation workflow should gracefully handle both presence and absence."
+      },
+      {
+        "question": "How should parent-child collection hierarchy be handled for stores that use Shopify collections with explicit hierarchical naming conventions (e.g. 'Men > Shoes > Running Shoes')?",
+        "impact": "Hierarchical collection naming is a common Shopify pattern. If this pattern exists in the store, the parent_relation fields should reflect it accurately.",
+        "recommended_default": "Add a collection hierarchy detection step: scan collection titles and handles for naming patterns that imply hierarchy. If detected, use them to populate parent_relation and parent_collection_id. Document the detection logic in the workflow."
+      },
+      {
+        "question": "Should a store-level navigation summary artifact be produced in addition to per-collection navigation artifacts? A summary artifact would show the full proposed navigation tree across all collections in one view.",
+        "impact": "Without a navigation summary, reviewers must read individual per-collection artifacts to understand the full navigation structure. A summary view would make review much more efficient.",
+        "recommended_default": "Yes — at the end of this workflow, produce an additional artifact: projects/{project_id}/collection-navigation/_navigation-summary.json that contains the full navigation tree (primary nav items, secondary nav items, homepage featured items) derived from the per-collection outputs. This is a derived convenience artifact, not a schema-driven output. Add this as a recommended enhancement."
+      }
+    ]
+  }
+}

@@ -1,0 +1,534 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. The quality-score.json output is a planning artifact only — not an objective performance forecast, not a business success prediction, not a validated conversion rate estimate, and not a Shopify store audit score. All quality scores produced here are planning-level readiness signals based on the completeness, coherence, and internal consistency of the planning artifact set. They do not reflect live implementation quality, theme performance, SEO ranking signals, or operator execution quality.",
+    "planning_artifact_note": "IMPORTANT — QUALITY SCORES ARE READINESS SIGNALS, NOT PERFORMANCE FORECASTS: This workflow scores the readiness of the planning artifact set across multiple dimensions. A high quality score means the planning work is complete and coherent. It does not mean the store will perform well commercially, rank well in search engines, or convert visitors at any particular rate. These are fundamentally different things.",
+    "score_calibration_note": "IMPORTANT — SCORES ARE CALIBRATED TO PLANNING COMPLETENESS, NOT BUSINESS QUALITY: Each dimension score reflects how completely and coherently the planning artifacts cover that dimension — not whether the underlying strategy is optimal for the business. A fully complete and internally consistent plan scores well even if the strategy itself could be improved. Strategy quality requires human expert review.",
+    "distinction_note": "IMPORTANT — THREE DISTINCT CONCEPTS MUST NOT BE CONFLATED: (1) Quality score — a weighted readiness score across planning artifact dimensions. (2) Publish readiness — a binary or tiered gate based on blockers and quality thresholds. (3) Operational completeness — whether all operator-supplied facts, legal content, pricing, and production assets have been provided. These are three distinct signals. This workflow produces quality score as primary output and derives publish readiness as a separate field. Operational completeness is reported as a dimension score but is not the same as overall publish readiness.",
+    "placeholder_degradation_note": "IMPORTANT — PLACEHOLDER DENSITY DEGRADES SCORES: Quality scores degrade when artifacts contain high densities of PLACEHOLDER-REQUIRES-REVIEW or REQUIRES-OPERATIONAL-DATA markers. This degradation is intentional — a plan full of placeholders is not a complete plan regardless of structural quality. The degradation rules are defined per dimension and applied deterministically before LLM narrative synthesis.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/quality-score.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "docs/architecture.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-quality-score",
+    "name": "build-quality-score",
+    "category": "governance",
+    "phase": "Phase 10 — Validation, Quality Scoring, Deployment Manifest, and Publish Decision",
+    "purpose": "Produce a single store-level quality scoring artifact (quality-score.json) by evaluating the completeness, coherence, and internal consistency of the full planning artifact set across ten weighted readiness dimensions. The quality-score.json output defines: a weighted overall score (0–100), a launch_readiness classification, individual dimension scores with dimension-level notes, blockers vs warnings surfaced from the validation report, a confidence and evidence boundary statement, and recommended next actions by severity. This workflow consumes the validation-report.json from run-validation as its primary governance input and supplements it with direct signals from key planning artifacts (design-system, seo-strategy, aeo-strategy, media-plan, structured-data-plan, page-content) to score each dimension. Scores are not subjective creative judgements — they are deterministic readiness measurements based on artifact presence, completeness, internal consistency, and placeholder density. The LLM synthesizes narrative and recommended-action language from the deterministic scoring outputs. No LLM output may override a deterministically computed score.",
+
+    "quality_scoring_vs_validation_vs_publish_decision": "This workflow is downstream of run-validation and upstream of build-publish-decision. It is distinct from both: run-validation produces a per-check pass/fail/warning signal. build-quality-score aggregates those signals plus direct artifact signals into a single weighted readiness score and a structured set of dimension-level insights. build-publish-decision uses the quality score, validation report, and deployment manifest to make a final publish/block determination. Quality scoring does not make publish decisions — it produces the scoring evidence that supports the decision.",
+
+    "upstream_dependency_order": "This workflow depends on: run-validation (Phase 10, step 1) — required primary input. Also uses: design-system (Phase 3), seo-strategy (Phase 7), aeo-strategy (Phase 8), structured-data-plan (Phase 8), media-plan (Phase 9), page-content artifacts (Phase 6), product-content artifacts (Phase 4). The validation-report must be available before this workflow runs.",
+
+    "scoring_dimensions": {
+      "description": "Ten weighted dimensions. Weights sum to 100. Each dimension produces a score 0–100. Final overall_score = sum of (dimension_score × weight). Placeholder density and validation blocker penalties are applied to each dimension before final score computation.",
+      "dimensions": {
+        "strategy_completeness": {
+          "weight": 15,
+          "scope": "Phases 2–3: brand-positioning, design-system, market-intelligence, homepage-strategy",
+          "what_is_scored": "Are the foundational strategy artifacts (brand positioning, design system, homepage strategy) present, non-sparse, and internally consistent? Are key strategy fields (brand_role, positioning_statement, section_sequence, hero_strategy) resolved and non-placeholder?",
+          "degradation_sources": [
+            "brand-positioning absence → -40 points on dimension",
+            "design-system absence → -50 points on dimension (critical — all downstream scoring depends on it)",
+            "PLACEHOLDER-REQUIRES-REVIEW in positioning_statement → -15 points",
+            "brand-positioning ↔ design-system brand_role contradiction (from validation-report) → -20 points"
+          ],
+          "note": "Strategy completeness is the foundation. Low strategy completeness propagates uncertainty through all other dimensions."
+        },
+        "content_completeness": {
+          "weight": 20,
+          "scope": "Phases 4–6: product-content, collection-content, page-content, section-instances",
+          "what_is_scored": "Are content artifacts present for all catalog items and key pages? Are product descriptions, collection descriptions, and page bodies substantially authored (not placeholder-only)?",
+          "degradation_sources": [
+            "product-content absence → -30 points",
+            "product description placeholder density > 50% → -25 points",
+            "product description placeholder density 10–50% → -10 points",
+            "legal page absence → -30 points",
+            "legal page with PLACEHOLDER content → -40 points",
+            "REQUIRES-OPERATIONAL-DATA in pricing → -20 points"
+          ],
+          "note": "Content completeness is the highest-weight dimension because content absence is the most common publish blocker. Legal page completeness is a hard dependency."
+        },
+        "seo_aeo_coherence": {
+          "weight": 15,
+          "scope": "Phases 7–8: seo-strategy, product-seo, collection-seo, page-seo, aeo-strategy, faq-page, product-faq",
+          "what_is_scored": "Are SEO strategy and per-page SEO artifacts present and internally consistent? Do keyword strategies align across product, collection, and page SEO? Are AEO strategy answer formats reflected in FAQ artifacts?",
+          "degradation_sources": [
+            "seo-strategy absence → -30 points",
+            "seo-strategy ↔ product-seo canonical contradiction (from validation-report) → -25 points (blocking)",
+            "product-seo or collection-seo keyword alignment failures (from validation-report) → -10 points per failed check",
+            "aeo-strategy ↔ faq-page answer format contradiction → -10 points",
+            "seo-strategy.revision_guidance present with re-run signal → -15 points (not yet acted on)"
+          ],
+          "note": "SEO/AEO coherence is not a performance forecast. It measures whether the planning artifacts are internally consistent with each other."
+        },
+        "structured_data_readiness": {
+          "weight": 10,
+          "scope": "Phases 5, 8: product-structured-data, structured-data-plan, faq-page AEO schema hints",
+          "what_is_scored": "Is a structured data plan present? Do product-structured-data artifacts exist and match the planned schema types? Are required fields present (even if REQUIRES-OPERATIONAL-DATA)?",
+          "degradation_sources": [
+            "structured-data-plan absence → -20 points",
+            "structured-data-plan ↔ product-structured-data schema type mismatch (from validation-report) → -15 points per mismatch",
+            "required fields missing entirely (not even as REQUIRES-OPERATIONAL-DATA) → -20 points",
+            "product-structured-data artifacts absent for products in structured-data-plan.required_products → -15 points"
+          ],
+          "note": "REQUIRES-OPERATIONAL-DATA on required structured data fields does NOT degrade this dimension — the structure is correct, the data is pending. Missing structure does degrade."
+        },
+        "media_readiness": {
+          "weight": 10,
+          "scope": "Phase 9: media-plan, video-plan, motion-media-strategy",
+          "what_is_scored": "Is a media plan present with defined asset slots? Are video slots paired with poster image slots? Is the media plan's asset gap policy conservative? Is the motion-media-strategy present with complete fallback policy?",
+          "degradation_sources": [
+            "media-plan absence → -30 points",
+            "video slots without corresponding poster slots (from validation-report) → -15 points per missing slot",
+            "video-plan.video_usage_level ceiling violation (from validation-report) → -30 points (critical)",
+            "motion-media-strategy fallback_policy incomplete (from validation-report) → -20 points",
+            "media-plan: more than 70% of planned asset slots at unavailable or placeholder status → -15 points"
+          ],
+          "note": "Media readiness reflects the planning quality of the media layer — not whether media assets have been produced. Asset production status is captured in deployment manifest."
+        },
+        "trust_policy_completeness": {
+          "weight": 10,
+          "scope": "Phase 6: page-content for policy pages; Phase 2: brand-positioning trust_style",
+          "what_is_scored": "Are all required legal and policy pages (privacy-policy, terms-of-service, shipping-policy, return-policy) present and non-placeholder? Are trust signals in brand-positioning meaningful (not entirely placeholder)?",
+          "degradation_sources": [
+            "any policy page absent → -25 points per missing page",
+            "any policy page with placeholder content_body → -30 points per placeholder page",
+            "brand-positioning.trust_style entirely placeholder → -10 points"
+          ],
+          "note": "Trust and policy completeness is a hard dependency for any publish mode. Placeholder legal pages are always a critical blocker."
+        },
+        "implementation_readiness": {
+          "weight": 10,
+          "scope": "Phases 3–9 overall: section-plan, design-system, internal-linking, structured-data-plan",
+          "what_is_scored": "Is the planning artifact set sufficiently complete to hand off to implementation teams? Are section instances present and consistent with homepage-strategy? Is internal linking planned? Is the design-system present with all required fields?",
+          "degradation_sources": [
+            "section instances count does not match homepage-strategy.section_sequence count → -15 points",
+            "design-system absent → -30 points",
+            "internal-linking absent → -10 points",
+            "homepage-strategy ↔ section-plan section type alignment failures (from validation-report) → -10 points per failed check"
+          ],
+          "note": "Implementation readiness reflects how much implementation guidance the planning artifacts provide. It does not score whether the implementation has been done."
+        },
+        "conversion_architecture_completeness": {
+          "weight": 5,
+          "scope": "Phases 3–4: homepage-strategy, section-plan, product-content CTA signals",
+          "what_is_scored": "Is a homepage strategy present with a defined conversion architecture (section sequence includes conversion-oriented sections)? Do product content artifacts include CTA-relevant fields?",
+          "degradation_sources": [
+            "homepage-strategy absent → -30 points on dimension",
+            "section_sequence entirely placeholder → -20 points",
+            "no section with conversion-oriented role in section_sequence → -15 points"
+          ],
+          "note": "Conversion architecture completeness scores the planning layer only. Actual conversion performance is not measurable at planning time."
+        },
+        "ux_navigation_completeness": {
+          "weight": 5,
+          "scope": "Phase 6: collection-navigation; Phase 8: internal-linking",
+          "what_is_scored": "Is collection navigation planned? Is internal linking planned? Do these artifacts provide sufficient guidance for a developer to implement navigation structure?",
+          "degradation_sources": [
+            "collection-navigation absent → -40 points on dimension",
+            "internal-linking absent → -30 points on dimension",
+            "both absent → dimension score = 0"
+          ],
+          "note": "UX and navigation planning are lower-weight because they are relatively simpler planning artifacts. Absence is still flagged clearly."
+        },
+        "overall_validation_health": {
+          "weight": 0,
+          "scope": "Derived entirely from validation-report",
+          "what_is_scored": "This is a synthetic dimension that reports the overall validation health as a score component. It is 0-weight in the weighted average but reported as a dimension for completeness.",
+          "derivation": {
+            "100": "validation-report overall_status = passed",
+            "75": "validation-report overall_status = passed-with-warnings",
+            "25": "validation-report overall_status = failed (no blocking failures)",
+            "0": "validation-report overall_status = blocked"
+          },
+          "note": "overall_validation_health is 0-weight because its contents are already reflected in other dimension degradations. It is reported separately for human readability."
+        }
+      }
+    },
+
+    "launch_readiness_derivation": {
+      "description": "launch_readiness is a tiered classification derived from overall_score AND blocking check count from validation-report. It is distinct from the numeric score.",
+      "rules": {
+        "not-ready": "validation-report.publish_blocked = true (any blocking checks failed) → always not-ready regardless of score",
+        "needs-work": "publish_blocked = false AND overall_score < 60",
+        "review-ready": "publish_blocked = false AND overall_score 60–79",
+        "launch-ready": "publish_blocked = false AND overall_score >= 80"
+      },
+      "conservative_override": "If any single dimension score is 0 (regardless of overall_score), launch_readiness is capped at needs-work. A zero dimension indicates a fundamental planning gap that a high overall score may obscure.",
+      "note": "launch-ready does not mean publish-approved. build-publish-decision makes the final publish determination using quality-score, validation-report, and deployment-manifest together."
+    },
+
+    "inputs": {
+      "from_validation_report": {
+        "source": "run-validation → validation-report.json",
+        "artifact_path": "projects/{project_id}/validation-report.json",
+        "data_treatment": "PRIMARY GOVERNANCE INPUT — validation-report is the most important input for quality scoring. Its blocking_count, failed_count, warning_count, and per-check results drive score degradation across all dimensions. Absent validation-report prevents quality scoring from producing reliable results.",
+        "fields_used": [
+          {
+            "field": "overall_status",
+            "treatment": "LAUNCH READINESS GATE — if overall_status = blocked → launch_readiness must be not-ready regardless of dimension scores.",
+            "note": "Blocking validation status overrides quality score for launch readiness classification."
+          },
+          {
+            "field": "summary.publish_blocked",
+            "treatment": "HARD GATE — publish_blocked = true forces launch_readiness = not-ready.",
+            "note": "This is the primary gating signal from the validation report."
+          },
+          {
+            "field": "checks",
+            "treatment": "PER-DIMENSION DEGRADATION SOURCE — failed and warning checks are mapped to their corresponding quality score dimensions and applied as degradation adjustments. Each check has a defined scope field that maps to a quality score dimension.",
+            "note": "Check scope mapping: seo → seo_aeo_coherence, content → content_completeness, media → media_readiness, deployment → implementation_readiness, project-structure → strategy_completeness."
+          }
+        ]
+      },
+
+      "from_design_system": {
+        "source": "build-design-system → design-system.json",
+        "artifact_path": "projects/{project_id}/design-system.json",
+        "data_treatment": "STRATEGY COMPLETENESS SIGNAL — design-system presence, field completeness, and ceiling coherence contribute to strategy_completeness and implementation_readiness dimensions.",
+        "fields_used": [
+          {
+            "field": "motion_strategy",
+            "treatment": "STRATEGY DIMENSION COMPLETENESS — motion_strategy presence and non-placeholder status contribute to strategy_completeness score. Missing motion_strategy within an otherwise present design-system degrades strategy score.",
+            "note": "motion_strategy is one of the most architecturally significant design-system fields for implementation readiness."
+          },
+          {
+            "field": "performance_guardrails",
+            "treatment": "IMPLEMENTATION READINESS DIMENSION — performance_guardrails presence contributes to implementation_readiness. A design-system without performance guardrails provides insufficient implementation guidance.",
+            "note": "Performance guardrails are required by developers for safe theme implementation."
+          }
+        ]
+      },
+
+      "from_seo_strategy": {
+        "source": "build-seo-strategy → seo-strategy.json",
+        "artifact_path": "projects/{project_id}/seo-strategy.json",
+        "data_treatment": "SEO/AEO COHERENCE DIMENSION INPUT — seo-strategy presence and non-sparse state contribute to seo_aeo_coherence dimension. seo-strategy.revision_guidance signals that downstream artifacts may need regeneration.",
+        "fields_used": [
+          {
+            "field": "primary_keyword_clusters",
+            "treatment": "SEO STRATEGY COMPLETENESS — cluster count and non-placeholder status contribute to seo_aeo_coherence score. Fewer than 3 clusters or entirely placeholder clusters degrade the dimension.",
+            "note": "Keyword clusters are the primary evidence of SEO strategy completeness."
+          },
+          {
+            "field": "revision_guidance",
+            "treatment": "RE-RUN RECOMMENDATION DEGRADATION — if revision_guidance contains explicit re-run signals, degrade seo_aeo_coherence by 15 points to reflect that the SEO artifact set may be stale relative to an updated strategy.",
+            "note": "This degradation disappears when revision_guidance is cleared after re-running affected workflows."
+          }
+        ]
+      },
+
+      "from_aeo_strategy": {
+        "source": "build-aeo-strategy → aeo-strategy.json",
+        "artifact_path": "projects/{project_id}/aeo-strategy.json",
+        "data_treatment": "SEO/AEO COHERENCE DIMENSION INPUT — aeo-strategy presence contributes to seo_aeo_coherence dimension.",
+        "availability": "Optional but expected. Missing aeo-strategy reduces seo_aeo_coherence dimension by 10 points."
+      },
+
+      "from_structured_data_plan": {
+        "source": "build-structured-data-plan → structured-data-plan.json",
+        "artifact_path": "projects/{project_id}/structured-data-plan.json",
+        "data_treatment": "STRUCTURED DATA READINESS DIMENSION INPUT — structured-data-plan presence, schema type coverage, and required fields definition contribute to structured_data_readiness dimension.",
+        "availability": "Optional but expected. Missing structured-data-plan reduces structured_data_readiness dimension significantly."
+      },
+
+      "from_media_plan": {
+        "source": "build-media-plan → media-plan.json",
+        "artifact_path": "projects/{project_id}/media-plan.json",
+        "data_treatment": "MEDIA READINESS DIMENSION INPUT — media-plan presence, asset slot coverage, and asset gap policy contribute to media_readiness dimension.",
+        "fields_used": [
+          {
+            "field": "planned_asset_slots",
+            "treatment": "ASSET COVERAGE COMPLETENESS — ratio of available vs. placeholder/unavailable slots. High unavailable ratio degrades media_readiness dimension.",
+            "note": "This reflects planning completeness, not production status."
+          }
+        ]
+      },
+
+      "from_page_content_policy_pages": {
+        "source": "build-page-content → page-content.json for policy pages",
+        "artifact_path": "projects/{project_id}/page-content/",
+        "data_treatment": "TRUST/POLICY COMPLETENESS DIMENSION INPUT — presence and content body completeness of privacy-policy, terms-of-service, shipping-policy, and return-policy artifacts drive the trust_policy_completeness dimension.",
+        "availability": "Required for trust_policy_completeness dimension. Missing or placeholder policy pages produce 0 trust dimension score per missing/placeholder page."
+      },
+
+      "from_product_content": {
+        "source": "build-product-content → product-content.json (per product)",
+        "artifact_path": "projects/{project_id}/product-content/",
+        "data_treatment": "CONTENT COMPLETENESS DIMENSION INPUT — product-content presence, description density, and pricing operational data status drive content_completeness dimension.",
+        "availability": "Per-product artifacts. Aggregate signals used for dimension scoring."
+      }
+    },
+
+    "outputs": {
+      "primary_output": "quality-score.json",
+      "artifact_path": "projects/{project_id}/quality-score.json",
+      "schema": "schemas/quality-score.schema.json",
+      "output_fields": {
+        "score_id": {
+          "source": "Generated at runtime",
+          "type": "string",
+          "format_pattern": "build-quality-score-{project_id}-{timestamp}",
+          "note": "Runtime-generated identifier not present in this planning artifact."
+        },
+        "overall_score": {
+          "source": "Deterministic weighted sum of dimension scores after placeholder and blocker degradation",
+          "type": "integer 0–100",
+          "computation": "sum of (dimension_score × dimension_weight) for all non-zero-weight dimensions. Rounded to nearest integer.",
+          "note": "overall_score is a planning readiness score, not a business quality score or performance prediction."
+        },
+        "launch_readiness": {
+          "source": "Deterministic derivation from overall_score and validation-report.publish_blocked and dimension score floors",
+          "type": "constrained enum",
+          "schema_enum": ["not-ready", "needs-work", "review-ready", "launch-ready"],
+          "derivation": "See launch_readiness_derivation section. Conservative override: any dimension score = 0 caps at needs-work.",
+          "note": "launch-ready does not mean publish-approved. The publish decision is made by build-publish-decision."
+        },
+        "dimension_scores": {
+          "source": "Per-dimension computation combining artifact signals and validation-report check results",
+          "type": "array of dimension score objects conforming to quality-score.schema.json dimension_scores array item schema",
+          "dimension_names": [
+            "strategy_completeness",
+            "content_completeness",
+            "seo_aeo_coherence",
+            "structured_data_readiness",
+            "media_readiness",
+            "trust_policy_completeness",
+            "implementation_readiness",
+            "conversion_architecture_completeness",
+            "ux_navigation_completeness",
+            "overall_validation_health"
+          ],
+          "note": "All dimension names must match schema enum values. overall_validation_health is 0-weight and not included in weighted average but reported as a dimension."
+        },
+        "strengths": {
+          "source": "LLM-synthesized from dimensions with score >= 70",
+          "type": "array of strings",
+          "note": "Strengths are narrative summaries of well-scored dimensions. They are not performance claims."
+        },
+        "weaknesses": {
+          "source": "LLM-synthesized from dimensions with score < 50 or failed validation checks",
+          "type": "array of strings",
+          "note": "Weaknesses are narrative summaries of low-scored dimensions and significant check failures."
+        },
+        "top_risks": {
+          "source": "LLM-synthesized from validation-report blocking checks and dimension scores of 0 or near-0",
+          "type": "array of risk objects with risk_name, severity, notes fields",
+          "note": "top_risks must include all blocking validation checks as critical-severity risks. Low-severity dimension gaps are reported as low or medium risks."
+        },
+        "manual_review_recommended": {
+          "source": "Deterministic: true if overall_score < 80 OR validation-report.summary.manual_review_required = true OR any dimension score = 0",
+          "type": "boolean",
+          "note": "manual_review_recommended = true does not block the scoring workflow — it is a signal for the publish decision workflow."
+        }
+      },
+      "downstream_consumers": [
+        "build-publish-decision — uses quality-score.launch_readiness and overall_score as primary quality gate inputs"
+      ]
+    },
+
+    "nodes": {
+      "node_1_trigger": {
+        "id": "trigger",
+        "type": "n8n-nodes-base.executeWorkflowTrigger",
+        "name": "Receive Inputs",
+        "description": "Receives inputs from the orchestrating workflow.",
+        "input_contract": {
+          "project_id": "string — required",
+          "validation_report": "object — required — validation-report.json from run-validation",
+          "design_system": "object — expected",
+          "seo_strategy": "object — optional",
+          "aeo_strategy": "object — optional",
+          "structured_data_plan": "object — optional",
+          "media_plan": "object — optional",
+          "page_content_artifacts": "array — expected — policy pages required",
+          "product_content_artifacts": "array — expected"
+        }
+      },
+
+      "node_2_validate_inputs": {
+        "id": "validate-upstream-inputs",
+        "type": "n8n-nodes-base.code",
+        "name": "Validate Upstream Inputs",
+        "description": "Validates required upstream inputs. Fails fast if validation_report is absent — quality scoring cannot proceed without it.",
+        "validation_checks": [
+          "project_id must be a non-empty string",
+          "validation_report must be present with overall_status, checks array, and summary fields — absence is a workflow halt condition",
+          "Catalog all additional input artifacts into artifact_availability context: { artifact_name: present | absent }",
+          "Extract validation_report.summary.publish_blocked and validation_report.summary.blocking_count into workflow context for use in scoring",
+          "Extract all failed and warning checks from validation_report.checks into a per-scope grouping for dimension degradation mapping"
+        ],
+        "on_critical_failure": "validation_report absent → output quality_scoring_cannot_proceed = true. Halt workflow.",
+        "on_partial_absence": "Non-required artifacts absent → proceed. Absence applied as dimension-specific degradation in node 3."
+      },
+
+      "node_3_compute_dimension_scores": {
+        "id": "compute-dimension-scores",
+        "type": "n8n-nodes-base.code",
+        "name": "Compute All Dimension Scores",
+        "description": "Deterministically computes all dimension scores using artifact availability, validation-report check results, and placeholder density signals.",
+        "computation_steps": [
+          "Initialize all dimensions at 100 (maximum possible before degradation)",
+          "STRATEGY COMPLETENESS (weight 15): Apply degradation for brand-positioning absence (-40), design-system absence (-50), PLACEHOLDER in positioning_statement (-15), brand_role contradiction check failure (-20)",
+          "CONTENT COMPLETENESS (weight 20): Apply degradation for product-content absence (-30), product description placeholder density > 50% (-25), 10–50% (-10), legal page absence (-30 per missing), legal page placeholder (-40 per placeholder), REQUIRES-OPERATIONAL-DATA on pricing (-20)",
+          "SEO/AEO COHERENCE (weight 15): Apply degradation for seo-strategy absence (-30), canonical contradiction check failure (-25), keyword alignment check failures (-10 each), aeo-strategy absence (-10), answer format contradiction check failures (-10), revision_guidance re-run signal (-15)",
+          "STRUCTURED DATA READINESS (weight 10): Apply degradation for structured-data-plan absence (-20), schema type mismatch check failures (-15 per), required fields entirely missing (-20), product structured data absent for required products (-15)",
+          "MEDIA READINESS (weight 10): Apply degradation for media-plan absence (-30), video poster slot coverage check failures (-15 per), video-plan ceiling violation check failure (-30), fallback policy completeness failure (-20), media asset slot unavailability > 70% (-15)",
+          "TRUST/POLICY COMPLETENESS (weight 10): Apply degradation for each missing policy page (-25), each placeholder policy page (-30), brand-positioning trust_style entirely placeholder (-10)",
+          "IMPLEMENTATION READINESS (weight 10): Apply degradation for section instance count mismatch (-15), design-system absence (-30), internal-linking absence (-10), section type alignment check failures (-10 each)",
+          "CONVERSION ARCHITECTURE COMPLETENESS (weight 5): Apply degradation for homepage-strategy absence (-30), section_sequence entirely placeholder (-20), no conversion-oriented section in sequence (-15)",
+          "UX/NAVIGATION COMPLETENESS (weight 5): Apply degradation for collection-navigation absence (-40), internal-linking absence (-30)",
+          "OVERALL VALIDATION HEALTH (weight 0): Derive from validation-report.overall_status using derivation rules",
+          "Apply floor: no dimension may score below 0",
+          "Apply ceiling: no dimension may score above 100",
+          "Compute overall_score as weighted sum of non-zero-weight dimensions",
+          "Derive launch_readiness using launch_readiness_derivation rules including conservative override",
+          "Derive manual_review_recommended: true if overall_score < 80 OR validation_report.summary.manual_review_required = true OR any dimension score = 0"
+        ],
+        "output": {
+          "dimension_scores_array": "array of { dimension_name, score, degradation_applied array, base_score 100 }",
+          "overall_score": "integer 0-100",
+          "launch_readiness": "not-ready | needs-work | review-ready | launch-ready",
+          "manual_review_recommended": "boolean",
+          "scoring_notes": "array of notable computation observations for inclusion in notes field"
+        }
+      },
+
+      "node_4_build_llm_prompt": {
+        "id": "build-llm-prompt",
+        "type": "n8n-nodes-base.code",
+        "name": "Build LLM Prompt for Quality Score Narrative",
+        "description": "Assembles a structured prompt for the LLM to synthesize strengths, weaknesses, top risks, and per-dimension notes from the deterministic scoring outputs.",
+        "prompt_components": [
+          "System message: quality score narrative synthesizer for schema-driven commerce OS. Role: translate deterministic dimension scores into clear, actionable strengths, weaknesses, risk descriptions, and per-dimension notes. Do not invent scores. Do not change numerical values. Do not claim the store will perform well. Do not forecast conversion rates or SEO rankings. Only synthesize narrative from provided scoring data. Maintain the distinction between quality score (readiness), publish readiness, and operational completeness.",
+          "Project context: project_id, vertical, store_name",
+          "Dimension scores array from node 3 with applied degradations",
+          "overall_score, launch_readiness, manual_review_recommended from node 3",
+          "validation_report summary: blocking_count, failed_count, warning_count",
+          "Top blocking checks from validation-report for risk synthesis",
+          "Instruction: produce (1) strengths array — 2–4 concise statements describing dimensions with score >= 70, (2) weaknesses array — 2–4 concise statements describing dimensions with score < 50 and significant degradations, (3) top_risks array — all blocking validation checks as critical risks, low-score dimensions as medium risks, with actionable notes for each, (4) per-dimension notes — one sentence per dimension explaining what drove the score.",
+          "CRITICAL INSTRUCTIONS: Strengths must not overclaim. A high score means planning is complete — not that implementation will succeed. Weaknesses must be specific about which artifacts or checks caused the degradation. Risks must include recommended next actions. Do not use encouraging language that minimizes critical or blocking risks."
+        ]
+      },
+
+      "node_5_llm_synthesis": {
+        "id": "llm-synthesis",
+        "type": "n8n-nodes-base.openAi",
+        "name": "LLM Synthesis — Quality Score Narrative",
+        "description": "Calls the LLM to synthesize strengths, weaknesses, top risks, and dimension notes.",
+        "model": "gpt-4o",
+        "temperature": 0.2,
+        "response_format": "json_object",
+        "credential_placeholder": "PLACEHOLDER — confirm actual n8n OpenAI credential name at runtime. Do not hardcode.",
+        "evidence_boundary_note": "The LLM synthesizes language only. All numerical scores, launch_readiness classification, and manual_review_recommended were computed deterministically in node 3 and may not be overridden."
+      },
+
+      "node_6_assemble_quality_score": {
+        "id": "assemble-quality-score",
+        "type": "n8n-nodes-base.code",
+        "name": "Assemble Final Quality Score",
+        "description": "Merges deterministic scoring outputs from node 3 with LLM-synthesized narrative from node 5. Constructs the final quality-score.json conforming to quality-score.schema.json.",
+        "assembly_steps": [
+          "Merge dimension_scores_array with LLM-synthesized per-dimension notes",
+          "Map dimension_names to schema enum values — verify all dimension names are valid schema enums",
+          "Set overall_score, launch_readiness, manual_review_recommended from node 3 (deterministic — not overridable)",
+          "Set strengths, weaknesses, top_risks from node 5 LLM output",
+          "Verify: LLM output must not have changed any numerical values. If any numerical discrepancy found → use node 3 values, log discrepancy.",
+          "Add notes field summarizing the scoring basis, confidence level, and evidence boundary for human reader",
+          "Construct complete quality-score.json with all required schema fields"
+        ]
+      },
+
+      "node_7_validate_schema": {
+        "id": "validate-output-schema",
+        "type": "n8n-nodes-base.code",
+        "name": "Validate Output Against Schema",
+        "description": "Validates the assembled quality-score.json against schemas/quality-score.schema.json using AJV.",
+        "schema_reference": "schemas/quality-score.schema.json",
+        "on_validation_failure": "Output schema_validation_failed = true with errors array. Do not persist.",
+        "on_validation_success": "Proceed to persist."
+      },
+
+      "node_8_persist": {
+        "id": "persist",
+        "type": "n8n-nodes-base.github",
+        "name": "Persist to Git",
+        "description": "Writes the validated quality-score.json to the project folder.",
+        "target_path": "projects/{project_id}/quality-score.json",
+        "commit_message_pattern": "feat({project_id}): add quality-score artifact [build-quality-score]",
+        "credential_placeholder": "PLACEHOLDER — confirm actual n8n GitHub credential name at runtime. Do not hardcode.",
+        "draft_safety_note": "In draft mode, write to projects/{project_id}/drafts/quality-score.json."
+      },
+
+      "node_9_output": {
+        "id": "output",
+        "type": "n8n-nodes-base.set",
+        "name": "Output",
+        "description": "Returns the quality score summary and workflow status to the calling orchestrator.",
+        "output_fields": {
+          "workflow_id": "build-quality-score",
+          "project_id": "{project_id}",
+          "status": "completed | failed",
+          "artifact_path": "projects/{project_id}/quality-score.json",
+          "overall_score": "{overall_score from quality-score}",
+          "launch_readiness": "{launch_readiness from quality-score}",
+          "manual_review_recommended": "{manual_review_recommended from quality-score}",
+          "dimension_count": "{count of dimension_scores entries}",
+          "top_risk_count": "{count of top_risks entries}",
+          "downstream_consumers": ["build-publish-decision"],
+          "phase_10_step": 2,
+          "errors": []
+        }
+      }
+    },
+
+    "assumptions": [
+      "validation-report.json from run-validation is the required primary input — quality scoring cannot produce reliable results without it",
+      "Dimension weights (15, 20, 15, 10, 10, 10, 10, 5, 5) are planning heuristics that represent the relative importance of each dimension for overall planning readiness — they are not empirically validated weights",
+      "Degradation values per dimension are planning heuristics — they represent the relative severity of each gap type within its dimension",
+      "A dimension score of 0 in any dimension is treated as a fundamental planning gap that caps launch_readiness at needs-work regardless of overall_score",
+      "launch-ready (launch_readiness classification) is not the same as publish-approved — the publish decision is made by build-publish-decision using quality-score, validation-report, and deployment-manifest together",
+      "The LLM synthesis node is responsible for language quality only — all numerical scores and classification determinations are made deterministically by code nodes and may not be overridden",
+      "Quality scoring measures planning artifact readiness — not business quality, SEO performance, conversion rate, or operational execution quality"
+    ],
+
+    "evidence_boundaries": [
+      "Quality scores are derived from planning artifact signals — not from live Shopify data, theme code, search engine ranking signals, or any production measurement",
+      "Dimension scores are computed using planning heuristics (degradation values, thresholds) that have not been empirically validated against real store launch outcomes",
+      "overall_score is a planning readiness score — it makes no claims about commercial performance, SEO ranking, conversion rate, or any business outcome",
+      "launch_readiness classification is a planning-level readiness signal — it does not constitute a human approval to publish",
+      "Strengths, weaknesses, and top risks are LLM-synthesized narrative descriptions — they are not expert business or technical recommendations",
+      "This workflow has no access to live store data, Shopify APIs, search engine APIs, analytics platforms, or production systems of any kind"
+    ],
+
+    "open_questions": [
+      "Should dimension weights be adjusted after the first real implementation and run against actual projects? The current weights are planning heuristics — empirical calibration against real outcomes is recommended.",
+      "Should trust_policy_completeness and structured_data_readiness be higher weight given their direct legal and technical compliance implications? Current weights favor content and SEO — confirm priorities with the team.",
+      "Are there additional dimensions that should be scored? Accessibility readiness, performance readiness, and security readiness are not currently included — confirm whether these are in scope for this planning phase.",
+      "Should the launch_readiness threshold for launch-ready (80) be adjusted based on project context? Some verticals (legal, medical, finance) may require higher thresholds.",
+      "How should the quality score handle a scenario where some products have complete content and others have none? The current design uses ratio-based degradation — confirm whether per-product floor behavior is needed."
+    ],
+
+    "draft_dev_safety_notes": [
+      "This workflow definition is not yet executable n8n JSON. A developer must translate it before running.",
+      "All credential references are PLACEHOLDER values.",
+      "This workflow depends on run-validation completing successfully and producing a valid validation-report.json.",
+      "In draft/dev mode, write output to projects/{project_id}/drafts/quality-score.json.",
+      "Dimension weight computation must be precise. Floating-point rounding should be handled explicitly — round to nearest integer for overall_score output.",
+      "The conservative override rule (any dimension = 0 → caps launch_readiness at needs-work) must be applied after the weighted sum, not before.",
+      "This workflow produces a planning artifact only — not an objective quality certification, business recommendation, or performance guarantee."
+    ]
+  }
+}

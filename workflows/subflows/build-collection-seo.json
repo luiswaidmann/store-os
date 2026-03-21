@@ -1,0 +1,540 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. Collection SEO outputs are planning artifacts — not validated keyword strategies, not live meta tag configurations, and not finalized search optimization decisions. All keyword decisions in this workflow are provisional. They are informed by available collection data and upstream strategic context, but are made without access to seo-strategy.json or aeo-strategy.json (workflow steps 11 and 12 in the chain). Those workflows have not yet been implemented and are out of Phase 6 scope. Human review is required before any collection-seo artifact influences live store metadata.",
+    "provisional_seo_note": "IMPORTANT — PROVISIONAL SEO DECISIONS: This workflow operates without the store-level seo-strategy.json and aeo-strategy.json artifacts. Those artifacts (steps 11 and 12 in the workflow chain) are not yet built and are out of Phase 6 scope. As a result: (1) Primary and secondary keyword selections are provisional estimates based on collection content and market intelligence — not validated keyword research. (2) Answer targets are planning seeds — not finalized AEO strategy decisions. (3) Internal linking targets are structural recommendations — not validated internal linking plans. All these fields are marked as PROVISIONAL-PENDING-SEO-STRATEGY in the output artifact notes. When seo-strategy.json and aeo-strategy.json become available in a later phase, a build-collection-seo-revision workflow should be run to update these artifacts against the finalized store-level strategy.",
+    "collection_seo_boundary_note": "IMPORTANT — COLLECTION SEO IS DIFFERENT FROM PRODUCT SEO: Collection SEO targets category-level search intent (commercial browsing, category discovery, comparison research) rather than product-level transactional intent. A collection page's primary keyword should reflect the category concept — not a specific product title. The page_role field determines whether this collection is a category entry point, a category guide, a comparison page, or a hybrid. These distinctions must be preserved throughout keyword and title synthesis.",
+    "keyword_safety_note": "This workflow must not present keyword selections as validated or research-backed. Keyword decisions here are educated planning estimates derived from collection titles, collection content, Shopify category structure, audience search intents from market intelligence, and brand context. They are planning hypotheses. They must be reviewed by a human with access to actual keyword research data before implementation. The workflow must not claim search volume certainty, ranking certainty, or competitive difficulty estimates it cannot support.",
+    "seo_strategy_gap_note": "Phase 6 does not include build-seo-strategy or build-aeo-strategy. Those are step 11 and step 12 in the full chain. Collection SEO decisions made here will need a revision pass once those strategy artifacts exist. The provisional status of all keyword and AEO decisions must be visible in each artifact's notes field and in Git commit messages.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/collection-seo.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-collection-seo",
+    "name": "build-collection-seo",
+    "category": "planning",
+    "phase": "Phase 6 — Collection SEO and Navigation Planning",
+    "purpose": "Synthesize schema-validated collection SEO planning artifacts for each Shopify collection. Collection content (from build-collection-content) provides the editorial framing layer. Shopify collection data (title, handle, product membership, sort order) provides the operational truth layer. Market intelligence provides search intent signals as provisional keyword proxies. Brand positioning provides tone and framing guardrails. The output per collection is a collection-seo.json that defines: primary_keyword, secondary_keywords, search_intent, seo_title, meta_description, slug, page_role, internal_linking_targets, and answer_targets. Because seo-strategy.json and aeo-strategy.json are not yet available (steps 11 and 12 in the workflow chain are out of Phase 6 scope), all keyword and AEO decisions are explicitly provisional. Collection SEO targets category-level intent — commercial browsing, category discovery, comparison research — not product-level transactional intent. The page_role field classifies each collection's search role: category-entry-page, category-guide-page, comparison-entry-page, or hybrid-category-page. Sparse and empty collections trigger conservative fallback behavior.",
+
+    "collection_seo_vs_product_seo_note": "Collection SEO serves a different search purpose than product SEO. Product SEO answers: 'Is this the right product for me? How do I buy it?' Collection SEO answers: 'Is this the right category? What products exist here? How do I compare my options in this category?' As a result: primary keywords should reflect category concepts, not individual product names; search intent is typically commercial or hybrid rather than transactional; meta descriptions should guide discovery and selection, not drive immediate purchase; seo_title should reflect the collection role (e.g. 'Best [Category] for [Use Case]' rather than '[Product Name] – Buy Now').",
+
+    "inputs": {
+      "from_collection_content": {
+        "source": "build-collection-content → collection-content.json (per collection)",
+        "artifact_path": "projects/{project_id}/collection-content/{collection_handle}.json",
+        "data_treatment": "PRIMARY PLANNING LAYER INPUT — collection content is the main editorial context for SEO synthesis. It is LLM-synthesized planning content — not operational truth.",
+        "fields_used": [
+          {
+            "field": "collection_title",
+            "treatment": "HARD ANCHOR — the collection_title (which reflects the Shopify title) is the primary entity signal. The primary_keyword and seo_title must be consistent with the collection_title. Do not rename the collection for SEO purposes.",
+            "note": "collection_title is operational truth (from Shopify via collection-content). SEO planning builds around it — does not rename or reframe it without a clear documented reason."
+          },
+          {
+            "field": "collection_subtitle",
+            "treatment": "SYNTHESIS SIGNAL — the collection subtitle describes the editorial positioning of the collection. Useful for shaping the seo_title modifier and meta_description framing.",
+            "note": "Synthesized content — treat as planning direction, not operational truth."
+          },
+          {
+            "field": "category_promise",
+            "treatment": "SEARCH INTENT SIGNAL — the category promise reflects the core value claim for this collection. Helps classify search_intent (what stage of the buyer journey does this collection serve?) and orient answer_targets.",
+            "note": "Synthesized content — use as directional signal for intent classification."
+          },
+          {
+            "field": "intro_text",
+            "treatment": "KEYWORD SIGNAL — noun phrases and topic signals within the intro text may suggest secondary keyword candidates at the category level.",
+            "note": "Synthesized content — do not lift text verbatim as keywords. Extract category-level concepts only."
+          },
+          {
+            "field": "selection_guidance",
+            "treatment": "ANSWER TARGET SIGNAL — selection guidance items describe the decision considerations buyers have at this category level. These are strong candidates for answer_targets with question types such as 'how-to-choose' or 'what-to-look-for'.",
+            "note": "Synthesized content — use guidance_title noun phrases as AEO topic seeds."
+          },
+          {
+            "field": "faq_items",
+            "treatment": "ANSWER TARGET SIGNAL — collection-level FAQ items from the content plan are planning seeds for answer_targets. question_type and answer_goal in answer_targets should be informed by the FAQ topics.",
+            "note": "Synthesized content — use as AEO directional signals, not final answer text."
+          },
+          {
+            "field": "trust_elements",
+            "treatment": "CONTENT DEPTH SIGNAL — the presence and richness of trust elements hints at the potential content_depth (light, balanced, deep) for this collection page.",
+            "note": "Used as supporting signal — does not directly map to SEO fields."
+          },
+          {
+            "field": "cta_direction.primary_cta",
+            "treatment": "INTENT CROSS-VALIDATION — CTA direction helps cross-validate search_intent classification. explore-products or compare-options CTA → commercial or comparison intent. shop-now CTA → transactional or hybrid.",
+            "note": "Cross-check only — does not override the primary intent classification logic."
+          },
+          {
+            "field": "notes",
+            "treatment": "SPARSE DATA FLAG — if the collection-content notes field contains EMPTY-COLLECTION or SPARSE-COLLECTION flags, this workflow must activate conservative SEO fallback behavior for that collection.",
+            "note": "Conservative fallback: do not generate confident keyword or answer target claims for empty or sparse collections."
+          }
+        ]
+      },
+
+      "from_shopify_import": {
+        "source": "import-shopify-data → raw collection dataset",
+        "artifact_path": "projects/{project_id}/shopify-import/collections.json",
+        "data_treatment": "OPERATIONAL TRUTH SUPPLEMENT — Shopify collection data provides the factual layer for slug assignment, product count verification, and collection structure signals",
+        "fields_used_per_collection": [
+          {
+            "field": "handle",
+            "treatment": "OPERATIONAL TRUTH — the Shopify collection handle is the canonical URL slug. slug in the collection-seo artifact should default to the Shopify handle. It may be refined but must not conflict with the existing Shopify handle unless an explicit URL migration is planned.",
+            "note": "Do not change the Shopify handle without flagging it as a SLUG-MIGRATION-REVIEW event. Default: slug = Shopify handle."
+          },
+          {
+            "field": "title",
+            "treatment": "OPERATIONAL TRUTH — Shopify collection title is the canonical category name. Consistent with collection_title from collection-content.",
+            "note": "Used as the primary entity anchor for seo_title construction."
+          },
+          {
+            "field": "products (array / product_count)",
+            "treatment": "OPERATIONAL TRUTH — product count and product type distribution inform page_role classification and content_depth decisions. An empty or very sparse collection should produce conservative SEO output.",
+            "note": "product_count = 0 → EMPTY-COLLECTION fallback. product_count = 1-2 → SPARSE-COLLECTION fallback. product_count >= 3 → standard SEO synthesis."
+          },
+          {
+            "field": "products[].product_type",
+            "treatment": "OPERATIONAL TRUTH — product type distribution informs page_role classification. Homogeneous product types → category-entry-page. Mixed types with comparison potential → comparison-entry-page or hybrid.",
+            "note": "Product type diversity is a key signal for page_role derivation."
+          },
+          {
+            "field": "sort_order",
+            "treatment": "CONTEXT — Shopify sort order (manual, best-selling, price-ascending, etc.) hints at how this collection is merchandised. best-selling or price sort → transactional or commercial intent. manual → curated editorial intent.",
+            "note": "Supporting signal for search_intent and page_role classification."
+          },
+          {
+            "field": "metafields",
+            "treatment": "OPTIONAL ENRICHMENT — if collection metafields contain SEO hints, keyword notes, or category descriptions, treat as operational truth enrichment.",
+            "note": "Metafields may be absent. Do not depend on them."
+          }
+        ],
+        "sparse_collection_seo_behavior": {
+          "empty_collection": "product_count = 0 → EMPTY-COLLECTION. SEO fallback: slug = Shopify handle (direct), primary_keyword = PLACEHOLDER-REQUIRES-REVIEW, secondary_keywords = [], search_intent = 'commercial' (default safe choice), seo_title = PLACEHOLDER-REQUIRES-REVIEW, meta_description = PLACEHOLDER-REQUIRES-REVIEW. Notes must state: 'EMPTY COLLECTION: No products found. SEO plan is a minimal scaffold only. Enrich when products are added.'",
+          "sparse_collection": "product_count = 1 or 2 → SPARSE-COLLECTION. Limited keyword confidence: mark primary_keyword and seo_title as SPARSE-COLLECTION-REQUIRES-ENRICHMENT. Limit answer_targets to 2 generic items. Limit secondary_keywords to 2 generic candidates.",
+          "standard_collection": "product_count >= 3 → standard SEO synthesis applies"
+        }
+      },
+
+      "from_market_intelligence": {
+        "source": "build-market-intelligence → market-intelligence.json",
+        "artifact_path": "projects/{project_id}/market-intelligence.json",
+        "data_treatment": "PROVISIONAL KEYWORD PROXY — market intelligence provides search intent signals as the best available substitute for validated keyword research in the absence of seo-strategy.json",
+        "fields_used": [
+          {
+            "field": "search_intents",
+            "treatment": "PROVISIONAL KEYWORD PROXY — search intent types and example queries from market intelligence are the primary substitute for keyword research. Commercial and comparison intents are most relevant for collection-level SEO. Example queries within those intents hint at real search vocabulary at the category level.",
+            "note": "IMPORTANT: example_queries in search_intents are planning proxies — not validated keyword data. Use as directional vocabulary signals, not as confirmed keyword targets."
+          },
+          {
+            "field": "audience_segments",
+            "treatment": "SEARCH INTENT CONTEXT — audience segment descriptions and purchase_drivers help classify which search_intent type best characterizes each collection.",
+            "note": "Used to orient search_intent classification and answer_target audience framing."
+          },
+          {
+            "field": "content_opportunities",
+            "treatment": "ANSWER TARGET SIGNAL — content opportunities from market intelligence suggest what category-level questions buyers are researching. These orient answer_targets for collection pages.",
+            "note": "Used as AEO seed signals — not final AEO strategy decisions."
+          },
+          {
+            "field": "purchase_motivators",
+            "treatment": "META DESCRIPTION FRAMING SIGNAL — what drives purchase decisions informs the meta_description value framing for each collection.",
+            "note": "Directional signal for meta_description copy orientation."
+          },
+          {
+            "field": "seo_considerations",
+            "treatment": "PROVISIONAL SEO CONTEXT — any SEO considerations noted in market intelligence provide additional provisional context for keyword selection and page_role classification.",
+            "note": "Optional enrichment — may be absent. Use when present."
+          }
+        ]
+      },
+
+      "from_brand_positioning": {
+        "source": "build-brand-positioning → brand-positioning.json",
+        "artifact_path": "projects/{project_id}/brand-positioning.json",
+        "data_treatment": "GUARDRAIL LAYER — brand positioning constrains SEO copy tone and differentiator framing",
+        "fields_used": [
+          {
+            "field": "tone_of_voice.style",
+            "treatment": "COPY TONE GUARDRAIL — seo_title and meta_description must conform to the brand tone. A premium-confident brand must not produce commodity-feeling meta descriptions. A clear-direct brand must not produce overly promotional SEO copy.",
+            "note": "Hard guardrail on copy tone — applied during constraint enforcement."
+          },
+          {
+            "field": "value_proposition",
+            "treatment": "META DESCRIPTION DIFFERENTIATION ANCHOR — the value proposition provides the differentiation framing angle for meta_description copy.",
+            "note": "Directional framing for meta_description — not lifted verbatim."
+          },
+          {
+            "field": "differentiators",
+            "treatment": "SEO TITLE MODIFIER SIGNAL — brand differentiators may inform seo_title modifiers where character space allows.",
+            "note": "Directional signal — must fit within 70-character constraint."
+          },
+          {
+            "field": "seo_tone_hint",
+            "treatment": "OPTIONAL SEO COPY DIRECTION — if a seo_tone_hint is present in brand positioning, apply it as a directional tone constraint on SEO copy generation.",
+            "note": "Optional field — may be absent."
+          },
+          {
+            "field": "forbidden_impressions",
+            "treatment": "HARD EXCLUSION — any impressions listed in forbidden_impressions must never appear in seo_title or meta_description copy.",
+            "note": "Hard constraint — applied during constraint enforcement node."
+          }
+        ]
+      },
+
+      "from_seo_strategy": {
+        "source": "build-seo-strategy → seo-strategy.json",
+        "artifact_path": "projects/{project_id}/seo-strategy.json",
+        "data_treatment": "OPTIONAL — NOT AVAILABLE IN PHASE 6. When present, provides keyword taxonomy, content depth strategy, and collection-level SEO direction. When absent, workflow operates in full provisional mode.",
+        "availability": "NOT AVAILABLE IN PHASE 6 — seo-strategy.json (step 11 in the workflow chain) has not yet been implemented. This input is listed for completeness and for use when a future phase implements build-seo-strategy.",
+        "fallback_behavior": "When absent (Phase 6 default): set provisional_mode.seo = true. Use market_intelligence.search_intents as keyword proxies. Mark all keyword fields as PROVISIONAL-PENDING-SEO-STRATEGY."
+      },
+
+      "from_aeo_strategy": {
+        "source": "build-aeo-strategy → aeo-strategy.json",
+        "artifact_path": "projects/{project_id}/aeo-strategy.json",
+        "data_treatment": "OPTIONAL — NOT AVAILABLE IN PHASE 6. When present, provides question taxonomy and answer format strategy. When absent, workflow operates in provisional AEO mode.",
+        "availability": "NOT AVAILABLE IN PHASE 6 — aeo-strategy.json (step 12 in the workflow chain) has not yet been implemented.",
+        "fallback_behavior": "When absent (Phase 6 default): set provisional_mode.aeo = true. Use collection FAQ topics and content_opportunities as answer target seeds. Mark all answer_targets as PROVISIONAL-PENDING-AEO-STRATEGY."
+      }
+    },
+
+    "outputs": {
+      "primary_output": "collection-seo.json per collection",
+      "artifact_path": "projects/{project_id}/collection-seo/{collection_handle}.json",
+      "review_manifest_path": "projects/{project_id}/collection-seo/_review-required.json",
+      "schema": "schemas/collection-seo.schema.json",
+      "output_fields": {
+        "primary_keyword": {
+          "source": "PROVISIONAL LLM synthesis from collection_title + product type distribution + market_intelligence.search_intents example queries",
+          "type": "provisional LLM-synthesized string",
+          "constraint": "Must reflect the category concept — not an individual product name. Must be plausible for how a buyer would search for this type of collection. Must be consistent with the collection_title.",
+          "provisional_flag": "PROVISIONAL-PENDING-SEO-STRATEGY",
+          "note": "Collection primary keyword typically takes the form: '[Category Type] [Key Attribute]' or 'Best [Category] for [Use Case]' or simply '[Category Name]'. Without keyword research, this is a planning estimate."
+        },
+        "secondary_keywords": {
+          "source": "PROVISIONAL LLM synthesis from collection_subtitle, category_promise, selection_guidance titles, faq_items topics, search_intents example queries",
+          "type": "provisional LLM-synthesized array (minItems: 1)",
+          "constraint": "Must reflect category-level search vocabulary — not individual product names. Must not include branded competitor names without justification. 3-5 secondary keywords is a reasonable planning target for collections.",
+          "provisional_flag": "PROVISIONAL-PENDING-SEO-STRATEGY",
+          "note": "Secondary keywords should represent related category searches, subcategory terms, or key attribute modifiers relevant to this collection."
+        },
+        "search_intent": {
+          "source": "PROVISIONAL derivation from product type distribution + cta_direction + category_promise + market_intelligence.search_intents",
+          "type": "provisional constrained enum",
+          "constraint_logic": "Single product type + shop-now CTA → transactional or hybrid; mixed product types + compare-options CTA → comparison or commercial; broad category with multiple audience segments → commercial or hybrid; editorial collection with rich content → informational or commercial",
+          "schema_enum": ["informational", "commercial", "transactional", "comparison", "hybrid"],
+          "provisional_flag": "PROVISIONAL-PENDING-SEO-STRATEGY",
+          "note": "Collection search intent is most commonly 'commercial' (browsing with purchase intent) or 'hybrid'. Pure transactional is less common at the collection level than at the product level."
+        },
+        "seo_title": {
+          "source": "LLM synthesis — a search-optimized title string conforming to schema maxLength: 70 characters. Must include primary_keyword naturally. Should include a key category differentiator or benefit modifier where space allows.",
+          "type": "LLM-synthesized string — constrained by maxLength: 70",
+          "constraint": "Must include primary_keyword. Must not exceed 70 characters. Must reflect the actual collection category. Must conform to brand tone.",
+          "format_guidance": "Recommended patterns: '[Category] — [Key Differentiator]' OR '[Best/Top Category] for [Use Case]' OR '[Brand] [Category Collection]'. Avoid keyword stuffing. Do not repeat the store name in every collection title unless brand context strongly warrants it.",
+          "note": "seo_title is a planning proposal — requires human review and keyword validation before implementation."
+        },
+        "meta_description": {
+          "source": "LLM synthesis — a compelling meta description conforming to schema maxLength: 180 characters. Should include primary_keyword, a key category benefit from category_promise, and an implicit CTA consistent with page_role.",
+          "type": "LLM-synthesized string — constrained by maxLength: 180",
+          "constraint": "Must not exceed 180 characters. Must be factually honest — no unsupported category claims. Must reflect brand tone. Should be distinct per collection — not a template fill.",
+          "note": "meta_description is a planning proposal — not final production copy. Requires human review."
+        },
+        "slug": {
+          "source": "DEFAULT: direct from Shopify collection handle. If Shopify handle is missing or invalid, generate from collection_title (lowercase, hyphenated, stripped of special characters).",
+          "type": "operational truth default — only derived if Shopify handle is missing",
+          "constraint": "Must conform to pattern ^[a-z0-9-]+$. Must not conflict with existing Shopify handle without a URL migration flag.",
+          "slug_change_safety_note": "If the generated slug differs from the Shopify handle, add a note: 'SLUG-MIGRATION-REVIEW: Proposed slug differs from current Shopify handle. URL migration planning required before implementation.'"
+        },
+        "page_role": {
+          "source": "PROVISIONAL derivation from product type distribution + Shopify product diversity + collection_content intent signals + market search intents",
+          "type": "provisional constrained enum",
+          "schema_enum": ["category-entry-page", "category-guide-page", "comparison-entry-page", "hybrid-category-page"],
+          "derivation_logic": {
+            "category-entry-page": "Single dominant product type + straightforward shop-now intent + minimal comparison content in collection-content. The most common default for focused collections.",
+            "category-guide-page": "Rich selection_guidance + educational intro_text + informational search intent signals + content_depth = deep candidates. Collections where buyers need guidance before purchasing.",
+            "comparison-entry-page": "Multiple product types within collection + compare-options CTA direction + comparison intent in market search signals. Collections that serve comparison research.",
+            "hybrid-category-page": "Combination of entry and guide or guide and comparison signals. Use when page_role signals are mixed and no single role is dominant."
+          },
+          "provisional_flag": "PROVISIONAL-PENDING-SEO-STRATEGY",
+          "note": "page_role classification is a planning decision. It should be validated against actual SEO strategy when seo-strategy.json becomes available."
+        },
+        "internal_linking_targets": {
+          "source": "PROVISIONAL LLM synthesis from collection category relationships + homepage_strategy section types + Shopify collection structure",
+          "type": "provisional LLM-synthesized array (minItems: 1)",
+          "constraint": "Each target must have target_type (from schema enum — confirm from schemas/collection-seo.schema.json) and target_reason (non-empty string). Must not invent specific page URLs. target_type and reason are structural planning decisions.",
+          "provisional_flag": "PROVISIONAL-PENDING-SEO-STRATEGY: Internal linking targets will be refined when the full internal linking strategy is available (workflow step 23).",
+          "schema_enum_note": "Confirm target_type allowed values from schemas/collection-seo.schema.json before implementation. Expected types include: homepage, related-collection, product-page, guide-page, faq-page — but exact enum must be verified from the schema.",
+          "per_target_guidance": {
+            "homepage": "Always recommend with reason: 'brand authority and collection trust flow from homepage'",
+            "related-collection": "Recommend for collections that are siblings in the category hierarchy",
+            "product-page": "Recommend for flagship or hero products within the collection",
+            "guide-page": "Recommend if the collection has educational selection_guidance content suggesting a supporting guide would benefit buyers",
+            "faq-page": "Recommend for complex collections where category-level FAQ content is planned"
+          }
+        },
+        "answer_targets": {
+          "source": "PROVISIONAL LLM synthesis from collection faq_items, selection_guidance topics, category_promise framing, and market_intelligence.content_opportunities",
+          "type": "provisional LLM-synthesized array (minItems: 1)",
+          "constraint": "Each target must have question_type (from schema enum — confirm from schemas/collection-seo.schema.json) and answer_goal (non-empty string). answer_goal describes what the answer should accomplish — not the verbatim answer text.",
+          "provisional_flag": "PROVISIONAL-PENDING-AEO-STRATEGY: Answer targets will be refined and expanded when aeo-strategy.json is available (workflow step 12).",
+          "schema_enum_note": "Confirm question_type allowed values from schemas/collection-seo.schema.json before implementation. Collection-level answer types likely include: 'how-to-choose', 'what-is-in-this-category', 'what-to-look-for', 'best-for-use-case', 'comparison', 'shipping', 'returns' — but exact enum must be verified from the schema.",
+          "guidance": {
+            "how-to-choose": "For collections with selection_guidance items — always recommend when selection_guidance is non-empty",
+            "what-is-in-this-category": "For collections where product type diversity makes category scope non-obvious",
+            "what-to-look-for": "For collections in markets where buyers have specific feature requirements",
+            "best-for-use-case": "For collections that serve multiple distinct audience segments",
+            "comparison": "For comparison-entry-page collections",
+            "shipping": "Universal safe answer target for all collections",
+            "returns": "Universal safe answer target — especially relevant for high-consideration product categories"
+          }
+        },
+        "structured_data_targets": {
+          "source": "Derived conservatively from page_role and collection content richness",
+          "type": "derived array — conservative defaults",
+          "schema_enum": ["breadcrumb", "faq", "item-list"],
+          "default_logic": "'breadcrumb' is always included (standard navigation schema). 'faq' is included if faq_items in collection-content is non-empty and non-placeholder. 'item-list' is included if collection has 3+ products (product listing schema opportunity).",
+          "note": "structured_data_targets is optional in the schema. The detailed structured data plan is out of Phase 6 scope (build-structured-data-plan is workflow step 24)."
+        },
+        "canonical_strategy": {
+          "source": "Derived from Shopify collection filter/facet structure",
+          "type": "derived enum",
+          "schema_enum": ["self-canonical", "filter-aware", "platform-default"],
+          "constraint_logic": "Collections without faceted filtering → self-canonical; Collections with Shopify filter functionality enabled → filter-aware (prevent duplicate URLs from facet parameter combinations); Default Shopify setup → platform-default",
+          "note": "Default to platform-default unless Shopify facet/filter structure clearly indicates filter-aware is needed."
+        },
+        "content_depth": {
+          "source": "Derived from collection content richness + search intent classification + product type complexity",
+          "type": "derived enum",
+          "schema_enum": ["light", "balanced", "deep"],
+          "constraint_logic": "sparse/empty collection → light; standard collection + commercial intent → balanced; guide-page role + rich selection_guidance + informational or comparison intent → deep"
+        },
+        "notes": {
+          "source": "Workflow-generated synthesis metadata per collection",
+          "type": "machine-generated string",
+          "note": "Must include: synthesis timestamp, Shopify collection handle, PROVISIONAL-PENDING-SEO-STRATEGY flag for all keyword fields, PROVISIONAL-PENDING-AEO-STRATEGY flag for all answer target fields, list of inputs used (collection-content path, Shopify collection fields used), sparse/empty collection status if applicable, evidence boundary label, instruction to re-run or revise when seo-strategy.json and aeo-strategy.json are available."
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-collection-content",
+        "provides": ["collection-content.json per collection"],
+        "required": true,
+        "note": "build-collection-content (workflow step 17) must complete before this workflow runs. One collection-seo artifact is produced for each collection-content artifact. The collection_handle from collection-content is the primary key for artifact matching."
+      },
+      {
+        "workflow": "import-shopify-data",
+        "provides": ["Shopify collection data including handle, title, product membership, product count"],
+        "required": true,
+        "note": "Shopify collection data provides operational truth for slug, product count thresholds, and product type distribution."
+      },
+      {
+        "workflow": "build-market-intelligence",
+        "provides": ["market-intelligence.json"],
+        "required": true,
+        "note": "market-intelligence.json provides search_intents as provisional keyword proxies and content_opportunities as AEO seeds."
+      },
+      {
+        "workflow": "build-brand-positioning",
+        "provides": ["brand-positioning.json"],
+        "required": true,
+        "note": "brand-positioning.json provides tone guardrails for SEO copy and forbidden_impressions as hard copy exclusions."
+      },
+      {
+        "workflow": "build-seo-strategy",
+        "provides": ["seo-strategy.json"],
+        "required": false,
+        "note": "OPTIONAL — NOT AVAILABLE IN PHASE 6. When present in a later phase, its keyword taxonomy and content depth strategy should be used to revise provisional keyword decisions. When absent, workflow runs in PROVISIONAL mode."
+      },
+      {
+        "workflow": "build-aeo-strategy",
+        "provides": ["aeo-strategy.json"],
+        "required": false,
+        "note": "OPTIONAL — NOT AVAILABLE IN PHASE 6. When present in a later phase, its question taxonomy and answer format strategy should be used to revise provisional answer target decisions. When absent, workflow runs in PROVISIONAL mode."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-collection-navigation",
+        "receives": ["collection-seo.json"],
+        "note": "Workflow step 19. Consumes collection_id (derived from slug/handle), page_role, search_intent, and internal_linking_targets for navigation planning and cross-link decisions."
+      },
+      {
+        "workflow": "run-validation",
+        "receives": ["collection-seo.json"],
+        "note": "Out of Phase 6 scope (workflow step 28). Validates collection-seo artifacts against schema and store-level strategy alignment."
+      }
+    ],
+
+    "schema_alignment": {
+      "collection-seo.schema.json": {
+        "required_fields_covered": [
+          "primary_keyword",
+          "secondary_keywords",
+          "search_intent",
+          "seo_title",
+          "meta_description",
+          "slug",
+          "page_role",
+          "internal_linking_targets",
+          "answer_targets"
+        ],
+        "optional_fields_covered": [
+          "structured_data_targets",
+          "canonical_strategy",
+          "content_depth",
+          "notes"
+        ],
+        "schema_enum_confirmation_required": [
+          "internal_linking_targets[].target_type — confirm enum from schemas/collection-seo.schema.json before implementation",
+          "answer_targets[].question_type — confirm enum from schemas/collection-seo.schema.json before implementation"
+        ],
+        "seo_title_note": "Schema maxLength: 70 — the LLM must respect this hard character limit. Validation must check character count, not just presence.",
+        "meta_description_note": "Schema maxLength: 180 — the LLM must respect this hard character limit. Validation must check character count.",
+        "slug_note": "Schema pattern: ^[a-z0-9-]+$. Slug must match this pattern. Default from Shopify handle.",
+        "page_role_note": "page_role is a required field unique to collection-seo (not present in product-seo). All four enum values must be confirmed from the schema and applied per the derivation logic documented above.",
+        "validation_note": "Each collection-seo object must be validated against schemas/collection-seo.schema.json using ajv. seo_title maxLength, meta_description maxLength, slug pattern, all required sub-object fields, and enum membership must all be checked."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: collection_content_paths (list of collection-content artifact paths or objects), shopify_collections (array), market_intelligence, brand_positioning. Optional: seo_strategy, aeo_strategy. All required inputs must be present before this workflow begins.",
+        "input": "collection_content_paths + shopify_collections + market_intelligence + brand_positioning + optional seo_strategy + optional aeo_strategy",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present. collection_content list must be non-empty. shopify_collections must be non-empty array. market_intelligence must have search_intents (non-empty array). brand_positioning must have tone_of_voice. Check whether seo_strategy and aeo_strategy are present — log their availability status. If seo_strategy is absent, set provisional_mode.seo = true. If aeo_strategy is absent, set provisional_mode.aeo = true. Log provisional mode status prominently — it will be propagated to all output artifact notes.",
+        "input": "all inputs",
+        "output": "validated inputs + provisional_mode flags or halt error"
+      },
+      {
+        "step": 3,
+        "name": "Extract Collection SEO Planning Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Extract and prepare planning signals for collection SEO synthesis. Produce a collection_seo_signals object: (1) SEARCH INTENT PROXIES: commercial and comparison search_intents from market_intelligence — extract intent_type and example_queries as keyword planning proxies. (2) CONTENT OPPORTUNITY SEEDS: content_opportunities from market_intelligence — extract as AEO answer target orientation for collection-level questions. (3) SEO COPY TONE: seo_tone_hint from brand_positioning (optional) + tone_of_voice.style — use as meta copy tone guardrail. (4) BRAND DIFFERENTIATORS: differentiators from brand_positioning — available as optional seo_title modifier signals. (5) FORBIDDEN IMPRESSIONS: forbidden_impressions from brand_positioning — must be applied as hard exclusion during constraint enforcement. (6) PROVISIONAL MODE FLAGS: seo = true/false, aeo = true/false — inject into all prompts and output notes. If seo_strategy is present: extract keyword_taxonomy. If aeo_strategy is present: extract question_taxonomy.",
+        "input": "validated market_intelligence + brand_positioning + optional seo_strategy + optional aeo_strategy + provisional_mode flags",
+        "output": "collection_seo_signals object with provisional mode flags"
+      },
+      {
+        "step": 4,
+        "name": "Load Collection Content and Shopify Data (per collection)",
+        "type": "Code node (JavaScript)",
+        "description": "For each collection in the collection_content list, load the corresponding Shopify collection data from shopify_collections by matching collection_handle. Produce a merged per-collection input object: collection_content fields (all fields from the collection-content artifact) + shopify_fields (handle, title, product_count, product_types distribution, sort_order). Compute collection_state: 'empty' if product_count = 0, 'sparse' if product_count = 1 or 2, 'standard' if product_count >= 3. Attach collection_state to the merged input. If Shopify data cannot be matched for a collection-content artifact, flag that collection as SHOPIFY-MATCH-REQUIRED and continue processing others.",
+        "input": "collection_content list + shopify_collections array",
+        "output": "merged per-collection input objects array with collection_state flags"
+      },
+      {
+        "step": 5,
+        "name": "Build LLM Collection SEO Prompt (per collection)",
+        "type": "Code node (JavaScript)",
+        "description": "For each collection, assemble a structured LLM prompt for collection SEO planning. The prompt must: (1) Present collection-content fields (collection_title, collection_subtitle, category_promise, intro_text, selection_guidance, faq_items, cta_direction) as the editorial context layer. (2) Present Shopify collection facts (title, handle, product_count, product_types distribution, sort_order) as operational truth. (3) Present collection_seo_signals as the planning orientation layer. (4) Present collection_state clearly — if 'empty' or 'sparse', enforce conservative fallback instructions. (5) Include PROVISIONAL MODE notice if provisional_mode.seo = true: 'SEO STRATEGY IS NOT AVAILABLE. All keyword decisions are provisional estimates. Mark primary_keyword and secondary_keywords as PROVISIONAL-PENDING-SEO-STRATEGY in the notes field.' (6) Include PROVISIONAL AEO notice if provisional_mode.aeo = true: 'AEO STRATEGY IS NOT AVAILABLE. All answer_targets are provisional seeds. Mark them as PROVISIONAL-PENDING-AEO-STRATEGY in the notes field.' (7) Request output as valid JSON conforming to schemas/collection-seo.schema.json. (8) Include schema enum values for all enum fields. (9) Enforce maxLength 70 for seo_title and maxLength 180 for meta_description with character count instructions. (10) Instruct slug = Shopify handle by default. (11) Instruct that answer_goals must describe the communication goal — not write the answer itself. (12) Instruct that page_role must be derived using the documented logic (category-entry-page / category-guide-page / comparison-entry-page / hybrid-category-page). (13) Prohibit: fabricated keyword volume claims, competitor name targeting without basis, invented ranking predictions, overly confident SEO claims.",
+        "input": "merged per-collection input + collection_seo_signals + provisional_mode flags",
+        "output": "assembled LLM prompt string per collection",
+        "prompt_safety_note": "Prompt must explicitly state: 'All keyword fields are planning estimates — do not claim search volume or ranking certainty. Provisional flags must appear in the notes field. slug must default to the Shopify handle. seo_title must not exceed 70 characters. meta_description must not exceed 180 characters. page_role must reflect the collection's actual search purpose, not a generic default.'"
+      },
+      {
+        "step": 6,
+        "name": "LLM Synthesis: Collection SEO Plan (per collection)",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API for each collection. Request JSON output mode. Temperature: 0.2 (SEO planning should be more deterministic than editorial content synthesis). Max tokens: 2000 per collection.",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt per collection",
+        "output": "raw LLM response string per collection (expected to be JSON)"
+      },
+      {
+        "step": 7,
+        "name": "Parse and Enforce Hard Constraints (per collection)",
+        "type": "Code node (JavaScript)",
+        "description": "For each collection, parse the raw LLM response as JSON. Enforce constraint integrity: (1) SLUG: Overwrite slug with the Shopify collection handle if the LLM changed it. If Shopify handle is absent, validate the generated slug against ^[a-z0-9-]+$ and clean if needed. Flag any slug that differs from Shopify handle as SLUG-MIGRATION-REVIEW. (2) SEO TITLE LENGTH: If seo_title exceeds 70 characters, truncate at word boundary and log the adjustment. (3) META DESCRIPTION LENGTH: If meta_description exceeds 180 characters, truncate at sentence boundary and log the adjustment. (4) COLLECTION STATE ENFORCEMENT: If collection_state = 'empty', overwrite primary_keyword and seo_title to PLACEHOLDER-REQUIRES-REVIEW; clear secondary_keywords to []; enforce EMPTY-COLLECTION note. If collection_state = 'sparse', add SPARSE-COLLECTION-REQUIRES-ENRICHMENT note to any confident keyword claims. (5) FORBIDDEN IMPRESSIONS: Scan seo_title and meta_description for any forbidden_impressions strings. If found, replace with REQUIRES-REVIEW-COPY-VIOLATION and log. (6) PROVISIONAL FLAGS: Inject PROVISIONAL-PENDING-SEO-STRATEGY into notes for all keyword fields if provisional_mode.seo = true. Inject PROVISIONAL-PENDING-AEO-STRATEGY into notes for all answer_targets if provisional_mode.aeo = true. (7) MINIMUM COUNTS: Verify secondary_keywords >= 1 (unless empty/sparse collection fallback), internal_linking_targets >= 1, answer_targets >= 1. Add minimal placeholder entries if minimum is unmet. (8) STRUCTURED DATA DEFAULTS: Apply conservative defaults if LLM omitted obvious targets — always include 'breadcrumb'; include 'faq' if faq_items were non-empty in collection-content; include 'item-list' if product_count >= 3.",
+        "input": "raw LLM response per collection + collection_seo_signals + Shopify collection data + collection_state + provisional_mode flags",
+        "output": "parsed and constrained collection_seo object per collection (pre-validation)"
+      },
+      {
+        "step": 8,
+        "name": "Validate Against Schema (per collection)",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate each collection_seo object against schemas/collection-seo.schema.json using ajv. Key validations: primary_keyword non-empty (or PLACEHOLDER value for empty collections), secondary_keywords is array, search_intent in enum, seo_title maxLength = 70, meta_description maxLength = 180, slug matches ^[a-z0-9-]+$ pattern, page_role in enum, internal_linking_targets minItems = 1 with required sub-fields, answer_targets minItems = 1 with required sub-fields. Validate structured_data_targets items against enum if present. Halt per-collection on validation failure — log exact field violation and collection handle.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/collection-seo.schema.json",
+        "failure_behavior": "Log validation failure for the specific collection. Do not halt the entire workflow for one collection's failure — continue processing remaining collections. At the end, report all collections that failed validation as requiring manual review.",
+        "input": "constrained collection_seo object per collection",
+        "output": "validated collection_seo objects or per-collection validation errors"
+      },
+      {
+        "step": 9,
+        "name": "Persist collection-seo.json (per collection)",
+        "type": "GitHub node or Write File node",
+        "description": "Write each validated collection-seo.json to projects/{project_id}/collection-seo/{collection_handle}.json. Commit with a message such as 'chore: generate collection-seo for {store_id} — Phase 6 draft (provisional)'. Collections that failed validation are logged to a review-required manifest at projects/{project_id}/collection-seo/_review-required.json. The provisional nature of keyword decisions must be visible in the commit message.",
+        "artifact_path": "projects/{project_id}/collection-seo/{collection_handle}.json",
+        "review_manifest_path": "projects/{project_id}/collection-seo/_review-required.json",
+        "git_note": "Each collection-seo.json must be committed to Git. The provisional status of keyword decisions is documented in each artifact's notes field and in the commit message.",
+        "input": "validated collection_seo object per collection",
+        "output": "confirmation of write per collection + list of persisted artifact paths"
+      },
+      {
+        "step": 10,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the list of persisted collection-seo artifact paths, the review-required manifest path, and the provisional_mode flags to the master orchestrator. The orchestrator must be informed that collection-seo artifacts in Phase 6 are provisional — they should be flagged for re-run when seo-strategy.json and aeo-strategy.json become available. Also pass the collection handles and page_role values to build-collection-navigation (step 19) which consumes this output.",
+        "input": "artifact_paths list + review_required manifest path + provisional_mode flags + collection_handles with page_role summary",
+        "output": "workflow output payload with provisional status metadata"
+      }
+    ],
+
+    "assumptions": [
+      "collection-content.json is the primary planning-layer input. This workflow cannot run before build-collection-content completes successfully. One collection-seo artifact is produced for each collection-content artifact.",
+      "Shopify collection handle is the canonical URL slug by default. This workflow does not propose slug changes without flagging them as SLUG-MIGRATION-REVIEW.",
+      "seo-strategy.json and aeo-strategy.json are NOT available in Phase 6. All keyword and AEO decisions operate in provisional mode. This is a known, documented limitation — not a workflow error.",
+      "When seo-strategy.json and aeo-strategy.json become available in a later phase, a revision pass on all collection-seo artifacts should be triggered.",
+      "Market intelligence search_intents are the best available planning substitute for keyword research in Phase 6. They provide intent-level direction but not keyword volume or competitive difficulty data.",
+      "All keyword fields are planning estimates. No search volume, click-through rate, or ranking certainty is claimed or implied by this workflow.",
+      "Collection SEO targets category-level search intent, not product-level transactional intent. The primary keyword reflects the category concept, not individual product names.",
+      "Empty collections (product_count = 0) receive minimal placeholder SEO scaffolding. Sparse collections (1-2 products) receive conservative SEO output. These are safety behaviors, not workflow errors.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "The exact enum values for internal_linking_targets[].target_type and answer_targets[].question_type must be confirmed from schemas/collection-seo.schema.json before implementation. The values documented here are working assumptions pending schema review."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should a build-collection-seo-revision workflow be planned (analogous to the open question in build-product-seo) for updating provisional collection-seo artifacts when seo-strategy.json and aeo-strategy.json are available?",
+        "impact": "Without a revision workflow, provisional collection-seo artifacts may be used without being updated when SEO strategy becomes available.",
+        "recommended_default": "Yes — a build-collection-seo-revision subflow should be planned for the phase that implements build-seo-strategy and build-aeo-strategy. Document this in the workflow map as a planned future workflow."
+      },
+      {
+        "question": "What are the exact allowed enum values for internal_linking_targets[].target_type and answer_targets[].question_type in schemas/collection-seo.schema.json?",
+        "impact": "The constraint enforcement node and LLM prompt engineering depend on these exact values. Using values outside the schema enum will cause validation failures.",
+        "recommended_default": "Read schemas/collection-seo.schema.json directly before implementing the LLM prompt and constraint enforcement nodes. The schema is the authoritative source — not the assumptions in this draft."
+      },
+      {
+        "question": "How should page_role interact with the homepage-strategy.section_sequence when build-collection-navigation runs downstream? Specifically, if the homepage has a featured-collections section, does page_role influence which collections appear there?",
+        "impact": "Without clear guidance, build-collection-navigation may independently determine homepage visibility without full alignment with homepage strategy intent.",
+        "recommended_default": "The page_role should be passed to build-collection-navigation as an input. Collections with page_role = category-entry-page or comparison-entry-page are stronger candidates for homepage feature. The navigation workflow makes the final visibility decision."
+      },
+      {
+        "question": "Should Shopify filter/facet configuration be explicitly checked when determining canonical_strategy = filter-aware vs platform-default?",
+        "impact": "If faceted filtering exists but canonical_strategy defaults to platform-default, duplicate content issues may arise from filter parameter URLs.",
+        "recommended_default": "Yes — the Shopify import should capture whether a collection has filters/facets enabled. If that data is unavailable, default to platform-default and flag for review."
+      }
+    ]
+  }
+}

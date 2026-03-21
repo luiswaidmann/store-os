@@ -1,0 +1,567 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. The internal linking strategy output is a planning artifact — not implemented storefront template rules, not a confirmed linking audit, and not a finalized site architecture document. All linking priorities and rules produced here are planning-level hypotheses derived from available SEO and AEO strategy context, page role analysis, and provisional SEO artifacts. Human review is required before any internal linking strategy is used to make production storefront decisions.",
+    "planning_artifact_note": "IMPORTANT — OUTPUT IS A PLAN, NOT IMPLEMENTATION: Internal linking strategy produced by this workflow defines the intended linking logic for the store. It does not emit Shopify theme code, navigation template rules, or link injection directives. The output is a planning artifact consumed by content authors, developers, and theme configurators as a guidance document — not a directly executable instruction set.",
+    "provisional_inputs_note": "IMPORTANT — PROVISIONAL INPUT ARTIFACTS: The page-seo, product-seo, and collection-seo artifacts consumed by this workflow are provisional planning outputs from earlier phases. They were generated without a finalized seo-strategy and without validated keyword data. This workflow treats them as the best available planning proxies — not as authoritative finalized SEO decisions. Where provisional artifacts are sparse, empty, or flagged as PLACEHOLDER-REQUIRES-REVIEW, this workflow must handle them conservatively rather than projecting confident linking recommendations.",
+    "missing_pages_note": "IMPORTANT — MISSING OR SPARSE PAGES: Some link targets planned in this strategy may correspond to pages that have not yet been created, have sparse product or collection data, or have been flagged as provisional in earlier phases. The strategy must explicitly mark provisional or uncertain link targets as DEFERRED rather than claiming confident linking rules for pages that may not yet exist or be ready for production.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/internal-linking.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+
+  "workflow": {
+    "id": "build-internal-linking",
+    "name": "build-internal-linking",
+    "category": "planning",
+    "phase": "Phase 8 — AEO Strategy, Internal Linking, and Structured Data Planning",
+    "purpose": "Synthesize a schema-validated store-level internal linking strategy artifact from the available SEO strategy, AEO strategy, homepage strategy, page-SEO artifacts, collection-SEO artifacts, product-SEO artifacts, and FAQ page artifact. The internal-linking.json output defines: linking goal (seo-support, conversion-support, discovery-support, or hybrid), link rules (source-to-target page type rules with reasons and priorities), navigation priority weights (top, footer, in-page), contextual linking policy (allowed, intensity, knowledge-to-commerce), cross-page support flags (product-to-collection, collection-to-product, product-to-guide, guide-to-product, faq-to-product, faq-to-collection), and anchor text strategy. This strategy is the store-level linking planning framework that enables: (1) consistent linking direction for content authors, (2) navigation hierarchy alignment with SEO and AEO strategy, (3) contextual link policy for knowledge-to-commerce flows, and (4) cross-page linking priority guidance. All outputs are planning-level hypotheses — not implemented template code, not validated linking audits, not confirmed navigation structures.",
+
+    "navigational_vs_contextual_linking": "Internal linking encompasses two distinct mechanisms: (1) NAVIGATIONAL LINKS — links embedded in navigation menus (top navigation, footer) that define the store's primary page hierarchy. These are typically implemented in theme navigation settings and are permanent structural features of the store. (2) CONTEXTUAL LINKS — links embedded within page body content (product description links to related products, guide page links to relevant collections, FAQ answers linking to products). These require content authoring decisions and theme-level body content linking support. This workflow distinguishes between these two mechanisms in the link_rules and navigation_priority outputs. Navigational links inform the navigation_priority weights. Contextual links inform contextual_linking policy and link_rules.",
+
+    "page_role_to_linking_logic": "Page roles defined in SEO artifacts determine linking priority. Pages with page_role = primary-entry-point in collection-seo → receive high-priority inbound navigational links. Pages with page_role = transactional or category-entry-page → receive high-priority outbound contextual links from related guide and FAQ content. Pages with page_role = knowledge or informational → have high outbound contextual linking potential to product and collection pages. This workflow makes page role signals from provisional SEO artifacts explicit rather than treating all pages as equally important linking nodes.",
+
+    "inputs": {
+      "from_seo_strategy": {
+        "source": "build-seo-strategy → seo-strategy.json",
+        "artifact_path": "projects/{project_id}/seo-strategy.json",
+        "data_treatment": "FOUNDATIONAL LINKING POSTURE LAYER — seo-strategy.json defines the linking posture (link_depth, cross_linking_intensity, knowledge_to_commerce_links) that this workflow must implement as concrete link rules.",
+        "fields_used": [
+          {
+            "field": "internal_linking_strategy.link_depth",
+            "treatment": "LINK COMPLEXITY CONSTRAINT — simple → minimal cross-linking. balanced → standard collection-to-product + key page-to-collection links. rich → comprehensive cross-linking including guide-to-product, FAQ-to-product, collection-to-subcollection. This field sets the outer boundary of how complex the link_rules can be.",
+            "note": "link_depth is the most direct seo-strategy input for link rule complexity. The number of link_rules in the output should reflect this: simple → 3-5 rules. balanced → 5-10 rules. rich → 10+ rules."
+          },
+          {
+            "field": "internal_linking_strategy.cross_linking_intensity",
+            "treatment": "CONTEXTUAL LINKING INTENSITY — low → contextual_linking.intensity = light. medium → contextual_linking.intensity = balanced. high → contextual_linking.intensity = strong.",
+            "note": "Direct mapping: seo-strategy cross_linking_intensity informs aeo-strategy contextual linking intensity."
+          },
+          {
+            "field": "internal_linking_strategy.knowledge_to_commerce_links",
+            "treatment": "KNOWLEDGE-TO-COMMERCE FLAG — if true: contextual_linking.knowledge_to_commerce_links = true AND guide-to-product and faq-to-product and faq-to-collection cross_page_support flags = true. If false: these flags default to false unless AEO strategy provides a specific justification.",
+            "note": "Hard flag — knowledge_to_commerce_links from seo-strategy is a direct constraint on contextual linking policy."
+          },
+          {
+            "field": "primary_seo_goal",
+            "treatment": "LINKING GOAL DERIVATION SIGNAL — transactional-growth → linking_goal = conversion-support. category-discovery → linking_goal = discovery-support. knowledge-plus-commerce → linking_goal = seo-support or hybrid. brand-plus-category-growth → linking_goal = discovery-support or hybrid.",
+            "note": "primary_seo_goal is the primary input for linking_goal derivation. The linking strategy should serve the SEO goal."
+          },
+          {
+            "field": "page_priority",
+            "treatment": "LINK TARGET PRIORITY — pages higher in seo-strategy.page_priority receive higher inbound link priority (more sources linking to them). Lowest-priority page types in the array are deprioritized for inbound linking investment.",
+            "note": "page_priority from seo-strategy is the primary determinant of which page types should receive the most inbound linking attention."
+          },
+          {
+            "field": "knowledge_seo_role",
+            "treatment": "KNOWLEDGE CONTENT LINKING SIGNAL — none → guide-to-product and faq-to-product link rules are omitted or deferred. supporting → minimal knowledge-to-commerce link rules. balanced → standard knowledge-to-commerce link rules. major → rich knowledge-to-commerce link rules with strong contextual linking intensity.",
+            "note": "knowledge_seo_role calibrates how much of the link_rules set is devoted to knowledge-to-commerce flows."
+          }
+        ]
+      },
+
+      "from_aeo_strategy": {
+        "source": "build-aeo-strategy → aeo-strategy.json",
+        "artifact_path": "projects/{project_id}/aeo-strategy.json",
+        "data_treatment": "AEO LINKING DIRECTION LAYER — aeo-strategy.json provides AEO-specific signals that refine the contextual linking policy and FAQ-related link rules beyond what seo-strategy.json covers.",
+        "fields_used": [
+          {
+            "field": "faq_strategy.faq_distribution",
+            "treatment": "FAQ LINK DIRECTION — product-heavy → faq-to-product links are priority. collection-heavy → faq-to-collection links are priority. knowledge-heavy → standalone FAQ pages link to both products and collections. balanced → faq-to-product and faq-to-collection are both included.",
+            "note": "faq_distribution directly informs whether faq_to_product or faq_to_collection is the higher priority cross-page link direction."
+          },
+          {
+            "field": "primary_aeo_goal",
+            "treatment": "AEO LINKING GOAL CALIBRATION — comparison-readiness → comparison page-to-product links are a meaningful link rule. trust-and-reassurance → guide-to-product and faq-to-product links serve reassurance flows. category-understanding → collection-to-collection and guide-to-collection links reinforce category education.",
+            "note": "AEO goal provides a secondary linking direction signal that complements the SEO-driven linking_goal."
+          },
+          {
+            "field": "entity_clarity_strategy",
+            "treatment": "ENTITY LINKING PRIORITY — where entity clarity is critical (brand, product, or category), the corresponding page types should have higher inbound link priority to support entity signal strength. E.g. critical category_entity_clarity → collection pages should receive more inbound links from guide and FAQ content.",
+            "note": "Entity clarity direction from AEO strategy can justify elevating certain link priorities beyond what seo-strategy alone would suggest."
+          }
+        ]
+      },
+
+      "from_homepage_strategy": {
+        "source": "build-homepage-strategy → homepage-strategy.json",
+        "artifact_path": "projects/{project_id}/homepage-strategy.json",
+        "data_treatment": "NAVIGATIONAL HIERARCHY LAYER — homepage-strategy.json defines the primary navigational structure and page hierarchy as planned for the homepage. This is the primary source for top_navigation_weight derivation and for understanding which collections, products, or pages are featured as primary navigation destinations.",
+        "fields_used": [
+          {
+            "field": "primary_navigation_destinations",
+            "treatment": "TOP NAVIGATION WEIGHT — pages and collections featured as primary homepage navigation destinations are high-weight top-navigation link targets. This informs navigation_priority.top_navigation_weight and which page types receive high inbound navigational priority.",
+            "note": "Homepage navigation destinations are the primary navigational linking signal. They define the store's published hierarchy — internal linking strategy should reinforce this hierarchy, not contradict it."
+          },
+          {
+            "field": "featured_collections",
+            "treatment": "COLLECTION LINKING PRIORITY SIGNAL — collections featured on the homepage receive implied high navigational link priority. These should appear in link_rules as high-priority inbound link targets from the homepage.",
+            "note": "If homepage_strategy is absent or its featured_collections are empty, navigational link priorities must be inferred from seo-strategy page_priority and collection-seo page_role distribution."
+          },
+          {
+            "field": "content_sections",
+            "treatment": "IN-PAGE NAVIGATION SIGNAL — homepage sections that link to other pages (featured products, guide links, FAQ links) inform in_page_navigation_weight and contextual linking pattern.",
+            "note": "in_page_navigation_weight from homepage-strategy reflects how heavily the homepage uses in-page content links vs top menu navigation."
+          }
+        ],
+        "availability_note": "AVAILABLE FROM PHASE 3. If homepage-strategy.json is absent, navigational priority must be derived from seo-strategy page_priority alone. Log the absence and set top_navigation_weight = medium as conservative default."
+      },
+
+      "from_page_seo_artifacts": {
+        "source": "build-page-seo → page-seo.json (per page, provisional)",
+        "artifact_path": "projects/{project_id}/page-seo/{page_handle}.json",
+        "data_treatment": "PAGE ROLE AND LINK TARGET ANALYSIS — page-seo artifacts define the SEO role of each store page (informational, transactional, trust, policy, guide). Pages with guide or informational roles have high contextual link SOURCE value. Pages with high traffic or priority page roles have high inbound link TARGET value.",
+        "availability": "AVAILABLE FROM PHASE 7. Page-seo artifacts were generated provisionally in Phase 7.",
+        "pattern_analysis": {
+          "guide_page_rate": "What percentage of page-seo artifacts have page_role = guide or informational? High guide page rate → guide-to-product and guide-to-collection link rules are more important.",
+          "sparse_page_rate": "What percentage of pages are flagged as PLACEHOLDER-REQUIRES-REVIEW or SPARSE-DATA? High rate → be conservative about link rules targeting these pages. Mark deferred."
+        },
+        "note": "Page-seo artifacts are provisional. Pages flagged as sparse or placeholder should be marked as DEFERRED link targets rather than included as confident link rules."
+      },
+
+      "from_collection_seo_artifacts": {
+        "source": "build-collection-seo → collection-seo.json (per collection, provisional)",
+        "artifact_path": "projects/{project_id}/collection-seo/{collection_handle}.json",
+        "data_treatment": "COLLECTION ROLE AND LINK PRIORITY ANALYSIS — collection-seo artifacts define each collection's page_role (category-entry-page, category-guide-page, comparison-entry-page, hybrid-category-page). page_role = category-entry-page → high inbound link priority. Sparse or empty collections → conservative linking, flag as DEFERRED.",
+        "availability": "AVAILABLE FROM PHASE 6.",
+        "pattern_analysis": {
+          "primary_entry_collection_count": "Count of collections with page_role = category-entry-page. These are the highest-priority link targets for collection-to-homepage and product-to-collection link rules.",
+          "guide_collection_count": "Count of collections with page_role = category-guide-page. These are important targets for guide-to-collection link rules.",
+          "empty_sparse_collection_rate": "Percentage of collections with EMPTY-COLLECTION or SPARSE-COLLECTION flags. Link rules targeting these should be marked DEFERRED."
+        },
+        "note": "Empty or sparse collections must not be included as confident link targets. The strategy must mark them as DEFERRED rather than including them in high-priority link rules."
+      },
+
+      "from_product_seo_artifacts": {
+        "source": "build-product-seo → product-seo.json (per product, provisional)",
+        "artifact_path": "projects/{project_id}/product-seo/{product_handle}.json",
+        "data_treatment": "PRODUCT ROLE AND LINK VALUE ANALYSIS — product-seo artifacts define each product's search intent (transactional, commercial, informational) and content depth. Products with transactional search intent → high-value inbound link targets from collection and guide pages. Products with sparse or PLACEHOLDER flags → conservative linking.",
+        "availability": "AVAILABLE FROM PHASE 5.",
+        "pattern_analysis": {
+          "transactional_product_rate": "Percentage of products with search_intent = transactional. High rate → product pages are high-value inbound link targets, justifying rich collection-to-product and guide-to-product link rules.",
+          "sparse_product_rate": "Percentage of products with PLACEHOLDER-REQUIRES-REVIEW or SPARSE-DATA flags. High rate → be conservative about product-specific link rules."
+        },
+        "note": "Product-seo artifacts are provisional. This workflow uses them for aggregate pattern analysis — not to create product-specific link rules. Specific link targets are expressed as page-type rules, not individual product handles."
+      },
+
+      "from_faq_page": {
+        "source": "build-faq-page → faq-page.json",
+        "artifact_path": "projects/{project_id}/faq-page.json",
+        "data_treatment": "FAQ LINKING SOURCE ANALYSIS — faq-page.json defines the FAQ page content and any link targets referenced in answers. FAQ answers that reference specific products or collections → those page types should be included in faq-to-product and faq-to-collection link rules.",
+        "fields_used": [
+          {
+            "field": "questions",
+            "treatment": "FAQ-TO-PRODUCT LINK SIGNAL — FAQ answers that reference product types, features, or use cases imply faq-to-product contextual link opportunities. If the question set is primarily product-focused, faq_to_product = true in cross_page_support.",
+            "note": "FAQ-to-product linking supports both AEO (contextual answer navigation) and SEO (distributing link equity from knowledge content to commerce pages)."
+          },
+          {
+            "field": "link_targets",
+            "treatment": "EXPLICIT FAQ LINK TARGETS — if faq-page includes explicit link_targets (product or collection handles referenced in answers), these inform the faq-to-product and faq-to-collection link rule priorities.",
+            "note": "Optional field — may be absent. If absent, infer FAQ link target types from question content and aeo-strategy.faq_strategy.faq_distribution."
+          }
+        ]
+      }
+    },
+
+    "outputs": {
+      "primary_output": "internal-linking.json",
+      "artifact_path": "projects/{project_id}/internal-linking.json",
+      "schema": "schemas/internal-linking.schema.json",
+      "output_fields": {
+        "strategy_name": {
+          "source": "LLM synthesis — a human-readable name for this store's internal linking strategy",
+          "type": "LLM-synthesized string",
+          "format_guidance": "Recommended pattern: '[Store Vertical] Internal Linking Strategy — [Linking Goal]'. Example: 'Sustainable Apparel Internal Linking Strategy — Discovery and Conversion Support'. Should reflect the actual store type and linking goal — not a generic template name.",
+          "note": "strategy_name is a planning label for human orientation."
+        },
+        "linking_goal": {
+          "source": "Derived from seo-strategy.primary_seo_goal + homepage-strategy.navigation_pattern + aeo-strategy.primary_aeo_goal",
+          "type": "constrained enum",
+          "schema_enum": ["seo-support", "conversion-support", "discovery-support", "hybrid"],
+          "derivation_logic": {
+            "seo-support": "The primary purpose of internal linking is to support search engine crawlability, distribute link equity to high-priority pages, and reinforce topical authority. Appropriate when knowledge_seo_role is major or when the store has a large catalog with complex hierarchy.",
+            "conversion-support": "The primary purpose of internal linking is to move buyers from discovery or FAQ content toward product and checkout pages. Appropriate when primary_seo_goal = transactional-growth and the buyer journey from discovery to conversion is the key linking challenge.",
+            "discovery-support": "The primary purpose of internal linking is to help buyers discover the breadth of the store's catalog and range. Appropriate when primary_seo_goal = category-discovery and the store has a broad catalogue that buyers may not fully explore.",
+            "hybrid": "Internal linking serves multiple meaningful goals. Use when seo-support and conversion-support or discovery-support are both significant and cannot be reduced to one primary goal."
+          }
+        },
+        "link_rules": {
+          "source": "Derived from seo-strategy link_depth + page roles from provisional SEO artifacts + aeo-strategy faq_distribution + homepage-strategy navigation destinations",
+          "type": "array (minItems: 1) of link rule objects",
+          "schema_fields_per_rule": {
+            "source_page_type": "enum: homepage | product-page | collection-page | guide-page | faq-page | blog-article | page",
+            "target_page_type": "enum: homepage | product-page | collection-page | guide-page | faq-page | blog-article | page",
+            "link_reason": "string describing WHY this source→target link is strategically important",
+            "priority": "optional enum: low | medium | high"
+          },
+          "standard_link_rules_by_link_depth": {
+            "simple": [
+              "homepage → collection-page (high): primary navigation — homepage should link to the most important collection pages to establish store hierarchy",
+              "collection-page → product-page (high): commerce flow — collection pages must link to the products they contain",
+              "product-page → collection-page (medium): return navigation — products should link back to their parent collections for discovery support"
+            ],
+            "balanced_adds": [
+              "homepage → product-page (medium): featured product links — homepage may feature key products directly for conversion support",
+              "faq-page → collection-page (medium): knowledge-to-category — FAQ answers should link to relevant collection pages where applicable",
+              "faq-page → product-page (medium): knowledge-to-product — FAQ answers should link to specific product pages where questions reference product attributes",
+              "page → collection-page (low): policy/about page support — trust pages may link to relevant collections or product categories"
+            ],
+            "rich_adds": [
+              "guide-page → product-page (high): guide-to-commerce — guide pages are a primary knowledge-to-commerce link source",
+              "guide-page → collection-page (high): guide-to-category — guide pages should link to the most relevant collection pages for each topic",
+              "collection-page → collection-page (medium): cross-category — related collections should link to each other for discovery support",
+              "product-page → guide-page (low): product-to-knowledge — products may link to relevant guides or how-to content where it adds buyer value",
+              "blog-article → product-page (medium): editorial-to-product — blog content should link to products mentioned or reviewed"
+            ]
+          },
+          "deferred_rules_note": "Any link rule that targets a page type where provisional artifacts show a high sparse or empty rate must be tagged with DEFERRED status in the notes field and should include: reason for deferral, prerequisite for activation (e.g. 'collection SEO artifact must be populated with at least 3 products before faq-to-collection links should be activated').",
+          "note": "link_rules are planning-level guidance for content authors, developers, and theme configurators — not directly injected template code. The rules represent the strategic intent, not a mechanical implementation specification."
+        },
+        "navigation_priority": {
+          "top_navigation_weight": {
+            "source": "Derived from homepage-strategy.primary_navigation_destinations + seo-strategy.page_priority first items",
+            "type": "constrained enum",
+            "schema_enum": ["low", "medium", "high"],
+            "derivation_logic": {
+              "high": "The store's primary discovery path is through top navigation menus (typical for broad-catalogue stores with clear category structure). Navigation menus are the primary SEO and discovery linking mechanism.",
+              "medium": "Top navigation is important but not the sole linking mechanism. In-page contextual links and collection page links also play a meaningful discovery role.",
+              "low": "Top navigation is minimal (single-product or highly brand-focused stores). Discovery happens through landing pages, campaign links, or homepage featured sections rather than a traditional navigation menu."
+            }
+          },
+          "footer_navigation_weight": {
+            "source": "Derived from store catalog complexity + page type diversity (policy pages, about, contact, FAQ typically appear in footer)",
+            "type": "constrained enum",
+            "schema_enum": ["low", "medium", "high"],
+            "derivation_logic": {
+              "high": "Large catalog with many page types (guide pages, about, policy, contact, FAQ, collections). Footer navigation serves important SEO crawlability and trust link functions.",
+              "medium": "Standard footer with trust pages, policy links, and key collection links. Footer is a secondary navigational layer.",
+              "low": "Minimal footer. Single-product or very focused stores with few utility pages. Footer links are primarily legal/policy."
+            }
+          },
+          "in_page_navigation_weight": {
+            "source": "Derived from seo-strategy.internal_linking_strategy.cross_linking_intensity + aeo-strategy.faq_strategy.faq_intensity + content_depth stance",
+            "type": "constrained enum",
+            "schema_enum": ["low", "medium", "high"],
+            "derivation_logic": {
+              "high": "Deep content strategy (rich link_depth, strong contextual linking, major knowledge_seo_role). In-page contextual links are the primary mechanism for knowledge-to-commerce flows and cross-category discovery.",
+              "medium": "Balanced content strategy. In-page links support standard product-to-collection and FAQ-to-product flows.",
+              "low": "Light content strategy. In-page links are minimal — navigation menus carry most of the linking work."
+            }
+          }
+        },
+        "contextual_linking": {
+          "allowed": {
+            "source": "Always true unless there is an explicit brand or technical reason to forbid in-content links",
+            "type": "boolean",
+            "note": "Contextual linking should default to allowed = true. Set to false only if brand guidelines explicitly prohibit in-content product or page links, or if the theme/storefront does not support body content hyperlinks."
+          },
+          "intensity": {
+            "source": "Derived from seo-strategy.internal_linking_strategy.cross_linking_intensity",
+            "type": "constrained enum",
+            "schema_enum": ["light", "balanced", "strong"],
+            "note": "Direct mapping: low cross_linking_intensity → light. medium → balanced. high → strong."
+          },
+          "knowledge_to_commerce_links": {
+            "source": "Derived from seo-strategy.internal_linking_strategy.knowledge_to_commerce_links + aeo-strategy.faq_strategy.faq_distribution",
+            "type": "boolean",
+            "note": "If seo-strategy.knowledge_to_commerce_links = true: this field = true. If seo-strategy.knowledge_to_commerce_links = false but aeo-strategy.faq_distribution = product-heavy: this field = true with a note documenting the AEO-driven justification for the override."
+          }
+        },
+        "cross_page_support": {
+          "product_to_collection": {
+            "source": "Derived from linking_goal + page_priority. true when product pages should actively link back to parent collections.",
+            "type": "boolean",
+            "note": "Default true for most stores. Provides navigational return path and supports collection page link equity."
+          },
+          "collection_to_product": {
+            "source": "Always true for any store with collections. Collection pages must link to their products.",
+            "type": "boolean",
+            "note": "This is a fundamental commerce navigation pattern. Set to false only for edge cases where collection pages do not contain product grids (e.g. pure guide or editorial collections)."
+          },
+          "product_to_guide": {
+            "source": "Derived from seo-strategy.knowledge_seo_role (supporting or higher → true) + page_seo guide page presence",
+            "type": "boolean",
+            "note": "Set to true when guide pages exist in the store and knowledge_seo_role is at least supporting. False when knowledge_seo_role = none or no guide pages exist."
+          },
+          "guide_to_product": {
+            "source": "Derived from seo-strategy.knowledge_to_commerce_links + aeo-strategy entity clarity direction",
+            "type": "boolean",
+            "note": "Set to true whenever knowledge_to_commerce_links = true. Guide-to-product links are the most important knowledge-to-commerce link type."
+          },
+          "faq_to_product": {
+            "source": "Derived from aeo-strategy.faq_strategy.faq_distribution (product-heavy or balanced → true) + faq_page link targets",
+            "type": "boolean",
+            "note": "Set to true when FAQ content directly references or relates to specific products. Set to false when FAQ content is purely policy or process-oriented with no product relevance."
+          },
+          "faq_to_collection": {
+            "source": "Derived from aeo-strategy.faq_strategy.faq_distribution (collection-heavy or balanced → true)",
+            "type": "boolean",
+            "note": "Set to true when FAQ content relates to product categories or collection-level topics. Category FAQ questions → faq_to_collection = true."
+          }
+        },
+        "anchor_text_strategy": {
+          "source": "Derived from seo-strategy.keyword_focus + brand_positioning tone of voice",
+          "type": "optional constrained enum",
+          "schema_enum": ["simple-descriptive", "balanced", "keyword-aware"],
+          "derivation_logic": {
+            "simple-descriptive": "Anchor text uses plain descriptive language (product names, collection names, page titles) without keyword optimization. Appropriate for brand-tone-first stores where keyword-stuffed anchor text would feel unnatural.",
+            "balanced": "Anchor text is descriptive but incorporates primary keyword vocabulary naturally where it fits. The most common stance for standard commerce stores.",
+            "keyword-aware": "Anchor text is intentionally aligned with primary keyword families from seo-strategy.keyword_focus. Appropriate for stores with strong long-tail or product-type keyword focus where anchor text keyword signals matter."
+          }
+        },
+        "notes": {
+          "source": "Workflow-generated synthesis metadata",
+          "type": "machine-generated string",
+          "required_content": "Must include: synthesis timestamp, strategy version label (e.g. Phase-8-draft), list of inputs used (seo-strategy, aeo-strategy, homepage-strategy, page-seo pattern summary, collection-seo pattern summary, product-seo pattern summary, faq-page), provisional flag (PROVISIONAL-INTERNAL-LINKING-STRATEGY: This artifact was synthesized from planning inputs. All linking rules are planning hypotheses derived from provisional SEO artifacts and strategic direction documents. Linking rules require human review and mapping to actual page handles before production implementation.), deferred rules notice (DEFERRED-RULES: Any link rules marked DEFERRED must not be implemented until their prerequisite conditions are met — typically that the target page type has been populated and its SEO artifact is no longer flagged as PLACEHOLDER-REQUIRES-REVIEW.), and planning-only note (PLANNING-ARTIFACT-ONLY: This strategy defines intended linking logic. It does not emit Shopify theme code, navigation configuration, or link injection directives. Implementation requires mapping these rules to actual page handles, theme navigation settings, and content authoring guidelines.)."
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-seo-strategy",
+        "provides": ["seo-strategy.json"],
+        "required": true,
+        "note": "seo-strategy.json (step 11, Phase 7) provides the linking posture (link_depth, cross_linking_intensity, knowledge_to_commerce_links), page_priority, and linking_goal derivation signals. This workflow cannot define linking strategy without the SEO foundation."
+      },
+      {
+        "workflow": "build-aeo-strategy",
+        "provides": ["aeo-strategy.json"],
+        "required": true,
+        "note": "aeo-strategy.json (step 12, Phase 8) provides faq_distribution and entity clarity direction that refine FAQ-to-product and FAQ-to-collection link rules beyond what seo-strategy alone covers. This dependency makes build-internal-linking order-dependent on build-aeo-strategy within Phase 8."
+      },
+      {
+        "workflow": "build-homepage-strategy",
+        "provides": ["homepage-strategy.json"],
+        "required": false,
+        "note": "homepage-strategy.json (step 9, Phase 3) provides navigational hierarchy signals. When absent, navigation_priority weights are derived from seo-strategy.page_priority alone. Absence degrades navigation priority specificity but does not halt the workflow."
+      },
+      {
+        "workflow": "build-page-seo",
+        "provides": ["page-seo.json artifacts (per page)"],
+        "required": false,
+        "note": "PHASE 7 CONTEXT: page-seo artifacts provide page role signals for guide page identification and sparse page rate analysis. When absent, guide page presence is inferred from seo-strategy knowledge_seo_role alone."
+      },
+      {
+        "workflow": "build-collection-seo",
+        "provides": ["collection-seo.json artifacts (per collection)"],
+        "required": false,
+        "note": "PHASE 6 CONTEXT: collection-seo artifacts provide collection page_role signals and sparse collection rate. When absent, collection link priority is derived from seo-strategy page_priority alone."
+      },
+      {
+        "workflow": "build-product-seo",
+        "provides": ["product-seo.json artifacts (per product)"],
+        "required": false,
+        "note": "PHASE 5 CONTEXT: product-seo artifacts provide search intent distribution and sparse product rate. When absent, product link priority is derived from seo-strategy primary_seo_goal alone."
+      },
+      {
+        "workflow": "build-faq-page",
+        "provides": ["faq-page.json"],
+        "required": false,
+        "note": "PHASE 7 CONTEXT: faq-page.json provides FAQ link target signals for faq-to-product and faq-to-collection link rule derivation. When absent, FAQ cross-page support flags are derived from aeo-strategy.faq_strategy alone."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-structured-data-plan",
+        "receives": ["internal-linking.json"],
+        "note": "Workflow step 24 (Phase 8). build-structured-data-plan may use internal-linking.json navigational hierarchy to inform breadcrumb schema priority and item-list schema page type mapping."
+      },
+      {
+        "workflow": "run-validation",
+        "receives": ["internal-linking.json"],
+        "note": "Out of Phase 8 scope (workflow step 28). Validates internal-linking.json against schema and cross-validates linking strategy alignment with seo-strategy.json and aeo-strategy.json."
+      }
+    ],
+
+    "schema_alignment": {
+      "internal-linking.schema.json": {
+        "required_fields_covered": [
+          "strategy_name",
+          "linking_goal",
+          "link_rules",
+          "navigation_priority",
+          "contextual_linking",
+          "cross_page_support"
+        ],
+        "optional_fields_covered": [
+          "anchor_text_strategy",
+          "notes"
+        ],
+        "schema_enum_notes": {
+          "linking_goal": "enum: seo-support | conversion-support | discovery-support | hybrid",
+          "link_rules[].source_page_type": "enum: homepage | product-page | collection-page | guide-page | faq-page | blog-article | page",
+          "link_rules[].target_page_type": "enum: homepage | product-page | collection-page | guide-page | faq-page | blog-article | page",
+          "link_rules[].priority": "optional enum: low | medium | high",
+          "navigation_priority.top_navigation_weight": "enum: low | medium | high",
+          "navigation_priority.footer_navigation_weight": "enum: low | medium | high",
+          "navigation_priority.in_page_navigation_weight": "enum: low | medium | high",
+          "contextual_linking.intensity": "enum: light | balanced | strong",
+          "anchor_text_strategy": "optional enum: simple-descriptive | balanced | keyword-aware"
+        },
+        "cross_page_support_note": "cross_page_support.product_to_collection, collection_to_product, product_to_guide, guide_to_product are required fields (booleans). faq_to_product, faq_to_collection are optional additional boolean fields in the schema.",
+        "validation_note": "internal-linking.json is a single-instance artifact (one per store). link_rules minItems = 1. All enum values must be validated before writing. The schema does not permit additionalProperties at the root level or within link_rule objects."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: seo_strategy (object, required), aeo_strategy (object, required). Optional: homepage_strategy (object), page_seo_artifacts (array), collection_seo_artifacts (array), product_seo_artifacts (array), faq_page (object). Logs which optional inputs are present.",
+        "input": "seo_strategy + aeo_strategy + optional homepage_strategy + optional page_seo_artifacts + optional collection_seo_artifacts + optional product_seo_artifacts + optional faq_page",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present and minimally complete. seo_strategy must have: primary_seo_goal, knowledge_seo_role, page_priority, internal_linking_strategy (with link_depth and cross_linking_intensity). aeo_strategy must have: primary_aeo_goal, faq_strategy.faq_distribution. Set availability flags: has_homepage_strategy, has_page_seo_patterns, has_collection_seo_patterns, has_product_seo_patterns, has_faq_page. Fail with clear error if required inputs are missing.",
+        "input": "all inputs",
+        "output": "validated inputs + availability flags or halt error"
+      },
+      {
+        "step": 3,
+        "name": "Extract Linking Context",
+        "type": "Code node (JavaScript)",
+        "description": "Extract and organize the linking context signals. Produce a linking_context object containing: (1) SEO LINKING POSTURE: link_depth, cross_linking_intensity, knowledge_to_commerce_links, primary_seo_goal, knowledge_seo_role, page_priority from seo_strategy. (2) AEO LINKING SIGNALS: faq_distribution, primary_aeo_goal, entity_clarity_strategy from aeo_strategy. (3) NAVIGATION SIGNALS: primary_navigation_destinations, featured_collections, content_sections from homepage_strategy (if available) or set to null with log. (4) CONTENT DEPTH: link_depth implies content depth stance for contextual linking rules.",
+        "input": "validated seo_strategy + aeo_strategy + optional homepage_strategy",
+        "output": "linking_context object"
+      },
+      {
+        "step": 4,
+        "name": "Analyze Page SEO Patterns (if available)",
+        "type": "Code node (JavaScript)",
+        "description": "If has_page_seo_patterns = true: load all page-seo artifacts. Compute: guide_page_rate (percentage with role = guide or informational), sparse_page_rate (PLACEHOLDER-REQUIRES-REVIEW or SPARSE-DATA), guide_page_handles (list of page handles with guide role for reference — NOT for inclusion as specific link targets in rules). If has_page_seo_patterns = false: set page_seo_analysis = null, log absence.",
+        "input": "page_seo_artifacts (if available)",
+        "output": "page_seo_analysis object or null"
+      },
+      {
+        "step": 5,
+        "name": "Analyze Collection SEO Patterns (if available)",
+        "type": "Code node (JavaScript)",
+        "description": "If has_collection_seo_patterns = true: load all collection-seo artifacts. Compute: primary_entry_collection_count, guide_collection_count, empty_sparse_collection_rate. Identify which collection page_roles are dominant. If empty_sparse_collection_rate > 30%: set deferred_faq_to_collection = true. If has_collection_seo_patterns = false: set collection_seo_analysis = null, log absence.",
+        "input": "collection_seo_artifacts (if available)",
+        "output": "collection_seo_analysis + deferred_faq_to_collection flag"
+      },
+      {
+        "step": 6,
+        "name": "Analyze Product SEO Patterns (if available)",
+        "type": "Code node (JavaScript)",
+        "description": "If has_product_seo_patterns = true: load all product-seo artifacts. Compute: transactional_product_rate, sparse_product_rate. If sparse_product_rate > 30%: set deferred_faq_to_product = true. If has_product_seo_patterns = false: set product_seo_analysis = null, log absence.",
+        "input": "product_seo_artifacts (if available)",
+        "output": "product_seo_analysis + deferred_faq_to_product flag"
+      },
+      {
+        "step": 7,
+        "name": "Derive Linking Strategy Direction (Pre-LLM)",
+        "type": "Code node (JavaScript)",
+        "description": "Compute deterministic pre-LLM linking strategy derivations: (1) CANDIDATE linking_goal: apply derivation logic from primary_seo_goal + aeo primary_aeo_goal. (2) CANDIDATE link_rules set: select standard link rules from the simple / balanced / rich rule set defined in the output_fields specification, based on link_depth value from seo_strategy. Add deferred flags where sparse rates are high. (3) CANDIDATE navigation_priority: apply homepage_strategy signals if available, else derive from seo_strategy.page_priority. (4) CANDIDATE contextual_linking: map cross_linking_intensity to intensity enum. Apply knowledge_to_commerce_links flag. (5) CANDIDATE cross_page_support: apply derivation logic from knowledge_seo_role, faq_distribution, deferred flags. (6) CANDIDATE anchor_text_strategy: apply keyword_focus from seo_strategy + brand_role from brand_positioning if available. Include reasoning notes for each candidate.",
+        "input": "linking_context + page_seo_analysis + collection_seo_analysis + product_seo_analysis",
+        "output": "pre_llm_linking_candidates object with candidate values and reasoning notes"
+      },
+      {
+        "step": 8,
+        "name": "Build LLM Linking Strategy Prompt",
+        "type": "Code node (JavaScript)",
+        "description": "Assemble the structured LLM prompt for internal linking strategy synthesis. The prompt must: (1) Present SEO linking posture: link_depth, cross_linking_intensity, knowledge_to_commerce_links, page_priority, knowledge_seo_role. (2) Present AEO linking signals: faq_distribution, primary_aeo_goal, entity clarity direction. (3) Present navigation signals from homepage-strategy if available. (4) Present pattern analysis findings: guide page rate, sparse rates, deferred flags. (5) Present pre-LLM candidate reasoning as grounding context. (6) Request output as valid JSON conforming to schemas/internal-linking.schema.json. Include all enum values and required fields. (7) Instruct: 'Link rules should be expressed as page-type rules, not as individual page handle rules. Do not reference specific product or collection handles.' (8) Instruct: 'Mark any link rules targeting page types with high sparse rates as DEFERRED in the link_reason field.' (9) Instruct: 'Do not claim that internal linking rules are implemented — this is a planning artifact only.'",
+        "input": "linking_context + pre_llm_linking_candidates + pattern analysis summaries",
+        "output": "assembled LLM prompt string",
+        "prompt_safety_note": "Prompt must explicitly state: 'Internal linking strategy is a planning artifact. Do not claim links are implemented. Do not reference specific product handles or collection handles — express rules as page-type patterns only. Mark any rule targeting sparse or empty page types as DEFERRED.'"
+      },
+      {
+        "step": 9,
+        "name": "LLM Synthesis: Internal Linking Strategy",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API. Request JSON output mode. Temperature: 0.1. Max tokens: 3000.",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt",
+        "output": "raw LLM response string (expected to be JSON conforming to internal-linking schema)"
+      },
+      {
+        "step": 10,
+        "name": "Parse and Enforce Linking Strategy Constraints",
+        "type": "Code node (JavaScript)",
+        "description": "Parse the raw LLM response as JSON. Enforce constraint integrity: (1) ENUM VALIDATION: All enum fields must match allowed schema values. Substitutions logged. (2) REQUIRED FIELD COMPLETENESS: All required schema fields must be present. link_rules minItems = 1. (3) PAGE TYPE RULE ONLY: Scan link_rules for any specific product or collection handles (e.g. strings containing '/' or matching known handle patterns). If found, replace with the appropriate page-type abstraction and log the substitution. (4) DEFERRED FLAG CONSISTENCY: If deferred_faq_to_collection or deferred_faq_to_product flags were set in step 5-6, verify corresponding link rules are marked DEFERRED in their link_reason. Inject DEFERRED tag if missing. (5) PROVISIONAL FLAG INJECTION: Inject 'PROVISIONAL-INTERNAL-LINKING-STRATEGY' and 'PLANNING-ARTIFACT-ONLY' flags into notes if not already present.",
+        "input": "raw LLM response + pre_llm_linking_candidates + deferred flags",
+        "output": "parsed and constrained internal_linking object (pre-validation)"
+      },
+      {
+        "step": 11,
+        "name": "Validate Against Schema",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate the internal_linking object against schemas/internal-linking.schema.json using ajv. Key validations: strategy_name non-empty string, linking_goal in enum, link_rules is array with minItems = 1 and each item has required source_page_type, target_page_type, link_reason in correct enums, navigation_priority is object with all three required weight fields in enum, contextual_linking is object with required allowed (boolean) and intensity (enum), cross_page_support is object with all four required boolean fields. Halt workflow on validation failure.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/internal-linking.schema.json",
+        "failure_behavior": "Halt workflow on any validation failure. Log exact field violation. Do not write a partially valid linking strategy.",
+        "input": "constrained internal_linking object",
+        "output": "validated internal_linking object or halt error"
+      },
+      {
+        "step": 12,
+        "name": "Persist internal-linking.json",
+        "type": "GitHub node or Write File node",
+        "description": "Write internal-linking.json to projects/{project_id}/internal-linking.json. Commit with a message such as 'chore: generate internal-linking strategy for {store_id} — Phase 8 draft (planning artifact, provisional)'. The provisional and planning-only nature must be visible in the commit message.",
+        "artifact_path": "projects/{project_id}/internal-linking.json",
+        "git_note": "This artifact is a planning document — not an implementation directive. The commit message must reflect this.",
+        "input": "validated internal_linking object",
+        "output": "confirmation of write + persisted artifact path"
+      },
+      {
+        "step": 13,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass internal-linking.json (as object or path) to the master orchestrator. The orchestrator must make internal-linking.json available to: build-structured-data-plan (step 24).",
+        "input": "internal-linking.json path",
+        "output": "workflow output payload with internal-linking path"
+      }
+    ],
+
+    "assumptions": [
+      "seo-strategy.json and aeo-strategy.json are both required inputs. This workflow cannot run without them.",
+      "homepage-strategy.json, page-seo, collection-seo, product-seo artifacts, and faq-page.json are all optional. Their absence degrades specificity but does not halt the workflow.",
+      "Link rules are expressed as page-type patterns (e.g. collection-page → product-page) rather than specific page handles. This keeps the internal-linking.json artifact store-agnostic and valid across stores with different catalog structures.",
+      "Pages or collections flagged as sparse, empty, or PLACEHOLDER-REQUIRES-REVIEW in earlier-phase artifacts must be reflected in the link rules as DEFERRED rather than as confident link targets.",
+      "The output is a planning artifact — not implemented Shopify theme code, navigation configuration, or template linking rules. Implementation requires a separate development phase that maps these rules to actual page handles and theme settings.",
+      "Navigational links (top-nav, footer) and contextual links (in-body content links) are treated as distinct mechanisms in this strategy. The strategy does not conflate them.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "A single internal-linking.json is produced per store. It is a store-level singleton artifact — not a per-page or per-collection artifact.",
+      "The distinction between DEFERRED and non-deferred link rules is a planning-phase quality gate. DEFERRED rules must be reviewed and activated only after their prerequisite conditions are verified by a human or a downstream validation workflow.",
+      "build-internal-linking runs after build-aeo-strategy in Phase 8. The aeo-strategy.json must be available as input before this workflow runs."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should internal-linking.json include a separate deferred_rules array for rules that are marked DEFERRED, to make it easier to scan and review deferred items separately?",
+        "impact": "Currently DEFERRED items are embedded in the link_reason string of link_rules items. A separate deferred_rules array would make it easier for humans and downstream validation to identify and act on deferred items.",
+        "recommended_default": "For Phase 8, keep DEFERRED rules embedded in link_reason strings as a planning notation. Adding a deferred_rules array is a schema evolution candidate for a later phase. Document this as an open schema extension opportunity."
+      },
+      {
+        "question": "How should build-internal-linking handle a store that has no guide pages (knowledge_seo_role = none) but has a rich FAQ page? Should faq-to-product links substitute for guide-to-product links?",
+        "impact": "In stores without guide pages, the FAQ page may be the only knowledge content source. faq-to-product linking may need to carry the full knowledge-to-commerce linking weight.",
+        "recommended_default": "Yes — if knowledge_seo_role = none but faq_intensity = strong in aeo-strategy, promote faq-to-product and faq-to-collection link rules to medium or high priority. FAQ content is the knowledge-to-commerce link source in this case. Document this reasoning in the notes field."
+      },
+      {
+        "question": "Should the anchor_text_strategy field recommend specific keyword vocabulary examples, or remain at the enum level only?",
+        "impact": "keyword-aware anchor text without vocabulary examples gives limited implementation guidance. Including keyword examples (from seo-strategy keyword_focus types) would make the strategy more actionable for content authors.",
+        "recommended_default": "Keep anchor_text_strategy at the enum level for the schema field. Include keyword vocabulary examples as plain text in the notes field rather than as a structured field. This avoids schema evolution while still providing useful implementation guidance."
+      },
+      {
+        "question": "Should build-internal-linking produce a supplementary human-readable linking guidance document (similar to seo-strategy-revisions.md) alongside internal-linking.json?",
+        "impact": "internal-linking.json is machine-readable but requires interpretation to map to actual page handles and theme implementation tasks. A markdown guidance document would help content authors and developers implement the strategy.",
+        "recommended_default": "Recommended — produce a internal-linking-guidance.md alongside internal-linking.json in a future implementation. For Phase 8, include sufficient detail in the notes field of internal-linking.json to serve this purpose. The supplementary document is a Phase 9 or implementation-phase deliverable."
+      }
+    ]
+  }
+}

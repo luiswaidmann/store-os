@@ -1,0 +1,537 @@
+{
+  "_meta": {
+    "format": "store-os-workflow-draft",
+    "version": "1.0",
+    "status": "draft",
+    "draft_safety_note": "This is a Git-first workflow definition. It is not yet executable n8n JSON. It describes the intended logic, contracts, field mapping, and node structure so that a future n8n implementation can be built safely. Section plan outputs are planning artifacts — not theme code, not executable section configurations, and not deployment-ready layout instructions. Each section instance describes planning-level configuration intent. A future theme-configuration workflow will translate these instances into actual theme section settings. Human review is required before this artifact informs content generation, media planning, or theme build decisions.",
+    "evidence_boundary_note": "Section plan decisions are derived from the homepage strategy (which is itself an LLM-synthesized planning artifact), the design system (LLM-synthesized from brand positioning and pattern manifest), and the pattern manifest (LLM-synthesized from market intelligence and competitor clusters). No actual theme section library inventory, no live Shopify theme inspection, and no real layout testing informs this artifact. Section types in the plan represent planning-level recommendations — not guaranteed theme capabilities. A future implementation must validate section types against the actual available theme section library.",
+    "schema_tension_note": "DOCUMENTED ARCHITECTURAL TENSION: The section-library.schema.json defines reusable section TYPE definitions (what a section type can do generically). The section-instance.schema.json defines concrete section placements on specific pages (what a specific section instance is configured to do). This workflow produces section INSTANCES that must respect section TYPE capabilities. The tension is that section-library definitions are generic system-level constraints, while section instances are page-specific decisions. This workflow resolves the tension by using section-library capability definitions as validation guardrails when configuring section instances — a section instance cannot claim a capability (e.g. video_allowed = true) that the underlying section type does not support. If a future theme section library inventory is not available, this workflow operates conservatively and uses the schema-defined section-library capabilities as the baseline.",
+    "credential_safety_note": "OpenAI credentials are referenced by a PLACEHOLDER name below. The actual n8n credential name must be confirmed at runtime. Do not hardcode credential names or values in this file.",
+    "output_schema": "schemas/section-instance.schema.json",
+    "secondary_schema": "schemas/section-library.schema.json",
+    "related_docs": [
+      "docs/input-model.md",
+      "docs/n8n-conventions.md",
+      "docs/workflow-map.md",
+      "workflows/mappings/workflow-input-output-map.md",
+      "workflows/mappings/input-to-artifacts.md"
+    ]
+  },
+  "workflow": {
+    "id": "build-section-plan",
+    "name": "build-section-plan",
+    "category": "planning",
+    "phase": "Phase 4 — Commerce Content Planning",
+    "purpose": "Translate the homepage strategy's section_sequence recommendation into configured section instances for the homepage. Each instance is validated against the section-library schema's capability definitions and the design system's motion and media ceilings. The output is a set of section instance plans — not theme code. Pattern manifest forbidden patterns are re-enforced at the instance level to prevent any forbidden behavior from re-entering through section composition. Media and motion configuration per instance must not exceed the ceilings already established in the design system. The output enables future content generation, media planning, and (eventually) theme configuration — but is not itself a final theme configuration.",
+
+    "inputs": {
+      "from_homepage_strategy": {
+        "source": "build-homepage-strategy → homepage-strategy.json",
+        "artifact_path": "projects/{project_id}/homepage-strategy.json",
+        "fields_used_as_primary_planning_input": [
+          {
+            "field": "section_sequence",
+            "treatment": "PRIMARY STRUCTURAL INPUT — the section_sequence array from homepage strategy is the starting point for section plan resolution. Each item in the array (section_type + purpose + priority + motion_allowed + media_allowed) is the planning intent for one section instance. This workflow translates each planning intent into a configured section instance.",
+            "note": "section_sequence from homepage-strategy is a strategic recommendation. This workflow may adjust configuration details (e.g. body_mode, cta_mode, media_priority) but must not add section types that were not in the homepage strategy or remove section types without documenting the reason."
+          },
+          {
+            "field": "homepage_goal",
+            "treatment": "CONTEXT — informs content_config.body_mode and conversion_config selections per instance. A conversion-first homepage goal means CTAs and trust elements are emphasized in conversion_config.",
+            "note": "Consistent with the brand_role and cta_strategy already embedded in homepage-strategy."
+          },
+          {
+            "field": "hero_strategy",
+            "treatment": "STRUCTURAL INPUT for hero section instance — hero_type, primary_focus, media_intensity, and fallback_required directly populate the hero section instance's media_config and content_config.",
+            "note": "The hero section instance is always the first instance. Its media_config.uses_video is set based on hero_type (video-hero → true; others → false unless media_intensity allows it). fallback_required propagates directly to media_config.fallback_required."
+          },
+          {
+            "field": "cta_strategy",
+            "treatment": "CONSTRAINT — cta_strategy.cta_repetition constrains conversion_config.supports_cta density across the section sequence. cta_strategy.primary_cta_focus informs the hero and featured-products section instance conversion_config.",
+            "note": "Multiple instances may have supports_cta = true, but the frequency must respect cta_repetition (low → only 1-2 sections; balanced → 2-4; high → 4+)."
+          },
+          {
+            "field": "trust_strategy",
+            "treatment": "CONSTRAINT — trust_strategy.trust_placement determines whether trust sections appear early, mid, or late in the instance sequence. trust_strategy.proof_intensity constrains conversion_config.supports_trust and supports_objection_handling per instance.",
+            "note": "Trust-type sections (trust-proof, review-section, social-proof) should be positioned according to trust_placement."
+          },
+          {
+            "field": "media_role",
+            "treatment": "CEILING — media_role.video_role constrains uses_video across all section instances. media_role.motion_role constrains motion_intensity across all section instances.",
+            "note": "These ceilings are already derived from design-system in the homepage-strategy workflow. This workflow re-applies them at the instance level for each section."
+          },
+          {
+            "field": "forbidden_homepage_patterns",
+            "treatment": "NEGATIVE CONSTRAINT — any forbidden pattern that is homepage-relevant must be checked against each section instance. A section instance must not be configured in a way that would require a forbidden pattern.",
+            "note": "These are homepage-specific. Pattern-manifest forbidden_patterns are also re-checked at the instance level."
+          }
+        ]
+      },
+      "from_design_system": {
+        "source": "build-design-system → design-system.json",
+        "artifact_path": "projects/{project_id}/design-system.json",
+        "fields_used_as_ceilings": [
+          {
+            "field": "motion_strategy.motion_level",
+            "treatment": "CEILING — no section instance may have scroll_motion = true or interaction_motion = true if motion_level = none. If motion_level = subtle, only hero and video-section instances may have scroll_motion = true. motion_intensity per instance is bounded by motion_level.",
+            "mapping": {
+              "none": "all instances: scroll_motion = false, interaction_motion = false, motion_intensity = none",
+              "subtle": "hero and video-section: motion_intensity = subtle; others: none",
+              "moderate": "most sections: motion_intensity = subtle or balanced",
+              "cinematic": "hero: up to strong; others: balanced"
+            }
+          },
+          {
+            "field": "media_strategy.image_intensity",
+            "treatment": "CEILING — constrains uses_images and media_priority per instance. light → only hero and featured-products use images at medium priority; balanced → most sections may use images; rich → all sections may use images.",
+            "note": "Applies per-instance — not a global on/off switch."
+          },
+          {
+            "field": "media_strategy.video_usage",
+            "treatment": "CEILING — constrains uses_video per instance. none → no instance uses video. supporting-only → video is allowed only in video-section instance. balanced → video-section and hero (if video-hero). hero-driven → only hero uses video prominently.",
+            "note": "Consistent with media_role.video_role from homepage-strategy — both apply at instance level."
+          },
+          {
+            "field": "media_strategy.fallback_required",
+            "treatment": "DIRECT PROPAGATION — if fallback_required = true in design-system, every section instance with uses_video = true or uses_images = true must have fallback_required = true.",
+            "note": "Direct boolean. Non-negotiable."
+          },
+          {
+            "field": "performance_guardrails.heavy_media_control",
+            "treatment": "CONSTRAINT — strict heavy_media_control limits the number of instances with uses_video = true or media_priority = high. At most 1-2 instances may have media_priority = high if heavy_media_control = strict.",
+            "note": "Conservative default — do not create multiple high-media instances without checking this value."
+          },
+          {
+            "field": "component_style.border_radius",
+            "treatment": "CONTEXT — available as a hint for section instance notes. Not a required field at section instance level, but relevant for future theme configuration.",
+            "note": "Pass into section instance notes field for downstream use."
+          }
+        ]
+      },
+      "from_pattern_manifest": {
+        "source": "build-pattern-manifest → pattern-manifest.json",
+        "artifact_path": "projects/{project_id}/pattern-manifest.json",
+        "fields_used_as_structural_constraints": [
+          {
+            "field": "forbidden_patterns",
+            "treatment": "HARD EXCLUSION — re-applied at section instance level. If a section instance's configuration would require a forbidden pattern behavior, the configuration must be adjusted or the section must be flagged as review-required.",
+            "note": "Example: if forbidden_patterns includes 'aggressive countdown urgency', a cta-banner instance must not have cta_mode = multiple with urgency-oriented content. The instance configuration must avoid enabling the forbidden behavior."
+          },
+          {
+            "field": "approved_patterns",
+            "treatment": "APPROVED PALETTE — section instance configurations should be consistent with the approved pattern types (layout patterns, trust patterns, PDP patterns, etc.).",
+            "note": "Approved patterns validate that the section types and their configuration modes are appropriate for this store's context."
+          },
+          {
+            "field": "pdp_direction",
+            "treatment": "CONTEXT for product-page section instances — if the section plan includes product-page sections (out of scope for Phase 4 homepage but noted for future extension), pdp_direction constrains their configuration.",
+            "note": "In Phase 4, this is primarily relevant for homepage featured-products section instance trust and conversion configuration."
+          },
+          {
+            "field": "trust_direction.trust_visibility",
+            "treatment": "CONSTRAINT — validates that the number and prominence of trust-type sections in the plan is consistent with trust_visibility. light → at most one trust section; moderate → 1-2 trust sections; strong → 2+ trust sections.",
+            "note": "Cross-check against trust_strategy already embedded in homepage-strategy."
+          }
+        ]
+      }
+    },
+
+    "outputs": {
+      "section_plan": {
+        "description": "A section plan artifact containing two components: (1) a section_library_selections array documenting which section types are being used and their capability constraints for this store, and (2) a section_instances array of fully configured section instances for the homepage conforming to schemas/section-instance.schema.json. This is a planning artifact — not a theme configuration file.",
+        "artifact_path": "projects/{project_id}/section-plan.json",
+        "primary_schema": "schemas/section-instance.schema.json",
+        "secondary_schema": "schemas/section-library.schema.json",
+        "field_mapping": {
+          "section_library_selections": {
+            "description": "Array of section library entries (conforming to section-library.schema.json) for each section type included in this plan. Documents the baseline capabilities of each section type as used in this store context.",
+            "source": "Derived from section-library.schema.json capability definitions, filtered to the section types present in section_instances",
+            "type": "array of section-library.schema.json objects",
+            "note": "This array serves as a reference layer — it documents what each section type CAN do generically. The section_instances array documents what each specific instance IS CONFIGURED to do for this store. These two layers must be consistent."
+          },
+          "section_instances": {
+            "description": "Array of section instance objects, each conforming to schemas/section-instance.schema.json. One entry per section in the homepage plan.",
+            "source": "LLM synthesis + constraint enforcement from homepage_strategy.section_sequence + design-system ceilings + pattern-manifest constraints",
+            "type": "array of section-instance.schema.json objects",
+            "per_instance_fields": {
+              "section_id": {
+                "source": "Generated by workflow — kebab-case string: {section_type}-{position} (e.g. 'hero-1', 'featured-products-2')",
+                "type": "generated string",
+                "pattern": "^[a-z0-9-]+$"
+              },
+              "section_type": {
+                "source": "DIRECT from homepage_strategy.section_sequence[i].section_type",
+                "type": "direct-mapped enum",
+                "note": "Must be one of the section-instance.schema.json enum values. No new section types may be introduced that were not in the homepage strategy section_sequence."
+              },
+              "page_type": {
+                "source": "FIXED — 'homepage' for all instances in this plan",
+                "type": "fixed value",
+                "note": "This workflow produces homepage section instances only. Product-page and collection-page instances are out of scope for Phase 4."
+              },
+              "purpose": {
+                "source": "DIRECT from homepage_strategy.section_sequence[i].purpose — unchanged",
+                "type": "direct propagation",
+                "note": "The purpose field documents the strategic reason for this section in the sequence. It must not be blank. If the homepage strategy purpose field was vague, the LLM may expand it minimally for clarity."
+              },
+              "enabled": {
+                "source": "DEFAULT true for core and supporting sections; false for optional sections where data availability is uncertain",
+                "type": "derived boolean",
+                "note": "review-section and social-proof sections that depend on real Shopify review data should default to enabled = false with a note explaining the data dependency. They are enabled when data is confirmed at runtime."
+              },
+              "priority": {
+                "source": "DIRECT from homepage_strategy.section_sequence[i].priority",
+                "type": "direct-mapped enum",
+                "schema_enum": ["core", "supporting", "optional"]
+              },
+              "content_config": {
+                "headline": {
+                  "source": "LLM synthesis — a planning-level headline direction string (not final copy). Should describe the intended message goal, not final wording.",
+                  "type": "LLM-synthesized planning direction",
+                  "note": "Example: 'Primary brand promise — outcome-first framing with core benefit'. Must not be final copy. The actual copy is generated in build-product-content or theme content workflows."
+                },
+                "body_mode": {
+                  "source": "LLM selection from enum — constrained by homepage_goal and section type",
+                  "constraint_logic": "conversion-first homepage + conversion section → short; editorial/brand-introduction + storytelling section → balanced or long; hero → short; usp-strip → short; how-it-works → balanced; brand-story → long",
+                  "schema_enum": ["none", "short", "balanced", "long"]
+                },
+                "cta_mode": {
+                  "source": "Derived from cta_strategy.cta_repetition + section type",
+                  "constraint_logic": "hero: single (always); featured-products: single; cta-banner: single or multiple; newsletter: single; review-section: none; usp-strip: none or single. Total multiple-CTA instances limited by cta_repetition = low constraint.",
+                  "schema_enum": ["none", "single", "multiple"]
+                },
+                "faq_mode": {
+                  "source": "Relevant only for faq-preview section type. Others: none.",
+                  "schema_enum": ["none", "light", "balanced"]
+                }
+              },
+              "media_config": {
+                "uses_images": {
+                  "source": "Derived from design-system image_intensity ceiling + section type capability",
+                  "type": "derived boolean — bounded by image_intensity ceiling"
+                },
+                "uses_video": {
+                  "source": "Derived from design-system video_usage ceiling + hero_strategy.hero_type + section type",
+                  "type": "derived boolean",
+                  "constraint_logic": "video-hero hero_type → hero instance uses_video = true; video-section instance → uses_video = true only if video_usage != none; all others → false unless video_usage = balanced or hero-driven and section type supports it"
+                },
+                "uses_embeds": {
+                  "source": "Default false. Only true for video-section with external embed if design-system allows embeds.",
+                  "type": "derived boolean — conservative default"
+                },
+                "fallback_required": {
+                  "source": "DIRECT propagation from design-system.media_strategy.fallback_required",
+                  "type": "direct boolean — non-negotiable if design-system requires fallback"
+                },
+                "media_priority": {
+                  "source": "Derived from image_intensity + section type + heavy_media_control",
+                  "constraint_logic": "hero: medium or high (high only if image_intensity = rich and heavy_media_control != strict); featured-products: medium; others: low; video-section: medium or high (limited by heavy_media_control)",
+                  "schema_enum": ["low", "medium", "high"]
+                }
+              },
+              "motion_config": {
+                "scroll_motion": {
+                  "source": "Derived from design-system.motion_strategy.motion_level + section type",
+                  "type": "derived boolean",
+                  "constraint_logic": "motion_level = none → false for all. motion_level = subtle → true only for hero. motion_level = moderate or cinematic → true for hero, video-section, storytelling-section, brand-story."
+                },
+                "interaction_motion": {
+                  "source": "Derived from design-system.motion_strategy.motion_level + section type",
+                  "type": "derived boolean",
+                  "constraint_logic": "motion_level = none → false for all. motion_level = subtle → false for all. motion_level = moderate → true for hero and cta-banner. motion_level = cinematic → most sections."
+                },
+                "motion_intensity": {
+                  "source": "CEILING from design-system.motion_strategy.motion_level",
+                  "type": "constrained enum — cannot exceed design-system ceiling",
+                  "mapping": {
+                    "none": "none",
+                    "subtle": "subtle (hero only), none (others)",
+                    "moderate": "balanced (hero), subtle (supporting sections)",
+                    "cinematic": "strong (hero), balanced (storytelling/video sections), subtle (others)"
+                  },
+                  "schema_enum": ["none", "subtle", "balanced", "strong"]
+                }
+              },
+              "seo_config": {
+                "indexable_text": {
+                  "source": "Based on section type capability — sections with supports_indexable_text = true in section-library schema",
+                  "type": "derived boolean from section-library capability"
+                },
+                "internal_links_allowed": {
+                  "source": "Based on section type capability — sections with supports_internal_linking = true in section-library schema",
+                  "type": "derived boolean from section-library capability"
+                },
+                "keyword_support": {
+                  "source": "Based on section type capability from section-library schema + homepage keyword role from homepage-strategy.seo_role",
+                  "type": "derived boolean"
+                },
+                "answer_support": {
+                  "source": "Only true for faq-preview section type in this phase",
+                  "type": "derived boolean"
+                }
+              },
+              "conversion_config": {
+                "supports_cta": {
+                  "source": "Based on section type capability from section-library schema + cta_mode selection",
+                  "type": "derived boolean"
+                },
+                "supports_trust": {
+                  "source": "Based on section type role (trust, social-proof, review-section types) + trust_strategy.trust_placement positioning",
+                  "type": "derived boolean"
+                },
+                "supports_objection_handling": {
+                  "source": "Based on section type (problem-solution, how-it-works, comparison-section, faq-preview types) + brand-positioning objection_handling_style",
+                  "type": "derived boolean"
+                }
+              },
+              "notes": {
+                "source": "Workflow-generated annotation per instance",
+                "type": "machine-generated string",
+                "note": "Must include: provenance (which homepage-strategy section_sequence entry this instance corresponds to), any constraint overrides applied, any review-required flags (e.g. 'enabled = false pending Shopify review data confirmation'), and the evidence boundary label."
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "upstream_dependencies": [
+      {
+        "workflow": "build-homepage-strategy",
+        "provides": ["homepage-strategy.json"],
+        "required": true,
+        "note": "Primary structural input. The section_sequence, hero_strategy, cta_strategy, trust_strategy, media_role, and forbidden_homepage_patterns are all consumed here. This workflow cannot run without a validated homepage-strategy.json."
+      },
+      {
+        "workflow": "build-design-system",
+        "provides": ["design-system.json"],
+        "required": true,
+        "note": "Provides the definitive motion and media ceilings that govern per-instance media_config and motion_config. fallback_required, heavy_media_control, motion_level, image_intensity, and video_usage are all re-applied at the instance level."
+      },
+      {
+        "workflow": "build-pattern-manifest",
+        "provides": ["pattern-manifest.json"],
+        "required": true,
+        "note": "Provides forbidden_patterns and approved_patterns for re-enforcement at the instance configuration level. No section instance may be configured in a way that enables a forbidden pattern."
+      }
+    ],
+
+    "downstream_consumers": [
+      {
+        "workflow": "build-media-plan",
+        "receives": ["section-plan.json"],
+        "note": "Out of scope for Phase 4 beyond this workflow. The media plan consumes section instance media_config to determine asset requirements per section."
+      },
+      {
+        "workflow": "run-validation",
+        "receives": ["section-plan.json"],
+        "note": "Out of scope for Phase 4. The validation workflow checks section instances for schema compliance, forbidden pattern enforcement, and media/motion ceiling adherence."
+      }
+    ],
+
+    "schema_alignment": {
+      "section-instance.schema.json": {
+        "required_fields_covered": [
+          "section_id",
+          "section_type",
+          "page_type",
+          "purpose",
+          "enabled",
+          "priority",
+          "content_config",
+          "media_config",
+          "motion_config",
+          "seo_config",
+          "conversion_config"
+        ],
+        "optional_fields_covered": ["notes"],
+        "content_config_note": "content_config requires headline (string), body_mode (enum), and cta_mode (enum). headline is a planning-direction string — not final copy. faq_mode is optional and only relevant for faq-preview sections.",
+        "media_config_note": "media_config requires uses_images (boolean), uses_video (boolean), uses_embeds (boolean), and fallback_required (boolean). fallback_required must be true for any instance with uses_video = true or uses_images = true when design-system.media_strategy.fallback_required = true.",
+        "motion_config_note": "motion_config requires scroll_motion (boolean), interaction_motion (boolean), and motion_intensity (enum). motion_intensity must not exceed the design-system ceiling.",
+        "validation_note": "Each section instance must be validated against schemas/section-instance.schema.json before persisting. section_id must match pattern ^[a-z0-9-]+$. page_type must be 'homepage' for all instances in this workflow."
+      },
+      "section-library.schema.json": {
+        "usage_note": "section-library.schema.json defines the generic capabilities of each section type. This workflow uses those capability definitions as guardrails when configuring section instances — a section instance must not claim capabilities that the section type does not support. The section_library_selections output documents which section types are used and their capabilities.",
+        "capability_enforcement": "Before finalizing media_config.uses_video = true for a section instance, verify that the section type's media_capabilities.video_allowed = true in the section library schema. Similarly for uses_images vs images_allowed, uses_embeds vs embeds_allowed. For motion, verify section type motion_capabilities support before setting scroll_motion or interaction_motion = true."
+      }
+    },
+
+    "nodes": [
+      {
+        "step": 1,
+        "name": "Trigger",
+        "type": "Execute Workflow Trigger",
+        "description": "Receives the call from the master orchestrator. Expects: homepage_strategy (or path), design_system (or path), pattern_manifest (or path). All three inputs must be present before this workflow begins.",
+        "input": "homepage_strategy + design_system + pattern_manifest",
+        "output": "inputs available in workflow context"
+      },
+      {
+        "step": 2,
+        "name": "Validate Upstream Inputs",
+        "type": "Code node (JavaScript)",
+        "description": "Verify required upstream inputs are present and structurally valid. homepage_strategy must have: section_sequence (non-empty array, min 3 items), homepage_goal, hero_strategy (with hero_type, primary_focus, media_intensity, fallback_required), cta_strategy, trust_strategy, media_role, forbidden_homepage_patterns. design_system must have: motion_strategy.motion_level, media_strategy.image_intensity, media_strategy.video_usage, media_strategy.fallback_required, performance_guardrails.heavy_media_control. pattern_manifest must have: forbidden_patterns (array), approved_patterns (non-empty array). Halt with a descriptive error if any required field is missing or structurally invalid.",
+        "input": "all upstream inputs",
+        "output": "validated inputs or halt error"
+      },
+      {
+        "step": 3,
+        "name": "Extract Section-Level Ceiling Signals",
+        "type": "Code node (JavaScript)",
+        "description": "Extract and prepare the ceiling signals that will govern per-instance configuration. Produce a section_ceilings object containing: (1) MOTION CEILINGS: motion_level from design-system → per-section motion_allowed rules (see motion_config field mapping above). (2) MEDIA CEILINGS: image_intensity → per-section uses_images and media_priority bounds. video_usage → per-section uses_video ceiling. fallback_required → propagation rule for all instances with media. heavy_media_control → maximum count of high-media-priority instances. (3) FORBIDDEN PATTERN SET: union of pattern_manifest.forbidden_patterns and homepage_strategy.forbidden_homepage_patterns — these must be checked against each instance configuration. (4) TRUST PLACEMENT: trust_strategy.trust_placement → index window for trust-type sections in the sequence. (5) CTA DENSITY: cta_repetition → maximum count of sections with cta_mode != none. Log all ceiling signals with source labels for traceability.",
+        "input": "validated design_system + pattern_manifest + homepage_strategy",
+        "output": "section_ceilings object with provenance annotations"
+      },
+      {
+        "step": 4,
+        "name": "Resolve Section Library Capabilities",
+        "type": "Code node (JavaScript)",
+        "description": "For each section_type present in homepage_strategy.section_sequence, look up the section-library.schema.json capability definitions. Build a section_library_capabilities map: section_type → { images_allowed, video_allowed, embeds_allowed, fallback_required_if_media_used, scroll_motion_allowed, interaction_motion_allowed, motion_should_be_subtle, supports_indexable_text, supports_internal_linking, supports_keyword_targeting, supports_cta, supports_trust, supports_objection_handling }. This map is used in the next step to validate that instance configuration does not claim capabilities the section type does not support. Note: section-library capability definitions in this phase are taken from the schema enum — not from a live theme section inventory. If a future theme section inventory becomes available, this step should be updated to query it instead.",
+        "input": "homepage_strategy.section_sequence (section_type list) + section-library schema definitions",
+        "output": "section_library_capabilities map",
+        "implementation_note": "The section-library schema defines WHICH CAPABILITIES each type has generically. In a code node, this can be implemented as a hardcoded capability map derived from the schema (since the schema is committed to Git and stable). A future version of this step could load the schema dynamically from the GitHub-stored schemas/section-library.schema.json."
+      },
+      {
+        "step": 5,
+        "name": "Build LLM Section Instance Configuration Prompt",
+        "type": "Code node (JavaScript)",
+        "description": "Assemble the structured LLM prompt for section instance configuration. The prompt must: (1) Present the section_sequence from homepage-strategy as the ordered list of sections to configure. (2) For each section, include the purpose and priority from homepage-strategy. (3) Present the section_ceilings as non-negotiable constraints — the LLM must respect them for every instance. (4) Present the section_library_capabilities map so the LLM knows what each section type supports. (5) Request output as a JSON array of section instance objects, each conforming to schemas/section-instance.schema.json. (6) Include the full schema enum values for all fields. (7) Instruct the model to generate content_config.headline as a planning-direction string (NOT final copy) — a description of the intended message goal for the section. (8) Instruct the model to set enabled = false for sections that depend on runtime data (reviews, UGC) and explain why in the notes field. (9) Instruct the model to flag any section that would require a forbidden pattern behavior as review-required in the notes field. (10) Remind the model that section instances are planning artifacts — not final theme configurations or content instructions.",
+        "input": "validated inputs + section_ceilings + section_library_capabilities",
+        "output": "assembled LLM prompt string",
+        "prompt_safety_note": "Prompt must explicitly state: 'CEILING values are absolute upper limits for motion and media. Do not exceed them. FORBIDDEN PATTERN behaviors must not appear in any section instance configuration. content_config.headline is a planning direction string — not final copy. Do not write marketing copy. Set enabled = false for sections that depend on Shopify review or UGC data availability.'"
+      },
+      {
+        "step": 6,
+        "name": "LLM Synthesis: Section Instance Configurations",
+        "type": "OpenAI node (Chat Model)",
+        "description": "Send the assembled prompt to the OpenAI API. Request JSON output mode. Temperature: 0.2 (lower than homepage strategy — section instance configuration is more deterministic). Max tokens: 4000 (to accommodate full section instance array).",
+        "credential": "OPENAI_CREDENTIAL_PLACEHOLDER",
+        "model_note": "Actual model name must be confirmed at implementation time. Default assumption: gpt-4o.",
+        "input": "assembled LLM prompt",
+        "output": "raw LLM response string (expected to be JSON array)"
+      },
+      {
+        "step": 7,
+        "name": "Parse and Enforce Section-Level Constraints",
+        "type": "Code node (JavaScript)",
+        "description": "Parse the raw LLM response as JSON. Then enforce constraint integrity for each instance: (1) SECTION IDs: Assign section_id as {section_type}-{position_index} (e.g. 'hero-1', 'featured-products-2') if not already correctly formed. (2) PAGE TYPE: Overwrite page_type = 'homepage' for all instances. (3) MEDIA CEILINGS: For each instance, if uses_video = true and video_usage from design-system forbids it, set uses_video = false and add a note. If fallback_required = true in design-system, set fallback_required = true for all instances with uses_video = true or uses_images = true. Count instances with media_priority = high — if count exceeds heavy_media_control limit, downgrade lowest-priority exceedance to medium. (4) MOTION CEILINGS: Enforce motion_intensity ceiling per instance based on motion_level. Set scroll_motion = false and interaction_motion = false for all instances where motion_level = none. (5) CAPABILITY ENFORCEMENT: For each instance, verify that its media_config and motion_config are consistent with the section_library_capabilities for that section type. If inconsistent, adjust the instance to the more conservative value and note the adjustment. (6) FORBIDDEN PATTERN CHECK: For each instance, check that no configuration choice enables a known forbidden pattern behavior. If a violation is detected, adjust the configuration or set a review-required note. (7) TRUST PLACEMENT ENFORCEMENT: Verify that trust-type sections appear in the correct position window according to trust_placement. (8) CTA DENSITY ENFORCEMENT: Count instances with cta_mode != none — if count exceeds cta_repetition ceiling, set excess instances to cta_mode = none (prioritizing optional sections first).",
+        "input": "raw LLM response + section_ceilings + section_library_capabilities",
+        "output": "parsed and constrained section instances array (pre-validation)"
+      },
+      {
+        "step": 8,
+        "name": "Build Section Library Selections",
+        "type": "Code node (JavaScript)",
+        "description": "From the resolved section instances, extract the unique set of section types used. For each unique section type, construct a section_library entry conforming to schemas/section-library.schema.json. This documents the planning-level capability profile for each section type used in this store's plan. These entries should reflect the capabilities as defined in the schema — not as overridden by instance configuration. The section_library_selections array and the section_instances array together form the final section_plan artifact.",
+        "input": "constrained section instances array",
+        "output": "section_library_selections array + section_instances array"
+      },
+      {
+        "step": 9,
+        "name": "Validate Instances Against Schema",
+        "type": "Code node (JavaScript) with JSON Schema validator",
+        "description": "Validate each section instance object against schemas/section-instance.schema.json using ajv. Key validations: section_id matches pattern ^[a-z0-9-]+$, section_type in enum, page_type = 'homepage', purpose non-empty, enabled is boolean, priority in enum, content_config required fields present and body_mode/cta_mode in enum, media_config required fields all present and boolean, motion_config required fields present and motion_intensity in enum, seo_config and conversion_config required fields present. Halt on any validation failure and report the exact instance and field violation.",
+        "validation_library": "ajv",
+        "schema_file": "schemas/section-instance.schema.json",
+        "failure_behavior": "Halt workflow. Report exact schema violation. Do not persist any instance if validation fails.",
+        "input": "constrained section instances array",
+        "output": "validated section instances array or validation error"
+      },
+      {
+        "step": 10,
+        "name": "Persist section-plan.json",
+        "type": "GitHub node or Write File node",
+        "description": "Write the section plan artifact to projects/{project_id}/section-plan.json. The artifact contains two top-level keys: section_library_selections (array) and section_instances (array). Commit with a message such as 'chore: generate section-plan for {store_id} — Phase 4 draft'. This artifact concludes the section planning workflow.",
+        "artifact_path": "projects/{project_id}/section-plan.json",
+        "artifact_structure": {
+          "section_library_selections": "array of section-library.schema.json objects for section types used",
+          "section_instances": "array of section-instance.schema.json objects for configured homepage sections"
+        },
+        "git_note": "section-plan.json must be committed to Git. It is consumed by the future build-media-plan and run-validation workflows.",
+        "input": "validated section instances array + section_library_selections",
+        "output": "confirmation of write + artifact path"
+      },
+      {
+        "step": 11,
+        "name": "Output to Downstream",
+        "type": "Execute Workflow Trigger output / pass-through",
+        "description": "Pass the artifact path and a reference to the validated section_plan object to the master orchestrator.",
+        "input": "artifact_path + validated section_plan",
+        "output": "workflow output payload"
+      }
+    ],
+
+    "assumptions": [
+      "homepage-strategy.json is the authoritative source for which section types appear in the plan and in what order. This workflow configures instances — it does not add or remove section types from the homepage strategy sequence without documented reason.",
+      "design-system.json is the definitive motion and media ceiling. Per-instance configuration must not exceed design-system ceilings, even if the section type supports higher capabilities generically.",
+      "Section-library capability definitions are taken from schemas/section-library.schema.json committed to Git. No live theme section inventory is available in Phase 4. A future implementation should query actual theme capabilities and may need to adjust instance configurations if the theme does not support a section type.",
+      "section instances in this plan are for the homepage only (page_type = 'homepage'). Product-page, collection-page, and other page type instances are out of scope for this phase.",
+      "The hero section instance is always the first instance in section_instances and always has priority = core.",
+      "Sections that depend on Shopify runtime data (reviews, UGC, real product media) are given enabled = false by default, with a note explaining the data dependency. The runtime system must enable them after data confirmation.",
+      "content_config.headline is a planning-direction string — it describes the intended message goal for the section, not final copy. Final copy is produced by content generation workflows.",
+      "The OpenAI credential is already configured in n8n. The actual credential name must be confirmed during implementation.",
+      "Forbidden pattern enforcement in this workflow is additive to — not a replacement for — the enforcement done in build-pattern-manifest and build-homepage-strategy. If a new forbidden pattern violation is detected at the instance level, the instance is adjusted and the violation is documented in the instance notes."
+    ],
+
+    "open_questions": [
+      {
+        "question": "Should section-plan.json include product-page and collection-page section instances in addition to homepage instances, or should separate subworkflows be created for each page type?",
+        "impact": "The current scope produces homepage instances only. Product pages and collection pages would need their own section instance plans. Creating separate workflows (build-product-section-plan, build-collection-section-plan) is more modular but adds workflow count.",
+        "recommended_default": "Out of scope for Phase 4. Document here and defer to a future phase. The current workflow filename and structure is extensible — page_type in section-instance.schema.json already supports multiple page types."
+      },
+      {
+        "question": "How should the section plan handle section types that the homepage strategy recommends but that a real Shopify theme may not support?",
+        "impact": "If the plan recommends a 'comparison-section' but the theme has no comparison section, the plan is invalid at implementation time.",
+        "recommended_default": "Add a theme_capability_gap flag to the notes field for any section type that is not universally available in standard Shopify theme section libraries. Mark these as REVIEW-REQUIRED. Resolve against actual theme inventory at implementation time. This workflow cannot resolve this without a live theme inspection."
+      },
+      {
+        "question": "Should the section plan include a canonical section order recommendation separate from the section_instances array order?",
+        "impact": "The section_instances array is ordered by the homepage strategy sequence. If a future system needs to re-order sections dynamically, a separate order field would be needed.",
+        "recommended_default": "Array position is the canonical order for now. Add position-based section_id conventions (hero-1, featured-products-2) to make order explicit without a separate field."
+      },
+      {
+        "question": "How should review-section and social-proof instances behave when the store has zero Shopify reviews?",
+        "impact": "A section plan with an enabled review-section but no review data would produce an empty section in the live store.",
+        "recommended_default": "Default enabled = false for data-dependent sections. Add a note: 'Enable pending confirmation that Shopify review count > N (recommended minimum: 5 published reviews). Use a threshold appropriate to the store's catalog size.' The threshold is configurable."
+      }
+    ],
+
+    "evidence_boundaries": {
+      "direct_from_user": [
+        "Motion preferences (applied via design-system ceiling — indirectly constrains per-instance motion_config)",
+        "Video preferences (applied via design-system ceiling — constrains uses_video per instance)",
+        "Performance priority (applied via design-system — constrains media_priority and heavy_media_control)"
+      ],
+      "direct_from_prior_phase_constraints": [
+        "section_sequence order (direct from homepage-strategy — the LLM-synthesized section planning from Phase 3)",
+        "hero_strategy.fallback_required (direct propagation from design-system via homepage-strategy)",
+        "forbidden_patterns (direct from pattern-manifest, re-applied at instance level)",
+        "cta_repetition (direct from homepage-strategy.cta_strategy)"
+      ],
+      "derived_from_synthesized_upstream_artifacts": [
+        "content_config.headline (LLM-synthesized planning direction — not final copy)",
+        "body_mode, cta_mode (LLM-selected from enum within constraint space)",
+        "Trust section placement (LLM-applied trust_placement from homepage-strategy — itself LLM-synthesized)",
+        "motion_intensity per instance (ceiling-derived — exact allocation within ceiling is LLM-selected)"
+      ],
+      "not_available_in_this_phase": [
+        "Live Shopify theme section inventory or capability list",
+        "Real section layout testing or CRO data",
+        "Actual product media availability from Shopify (for media-dependent section configurations)",
+        "Real Shopify review counts for data-dependent section enablement",
+        "Theme performance benchmarks for specific section type combinations"
+      ],
+      "labeling_requirement": "The artifact notes field and each instance notes field must include: 'SECTION PLAN — SYNTHESIS ARTIFACT: Section instances are planning-level configurations derived from LLM-synthesized upstream planning artifacts (homepage strategy, design system, pattern manifest). Section types and their configurations are planning recommendations — not validated theme implementations. Section capability constraints are taken from the section-library schema, not from a live theme inspection. Enabled = false sections require runtime data confirmation before activation. Human review is required before this artifact informs content generation or theme configuration decisions.'"
+    },
+
+    "runtime_dependencies": [
+      "n8n Execute Workflow Trigger node — receives subworkflow call from master orchestrator",
+      "n8n Code node (JavaScript) — for input validation, ceiling extraction, capability resolution, prompt building, response parsing, constraint enforcement, library selection, and schema validation",
+      "n8n OpenAI node OR HTTP Request node (OpenAI API) — for LLM section instance configuration synthesis",
+      "n8n GitHub node OR Write File node — for persisting section-plan.json",
+      "ajv (Ajv JSON Schema Validator) — for schema validation inside Code node",
+      "schemas/section-instance.schema.json — must be accessible to the validation step",
+      "schemas/section-library.schema.json — must be accessible to the capability resolution step",
+      "OpenAI API credential — stored in n8n, never in Git",
+      "build-homepage-strategy, build-design-system, and build-pattern-manifest must all complete successfully before this workflow runs"
+    ]
+  }
+}
