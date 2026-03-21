@@ -259,7 +259,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// orchestrate-phase1 — Phase 2 Complete\n// build-market-intelligence succeeded.\n// Returns a summary for the operator and carries market_intelligence forward.\n//\n// CLOUD MODE: market_intelligence is returned inline (no disk artifact).\n// SELF-HOSTED: artifact_path points to market-intelligence.json on disk.\n\nconst miOutput = $input.first().json;\nconst cloudMode = miOutput.cloud_mode || false;\n\nconst summary = {\n  status:           'PHASE_2_COMPLETE',\n  project_id:       miOutput.project_id,\n  artifact_written: miOutput.artifact_path,\n  completed_at:     new Date().toISOString(),\n  next_phase:       'Phase 3 — Brand Positioning (build-brand-positioning) — not yet implemented',\n  cloud_mode:       cloudMode,\n  cloud_warnings:   miOutput.cloud_warnings || [],\n  notes:            (miOutput.notes || []).filter(Boolean),\n  message:          cloudMode\n    ? [\n        `Phase 2 chain completed (cloud mode) for project: ${miOutput.project_id}`,\n        'No artifacts were written to disk. market_intelligence is available in this output.',\n        'Next: build-brand-positioning (Phase 3 — not yet implemented).',\n      ].join(' | ')\n    : [\n        `Phase 2 chain completed for project: ${miOutput.project_id}`,\n        `market-intelligence.json written to: ${miOutput.artifact_path}`,\n        'Next: build-brand-positioning (Phase 3 — not yet implemented).',\n      ].join(' | '),\n};\n\n// Carry market_intelligence forward for inspection (cloud mode)\nif (cloudMode && miOutput.market_intelligence) {\n  summary.market_intelligence = miOutput.market_intelligence;\n}\n\nreturn [{ json: summary }];\n"
+        "jsCode": "// orchestrate-phase1 — Phase 2 Complete\n// build-market-intelligence succeeded.\n// Returns a summary for the operator and carries all data forward for Phase 3 (build-brand-positioning).\n//\n// CLOUD MODE: market_intelligence is returned inline (no disk artifact).\n// SELF-HOSTED: artifact_path points to market-intelligence.json on disk.\n//              market_intelligence object is also passed inline for Phase 3.\n\nconst miOutput = $input.first().json;\nconst cloudMode = miOutput.cloud_mode || false;\n\n// Gather upstream data needed for Phase 3 (brand positioning)\nconst phase1Output = $node['Phase 1 Complete'].json;\n\nconst summary = {\n  status:           'PHASE_2_COMPLETE',\n  project_id:       miOutput.project_id,\n  artifact_written: miOutput.artifact_path,\n  completed_at:     new Date().toISOString(),\n  next_phase:       'Phase 3 — Brand Positioning (build-brand-positioning)',\n  cloud_mode:       cloudMode,\n  cloud_warnings:   miOutput.cloud_warnings || [],\n  notes:            (miOutput.notes || []).filter(Boolean),\n  message:          cloudMode\n    ? [\n        `Phase 2 chain completed (cloud mode) for project: ${miOutput.project_id}`,\n        'No artifacts were written to disk. market_intelligence is available in this output.',\n        'Continuing to Phase 3: build-brand-positioning.',\n      ].join(' | ')\n    : [\n        `Phase 2 chain completed for project: ${miOutput.project_id}`,\n        `market-intelligence.json written to: ${miOutput.artifact_path}`,\n        'Continuing to Phase 3: build-brand-positioning.',\n      ].join(' | '),\n  // Pass forward for Phase 3 (always — market_intelligence flows inline in both modes)\n  runtime_config:             miOutput.runtime_config || phase1Output.runtime_config,\n  store_profile:              phase1Output.store_profile,\n  normalized_intake_payload:  phase1Output.normalized_intake_payload,\n  market_intelligence:        miOutput.market_intelligence,\n};\n\nreturn [{ json: summary }];\n"
       },
       "id": "e5f6a7b8-0005-0005-0005-000000000018",
       "name": "Phase 2 Complete",
@@ -267,6 +267,80 @@
       "typeVersion": 2,
       "position": [
         3500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Bridge: Prepare build-brand-positioning input\n// Assembles the input payload for the build-brand-positioning subworkflow.\n// build-brand-positioning expects: project_id, store_profile, market_intelligence,\n// normalized_intake_payload, and runtime_config.\n//\n// market_intelligence flows inline in both cloud and self-hosted modes\n// (forwarded from build-market-intelligence output through Phase 2 Complete).\n\nconst phase2Output = $input.first().json;\n\nconst output = {\n  project_id:                 phase2Output.project_id,\n  runtime_config:             phase2Output.runtime_config,\n  store_profile:              phase2Output.store_profile,\n  normalized_intake_payload:  phase2Output.normalized_intake_payload,\n  market_intelligence:        phase2Output.market_intelligence,\n  chain_step:                 'pre-build-brand-positioning',\n};\n\nreturn [{ json: output }];\n"
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000019",
+      "name": "Prepare Brand Positioning Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_WITH_BUILD_BRAND_POSITIONING_WORKFLOW_ID",
+        "options": {}
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000020",
+      "name": "Run build-brand-positioning",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        4000,
+        300
+      ],
+      "notes": "SETUP: Replace REPLACE_WITH_BUILD_BRAND_POSITIONING_WORKFLOW_ID with the n8n workflow ID of build-brand-positioning. Find it in the URL when editing that workflow in n8n."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "value2": "SUCCESS"
+            }
+          ]
+        }
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000021",
+      "name": "Brand Positioning Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        4250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Brand Positioning HALT\nconst input    = $input.first().json;\nconst errorMsg = `CHAIN_HALT: build-brand-positioning failed. Status: ${input.status}.`;\nconsole.error(errorMsg);\nthrow new Error(errorMsg);\n"
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000022",
+      "name": "Halt - Brand Positioning Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4250,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Phase 3 Complete\n// build-brand-positioning succeeded.\n// Returns a summary for the operator. Terminal node for now.\n//\n// CLOUD MODE: brand_positioning is returned inline (no disk artifact).\n// SELF-HOSTED: artifact_path points to brand-positioning.json on disk.\n\nconst bpOutput = $input.first().json;\nconst cloudMode = bpOutput.cloud_mode || false;\n\nconst summary = {\n  status:           'PHASE_3_COMPLETE',\n  project_id:       bpOutput.project_id,\n  artifact_written: bpOutput.artifact_path,\n  completed_at:     new Date().toISOString(),\n  next_phase:       'Phase 4+ — Competitor Clusters and downstream planning (not yet implemented)',\n  cloud_mode:       cloudMode,\n  cloud_warnings:   bpOutput.cloud_warnings || [],\n  notes:            (bpOutput.notes || []).filter(Boolean),\n  message:          cloudMode\n    ? [\n        `Phase 3 chain completed (cloud mode) for project: ${bpOutput.project_id}`,\n        'No artifacts were written to disk. brand_positioning is available in this output.',\n        'Next: build-competitor-clusters (Phase 4+ — not yet implemented).',\n      ].join(' | ')\n    : [\n        `Phase 3 chain completed for project: ${bpOutput.project_id}`,\n        `brand-positioning.json written to: ${bpOutput.artifact_path}`,\n        'Next: build-competitor-clusters (Phase 4+ — not yet implemented).',\n      ].join(' | '),\n};\n\n// Carry brand_positioning forward for inspection\nif (bpOutput.brand_positioning) {\n  summary.brand_positioning = bpOutput.brand_positioning;\n}\n\nreturn [{ json: summary }];\n"
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000023",
+      "name": "Phase 3 Complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4500,
         300
       ]
     }
@@ -442,6 +516,57 @@
           }
         ]
       ]
+    },
+    "Phase 2 Complete": {
+      "main": [
+        [
+          {
+            "node": "Prepare Brand Positioning Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Brand Positioning Input": {
+      "main": [
+        [
+          {
+            "node": "Run build-brand-positioning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run build-brand-positioning": {
+      "main": [
+        [
+          {
+            "node": "Brand Positioning Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Brand Positioning Success?": {
+      "main": [
+        [
+          {
+            "node": "Phase 3 Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Halt - Brand Positioning Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -450,10 +575,10 @@
   },
   "_meta": {
     "storeOs": {
-      "phase": "Phase 12/13",
+      "phase": "Phase 12/13/14",
       "format": "n8n-executable",
       "sourceSpec": "workflows/runtime/n8n-implementation-map.md",
-      "cloudCompatibility": "PARTIAL — the full chain runs in both modes. In cloud mode: no artifact persistence, no schema validation, no checkpoint/log writes. shopify_import and store_profile flow inline through bridge nodes. market_intelligence is returned in the Phase 2 Complete output for inspection. Config is supplied via smoke_test_config in the trigger input (no process.env access).",
+      "cloudCompatibility": "PARTIAL — the full chain runs in both modes. In cloud mode: no artifact persistence, no schema validation, no checkpoint/log writes. shopify_import, store_profile, market_intelligence, and brand_positioning flow inline through bridge nodes. Config is supplied via smoke_test_config in the trigger input (no process.env access).",
       "intakePayloadExample": {
         "intake_payload": {
           "project_id": "suppliedtech",
@@ -481,17 +606,19 @@
           "STORE_OS_SHOPIFY_API_VERSION": "2024-01"
         }
       },
-      "chainCoverage": "resolve-runtime-config → intake-store-input → import-shopify-data → build-store-profile → build-market-intelligence",
+      "chainCoverage": "resolve-runtime-config → intake-store-input → import-shopify-data → build-store-profile → build-market-intelligence → build-brand-positioning",
       "setupRequired": [
         "Replace REPLACE_WITH_INTAKE_STORE_INPUT_WORKFLOW_ID with the n8n workflow ID of intake-store-input",
         "Replace REPLACE_WITH_IMPORT_SHOPIFY_DATA_WORKFLOW_ID with the n8n workflow ID of import-shopify-data",
         "Replace REPLACE_WITH_BUILD_STORE_PROFILE_WORKFLOW_ID with the n8n workflow ID of build-store-profile",
         "Replace REPLACE_WITH_BUILD_MARKET_INTELLIGENCE_WORKFLOW_ID with the n8n workflow ID of build-market-intelligence",
+        "Replace REPLACE_WITH_BUILD_BRAND_POSITIONING_WORKFLOW_ID with the n8n workflow ID of build-brand-positioning",
         "Replace REPLACE_WITH_N8N_OPENAI_CREDENTIAL_ID in build-market-intelligence with your OpenAI credential ID",
+        "Replace REPLACE_WITH_N8N_OPENAI_CREDENTIAL_ID in build-brand-positioning with your OpenAI credential ID",
         "Self-hosted: set all STORE_OS_* environment variables. n8n Cloud: pass values as smoke_test_config in trigger input.",
         "Configure Shopify API credential in n8n and update import-shopify-data with its credential ID"
       ],
-      "notYetImplemented": "build-brand-positioning and all subsequent workflows (Phase 3+)"
+      "notYetImplemented": "build-competitor-clusters and all subsequent workflows (Phase 4+)"
     }
   }
 }
