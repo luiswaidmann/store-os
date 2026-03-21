@@ -8,6 +8,7 @@ tmp/
 *.log
 .env
 .env.*
+!.env.example
 coverage/
 *.zip
 

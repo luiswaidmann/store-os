@@ -1,0 +1,250 @@
+{
+  "name": "orchestrate-phase1",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "e5f6a7b8-0005-0005-0005-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 400],
+      "notes": "SETUP: After triggering manually, n8n will prompt for input data. Provide the intake_payload JSON object as shown in the example below. See _meta.intakePayloadExample for a complete example."
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Step 1: Resolve Runtime Config\n// Validates all required environment variables and assembles the runtime config.\n// Any CONFIG_MISSING error halts the entire chain here — before any subworkflow runs.\n//\n// The intake_payload for this run must be provided as input data when triggering\n// the workflow manually. In n8n, pass it via the manual trigger's input JSON.\n// Example input: { \"intake_payload\": { \"project_id\": \"...\", ... } }\n\nconst fs = require('fs');\n\nconst REQUIRED_ENV_VARS = [\n  'STORE_OS_OPENAI_CREDENTIAL_NAME',\n  'STORE_OS_SHOPIFY_CREDENTIAL_NAME',\n  'STORE_OS_SHOPIFY_SHOP_URL',\n  'STORE_OS_LLM_MODEL',\n  'STORE_OS_ENV',\n  'STORE_OS_PROJECT_ROOT',\n  'STORE_OS_SHOPIFY_API_VERSION',\n  'STORE_OS_AJV_SCHEMA_PATH',\n];\n\nconst ALLOWED_ENVS = ['dev', 'staging', 'production'];\n\nconst missing = REQUIRED_ENV_VARS.filter(\n  (v) => !process.env[v] || !process.env[v].trim()\n);\nif (missing.length > 0) {\n  throw new Error(\n    'CONFIG_MISSING: Required environment variables not set: ' + missing.join(', ') +\n    '. Configure them in n8n Settings > Variables or the n8n process environment.'\n  );\n}\n\nconst env = process.env.STORE_OS_ENV.trim();\nif (!ALLOWED_ENVS.includes(env)) {\n  throw new Error(`CONFIG_MISSING: STORE_OS_ENV must be one of: ${ALLOWED_ENVS.join(', ')}. Got: \"${env}\"`);\n}\n\nconst projectRoot = process.env.STORE_OS_PROJECT_ROOT.trim();\nif (!fs.existsSync(projectRoot)) {\n  throw new Error(`CONFIG_MISSING: STORE_OS_PROJECT_ROOT does not exist: ${projectRoot}`);\n}\n\nconst ajvSchemaPath = process.env.STORE_OS_AJV_SCHEMA_PATH.trim();\nif (!fs.existsSync(ajvSchemaPath)) {\n  throw new Error(`CONFIG_MISSING: STORE_OS_AJV_SCHEMA_PATH does not exist: ${ajvSchemaPath}`);\n}\n\nconst runtimeConfig = {\n  env,\n  project_root:            projectRoot,\n  openai_credential_name:  process.env.STORE_OS_OPENAI_CREDENTIAL_NAME.trim(),\n  shopify_credential_name: process.env.STORE_OS_SHOPIFY_CREDENTIAL_NAME.trim(),\n  shopify_shop_url:        process.env.STORE_OS_SHOPIFY_SHOP_URL.trim(),\n  llm_model:               process.env.STORE_OS_LLM_MODEL.trim(),\n  shopify_api_version:     process.env.STORE_OS_SHOPIFY_API_VERSION.trim(),\n  ajv_schema_path:         ajvSchemaPath,\n  backup_root:             process.env.STORE_OS_BACKUP_ROOT ? process.env.STORE_OS_BACKUP_ROOT.trim() : null,\n  resolved_at:             new Date().toISOString(),\n};\n\n// Extract intake_payload from the trigger input\nconst triggerInput   = $input.first().json;\nconst intakePayload  = triggerInput.intake_payload;\n\nif (!intakePayload || !intakePayload.project_id) {\n  throw new Error(\n    'MISSING_INPUT: intake_payload with project_id is required. ' +\n    'Provide it as the manual trigger input JSON: { \"intake_payload\": { \"project_id\": \"...\", ... } }'\n  );\n}\n\nreturn [{\n  json: {\n    runtime_config:  runtimeConfig,\n    intake_payload:  intakePayload,\n    chain_step:      'resolve-runtime-config',\n    status:          'SUCCESS',\n  },\n}];\n"
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000002",
+      "name": "Resolve Runtime Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 400]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_WITH_INTAKE_STORE_INPUT_WORKFLOW_ID",
+        "options": {}
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000003",
+      "name": "Run intake-store-input",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [750, 400],
+      "notes": "SETUP: Replace REPLACE_WITH_INTAKE_STORE_INPUT_WORKFLOW_ID with the n8n workflow ID of intake-store-input. Find it in the URL when editing that workflow in n8n."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "value2": "SUCCESS"
+            }
+          ]
+        }
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000004",
+      "name": "Intake Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1000, 400]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_WITH_IMPORT_SHOPIFY_DATA_WORKFLOW_ID",
+        "options": {}
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000005",
+      "name": "Run import-shopify-data",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "notes": "SETUP: Replace REPLACE_WITH_IMPORT_SHOPIFY_DATA_WORKFLOW_ID with the n8n workflow ID of import-shopify-data."
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Intake HALT\n// Reached when intake-store-input returns a non-SUCCESS status.\n// Logs the failure. The chain stops here (no further nodes connected).\n\nconst input = $input.first().json;\nconst errorMsg = `CHAIN_HALT: intake-store-input failed. Status: ${input.status}. Check the intake-store-input execution for details.`;\nconsole.error(errorMsg);\nthrow new Error(errorMsg);\n"
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000006",
+      "name": "Halt - Intake Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "value2": "SUCCESS"
+            }
+          ]
+        }
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000007",
+      "name": "Import Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1500, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Import HALT\nconst input   = $input.first().json;\nconst errorMsg = `CHAIN_HALT: import-shopify-data failed. Status: ${input.status}.`;\nconsole.error(errorMsg);\nthrow new Error(errorMsg);\n"
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000008",
+      "name": "Halt - Import Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1500, 450]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Bridge: Prepare build-store-profile input\n// import-shopify-data returns its own output.\n// We need to re-attach the normalized_intake_payload from intake-store-input\n// so that build-store-profile has both upstream inputs.\n//\n// In n8n, data from earlier nodes is accessed via $node[\"Node Name\"].json.\n\nconst importOutput = $input.first().json;\nconst intakeOutput = $node['Run intake-store-input'].json;\n\nreturn [{\n  json: {\n    project_id:                 importOutput.project_id,\n    runtime_config:             importOutput.runtime_config,\n    normalized_intake_payload:  intakeOutput.normalized_intake_payload,\n    import_summary:             importOutput.import_summary,\n    chain_step:                 'pre-build-store-profile',\n  },\n}];\n"
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000009",
+      "name": "Prepare Profile Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1750, 300]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_WITH_BUILD_STORE_PROFILE_WORKFLOW_ID",
+        "options": {}
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000010",
+      "name": "Run build-store-profile",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [2000, 300],
+      "notes": "SETUP: Replace REPLACE_WITH_BUILD_STORE_PROFILE_WORKFLOW_ID with the n8n workflow ID of build-store-profile."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "value2": "SUCCESS"
+            }
+          ]
+        }
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000011",
+      "name": "Profile Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Profile HALT\nconst input    = $input.first().json;\nconst errorMsg = `CHAIN_HALT: build-store-profile failed. Status: ${input.status}.`;\nconsole.error(errorMsg);\nthrow new Error(errorMsg);\n"
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000012",
+      "name": "Halt - Profile Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 450]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Chain Complete\n// All Phase 1 workflows completed successfully.\n// Logs the result and returns a summary for the operator.\n\nconst profileOutput = $input.first().json;\nconst fs   = require('fs');\nconst path = require('path');\n\nconst projectId   = profileOutput.project_id;\nconst projectRoot = profileOutput.runtime_config.project_root;\n\n// Read final checkpoint to include in summary\nlet checkpoint = null;\ntry {\n  const cpPath = path.join(projectRoot, projectId, '.runtime', 'checkpoint.json');\n  if (fs.existsSync(cpPath)) {\n    checkpoint = JSON.parse(fs.readFileSync(cpPath, 'utf8'));\n  }\n} catch { /* non-fatal */ }\n\nconst summary = {\n  status:               'PHASE_1_COMPLETE',\n  project_id:           projectId,\n  artifact_written:     profileOutput.artifact_path,\n  completed_at:         new Date().toISOString(),\n  next_phase:           'Phase 2 — Market Intelligence (build-market-intelligence)',\n  checkpoint_status:    checkpoint ? checkpoint.chain_status : 'unknown',\n  notes:                (profileOutput.notes || []).filter(Boolean),\n  message:              [\n    `Phase 1 chain completed for project: ${projectId}`,\n    `store-profile.json written to: ${profileOutput.artifact_path}`,\n    'Next: run build-market-intelligence (Phase 2 — not yet implemented in Phase 12).',\n  ].join(' | '),\n};\n\nreturn [{ json: summary }];\n"
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000013",
+      "name": "Phase 1 Complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2500, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [{ "node": "Resolve Runtime Config", "type": "main", "index": 0 }]
+      ]
+    },
+    "Resolve Runtime Config": {
+      "main": [
+        [{ "node": "Run intake-store-input", "type": "main", "index": 0 }]
+      ]
+    },
+    "Run intake-store-input": {
+      "main": [
+        [{ "node": "Intake Success?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Intake Success?": {
+      "main": [
+        [{ "node": "Run import-shopify-data",  "type": "main", "index": 0 }],
+        [{ "node": "Halt - Intake Failed",      "type": "main", "index": 0 }]
+      ]
+    },
+    "Run import-shopify-data": {
+      "main": [
+        [{ "node": "Import Success?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Import Success?": {
+      "main": [
+        [{ "node": "Prepare Profile Input",   "type": "main", "index": 0 }],
+        [{ "node": "Halt - Import Failed",    "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Profile Input": {
+      "main": [
+        [{ "node": "Run build-store-profile", "type": "main", "index": 0 }]
+      ]
+    },
+    "Run build-store-profile": {
+      "main": [
+        [{ "node": "Profile Success?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Profile Success?": {
+      "main": [
+        [{ "node": "Phase 1 Complete",        "type": "main", "index": 0 }],
+        [{ "node": "Halt - Profile Failed",   "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "_meta": {
+    "storeOs": {
+      "phase": "Phase 12",
+      "format": "n8n-executable",
+      "sourceSpec": "workflows/runtime/n8n-implementation-map.md",
+      "setupRequired": [
+        "Replace REPLACE_WITH_INTAKE_STORE_INPUT_WORKFLOW_ID with the n8n workflow ID of intake-store-input",
+        "Replace REPLACE_WITH_IMPORT_SHOPIFY_DATA_WORKFLOW_ID with the n8n workflow ID of import-shopify-data",
+        "Replace REPLACE_WITH_BUILD_STORE_PROFILE_WORKFLOW_ID with the n8n workflow ID of build-store-profile",
+        "Set all STORE_OS_* environment variables (see .env.example)",
+        "Configure Shopify API credential in n8n and update import-shopify-data with its credential ID"
+      ],
+      "intakePayloadExample": {
+        "intake_payload": {
+          "project_id": "suppliedtech",
+          "project_name": "SuppliedTech",
+          "primary_market": "DE",
+          "primary_language": "de",
+          "primary_currency": "EUR",
+          "vertical": "consumer-tech-accessories",
+          "price_positioning": "mass-premium",
+          "publish_mode": "draft-only",
+          "store_type": "multi-product-store",
+          "business_model": "ecommerce",
+          "manual_review_required": true,
+          "seo_goal": "hybrid",
+          "aeo_goal": "hybrid",
+          "faq_intensity": "balanced",
+          "special_notes": null
+        }
+      },
+      "chainCoverage": "resolve-runtime-config → intake-store-input → import-shopify-data → build-store-profile",
+      "notYetImplemented": "build-market-intelligence and all subsequent workflows (Phase 13+)"
+    }
+  }
+}
