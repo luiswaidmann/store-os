@@ -193,4 +193,38 @@ Same as above, plus:
 3. `shopify_import` is optional — the workflow degrades gracefully without catalog context (market_subcategories omitted).
 4. `competitor_urls` from intake are used as archetype labeling hints only — not crawled.
 5. All LLM outputs require human review before driving strategic decisions.
-6. `media_opportunities` is intentionally not synthesized here — deferred to build-media-plan.
+
+## Status after Phase 14
+
+Phase 13 remains the executable runtime stage that produces `market_intelligence`, but it is no longer the terminal stage of the currently confirmed cloud smoke-test path.
+
+As of the Phase 14 merge, `build-market-intelligence` now feeds the next executable runtime stage:
+
+- `build-brand-positioning`
+
+Current confirmed cloud execution path:
+
+- `resolve-runtime-config`
+- `intake-store-input`
+- `import-shopify-data`
+- `build-store-profile`
+- `build-market-intelligence`
+- `build-brand-positioning`
+
+Current confirmed inline outputs in n8n Cloud:
+
+- `store_profile`
+- `market_intelligence`
+- `brand_positioning`
+
+This Phase 13 runtime document should therefore be read together with:
+
+- `docs/phase-14-brand-positioning-runtime.md`
+
+Phase 13 remains cloud-compatible under the same known constraints:
+
+- no filesystem persistence
+- no standard `process.env` dependency
+- no disk-based checkpointing
+- no local AJV/path-based validation in cloud mode
+7. `media_opportunities` is intentionally not synthesized here — deferred to build-media-plan.
