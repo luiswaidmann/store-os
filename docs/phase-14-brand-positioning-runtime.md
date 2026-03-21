@@ -171,3 +171,37 @@ Now carries `store_profile`, `normalized_intake_payload`, `runtime_config`, and 
 | `build-competitor-clusters` | Not yet implemented |
 | Downstream consumers (design-system, product-content, collection-content, pattern-manifest) | Out of scope for Phase 2 |
 | Human review gate enforcement | Controlled by `manual_review_required` in intake — not enforced at this workflow level |
+
+## Confirmed execution status
+
+Phase 14 is now merged to `main` and has been successfully smoke-tested in n8n Cloud as the next executable runtime stage after `build-market-intelligence`.
+
+Confirmed cloud execution chain:
+
+- `resolve-runtime-config`
+- `intake-store-input`
+- `import-shopify-data`
+- `build-store-profile`
+- `build-market-intelligence`
+- `build-brand-positioning`
+
+Confirmed cloud-mode outcome:
+
+- `store_profile` is returned inline
+- `market_intelligence` is returned inline
+- `brand_positioning` is returned inline
+- `cloud_mode: true`
+- no disk artifacts are written in cloud mode
+- expected cloud warnings about missing persistence / local validation remain acceptable
+
+Observed completion message pattern:
+
+> Phase 3 chain completed (cloud mode) for project: <project_id> | No artifacts were written to disk. brand_positioning is available in this output. | Next: build-competitor-clusters (Phase 4+ — not yet implemented).
+
+Notes:
+
+- `build-brand-positioning` requires `store_profile` and `market_intelligence` as upstream inputs
+- testing the workflow in isolation with incomplete input will fail by design
+- the correct validation path is end-to-end execution through `orchestrate-phase1`
+- the cloud smoke-test path remains preserved
+- the self-hosted persistence path remains conceptually open and is not replaced by the cloud-mode implementation
