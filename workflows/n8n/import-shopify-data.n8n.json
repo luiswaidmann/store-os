@@ -1,0 +1,184 @@
+{
+  "name": "import-shopify-data",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "c3d4e5f6-0003-0003-0003-000000000001",
+      "name": "Subworkflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{  'https://' + $env.STORE_OS_SHOPIFY_SHOP_URL + '/admin/api/' + $env.STORE_OS_SHOPIFY_API_VERSION + '/shop.json'  }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "shopifyApi": {
+          "id": "REPLACE_WITH_N8N_SHOPIFY_CREDENTIAL_ID",
+          "name": "Shopify API Credential"
+        }
+      },
+      "id": "c3d4e5f6-0003-0003-0003-000000000002",
+      "name": "Fetch Shop Basics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 200],
+      "notes": "SETUP: Replace credential id above with your n8n Shopify credential ID. Find it in n8n > Settings > Credentials > your Shopify credential > URL (the numeric ID in the URL path)."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{  'https://' + $env.STORE_OS_SHOPIFY_SHOP_URL + '/admin/api/' + $env.STORE_OS_SHOPIFY_API_VERSION + '/products.json?limit=250&status=active&fields=id,title,handle,body_html,vendor,product_type,tags,status,variants,images'  }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "shopifyApi": {
+          "id": "REPLACE_WITH_N8N_SHOPIFY_CREDENTIAL_ID",
+          "name": "Shopify API Credential"
+        }
+      },
+      "id": "c3d4e5f6-0003-0003-0003-000000000003",
+      "name": "Fetch Active Products",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 380],
+      "notes": "Phase 12: fetches first 250 active products (no pagination loop). Pagination for catalogs > 250 products is documented as a known gap — implement via n8n Split In Batches + loop for larger stores."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{  'https://' + $env.STORE_OS_SHOPIFY_SHOP_URL + '/admin/api/' + $env.STORE_OS_SHOPIFY_API_VERSION + '/custom_collections.json?limit=250&fields=id,title,handle,body_html,image,sort_order'  }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "shopifyApi": {
+          "id": "REPLACE_WITH_N8N_SHOPIFY_CREDENTIAL_ID",
+          "name": "Shopify API Credential"
+        }
+      },
+      "id": "c3d4e5f6-0003-0003-0003-000000000004",
+      "name": "Fetch Custom Collections",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 560]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{  'https://' + $env.STORE_OS_SHOPIFY_SHOP_URL + '/admin/api/' + $env.STORE_OS_SHOPIFY_API_VERSION + '/smart_collections.json?limit=250&fields=id,title,handle,body_html,image,sort_order'  }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyApi",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "shopifyApi": {
+          "id": "REPLACE_WITH_N8N_SHOPIFY_CREDENTIAL_ID",
+          "name": "Shopify API Credential"
+        }
+      },
+      "id": "c3d4e5f6-0003-0003-0003-000000000005",
+      "name": "Fetch Smart Collections",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 740]
+    },
+    {
+      "parameters": {
+        "jsCode": "// import-shopify-data — Assemble, Write, and Checkpoint\n// Merges all Shopify API responses into shopify-import.json.\n// Writes the artifact atomically. Updates the checkpoint.\n//\n// Input items (4 items from parallel HTTP Request nodes):\n//   item[0]: Fetch Shop Basics response\n//   item[1]: Fetch Active Products response\n//   item[2]: Fetch Custom Collections response\n//   item[3]: Fetch Smart Collections response\n//\n// The orchestrator passes runtime_config + project context via the trigger.\n// We retrieve it from the Subworkflow Trigger output stored by n8n.\n\nconst fs   = require('fs');\nconst path = require('path');\n\n// Retrieve runtime context from Subworkflow Trigger output\n// n8n makes previous node outputs available via $node[\"Node Name\"].json\nconst triggerData   = $node['Subworkflow Trigger'].json;\nconst runtimeConfig = triggerData.runtime_config;\nconst projectId     = triggerData.project_id;\n\nif (!runtimeConfig || !projectId) {\n  throw new Error('MISSING_RUNTIME_CONFIG: runtime_config and project_id are required');\n}\n\nconst projectRoot = runtimeConfig.project_root;\n\n// ── Parse API responses ───────────────────────────────────────────────────\nconst allItems = $input.all();\n\nconst shopResponse         = allItems[0].json;\nconst productsResponse     = allItems[1].json;\nconst customColResponse    = allItems[2].json;\nconst smartColResponse     = allItems[3].json;\n\nconst rawShopData = shopResponse.shop || {};\nconst rawProducts = productsResponse.products || [];\n\n// Merge custom and smart collections, tagging each with type\nconst customCollections = (customColResponse.custom_collections || []).map((c) => ({ ...c, type: 'custom' }));\nconst smartCollections  = (smartColResponse.smart_collections  || []).map((c) => ({ ...c, type: 'smart'  }));\nconst rawCollections    = [...customCollections, ...smartCollections];\n\n// ── Build import summary ──────────────────────────────────────────────────\nconst activeProductCount  = rawProducts.filter((p) => p.status === 'active').length;\nconst skippedProductCount = rawProducts.length - activeProductCount;\n\nconst importSummary = {\n  imported_at:           new Date().toISOString(),\n  project_id:            projectId,\n  shop_domain:           rawShopData.myshopify_domain || rawShopData.domain || '',\n  product_count:         rawProducts.length,\n  active_product_count:  activeProductCount,\n  skipped_product_count: skippedProductCount,\n  collection_count:      rawCollections.length,\n  shopify_api_version:   runtimeConfig.shopify_api_version,\n  import_errors:         [],\n  pagination_note:       rawProducts.length === 250\n    ? 'WARNING: exactly 250 products returned — store may have more. Pagination not implemented in Phase 12.'\n    : null,\n};\n\n// ── Assemble shopify-import.json ─────────────────────────────────────────\nconst shopifyImport = {\n  project_id:     projectId,\n  raw_shop_data:  {\n    shop_domain:      rawShopData.myshopify_domain || rawShopData.domain || '',\n    shop_name:        rawShopData.name || '',\n    shop_currency:    rawShopData.currency || '',\n    shop_plan_name:   rawShopData.plan_name || '',\n    shop_locale:      rawShopData.primary_locale || '',\n    shop_country_code:rawShopData.country_code || '',\n  },\n  raw_products:       rawProducts,\n  raw_collections:    rawCollections,\n  import_summary:     importSummary,\n};\n\n// ── Atomic write ─────────────────────────────────────────────────────────\nconst projectDir  = path.join(projectRoot, projectId);\nconst finalPath   = path.join(projectDir, 'shopify-import.json');\nconst tmpPath     = path.join(projectDir, 'shopify-import.tmp.json');\n\nfs.mkdirSync(projectDir, { recursive: true });\nfs.writeFileSync(tmpPath, JSON.stringify(shopifyImport, null, 2), 'utf8');\nfs.renameSync(tmpPath, finalPath);\n\n// ── Update checkpoint ─────────────────────────────────────────────────────\nconst checkpointPath = path.join(projectRoot, projectId, '.runtime', 'checkpoint.json');\nlet checkpoint;\ntry {\n  checkpoint = JSON.parse(fs.readFileSync(checkpointPath, 'utf8'));\n} catch {\n  // If checkpoint is missing, create a minimal one rather than halting\n  checkpoint = {\n    schema_version: '1.0', project_id: projectId,\n    execution_run_id: 'run-unknown',\n    chain_start_timestamp: new Date().toISOString(),\n    last_updated_timestamp: new Date().toISOString(),\n    chain_status: 'IN_PROGRESS', completed_workflows: [],\n    failed_at: null, next_workflow: 'build-store-profile',\n    review_gate_status: 'NOT_REACHED', review_gate_approved_at: null,\n    env: runtimeConfig.env, llm_model_used: runtimeConfig.llm_model || null,\n    shopify_api_version_used: runtimeConfig.shopify_api_version || null, notes: [],\n  };\n}\n\nconst now = new Date().toISOString();\ncheckpoint.completed_workflows.push({\n  workflow_id:     'import-shopify-data',\n  completed_at:    now,\n  output_artifact: 'shopify-import.json',\n  status:          'SUCCESS',\n});\ncheckpoint.last_updated_timestamp = now;\ncheckpoint.next_workflow          = 'build-store-profile';\n\nconst cpTmp = checkpointPath + '.tmp';\nfs.writeFileSync(cpTmp, JSON.stringify(checkpoint, null, 2), 'utf8');\nfs.renameSync(cpTmp, checkpointPath);\n\n// ── Append to execution log ───────────────────────────────────────────────\nconst logPath = path.join(projectRoot, projectId, '.runtime', 'execution-log.json');\ntry {\n  const logData = fs.existsSync(logPath)\n    ? JSON.parse(fs.readFileSync(logPath, 'utf8'))\n    : { entries: [] };\n  logData.entries.push({\n    timestamp:        now,\n    execution_run_id: checkpoint.execution_run_id,\n    level:            'INFO',\n    event_type:       'ARTIFACT_WRITE',\n    workflow_id:      'import-shopify-data',\n    artifact:         'shopify-import.json',\n    message:          `shopify-import.json written. Products: ${activeProductCount} active, Collections: ${rawCollections.length}`,\n  });\n  if (importSummary.pagination_note) {\n    logData.entries.push({\n      timestamp: now, execution_run_id: checkpoint.execution_run_id,\n      level: 'WARNING', event_type: 'ERROR',\n      workflow_id: 'import-shopify-data',\n      message: importSummary.pagination_note,\n    });\n  }\n  const logTmp = logPath + '.tmp';\n  fs.writeFileSync(logTmp, JSON.stringify(logData, null, 2), 'utf8');\n  fs.renameSync(logTmp, logPath);\n} catch { /* log write failure is non-fatal */ }\n\nreturn [{\n  json: {\n    project_id:      projectId,\n    artifact_path:   finalPath,\n    artifact_name:   'shopify-import',\n    import_summary:  importSummary,\n    runtime_config:  runtimeConfig,\n    status:          'SUCCESS',\n  },\n}];\n"
+      },
+      "id": "c3d4e5f6-0003-0003-0003-000000000006",
+      "name": "Assemble Write and Checkpoint",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 470]
+    }
+  ],
+  "connections": {
+    "Subworkflow Trigger": {
+      "main": [
+        [
+          { "node": "Fetch Shop Basics",         "type": "main", "index": 0 },
+          { "node": "Fetch Active Products",      "type": "main", "index": 0 },
+          { "node": "Fetch Custom Collections",   "type": "main", "index": 0 },
+          { "node": "Fetch Smart Collections",    "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Shop Basics": {
+      "main": [
+        [{ "node": "Assemble Write and Checkpoint", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Active Products": {
+      "main": [
+        [{ "node": "Assemble Write and Checkpoint", "type": "main", "index": 1 }]
+      ]
+    },
+    "Fetch Custom Collections": {
+      "main": [
+        [{ "node": "Assemble Write and Checkpoint", "type": "main", "index": 2 }]
+      ]
+    },
+    "Fetch Smart Collections": {
+      "main": [
+        [{ "node": "Assemble Write and Checkpoint", "type": "main", "index": 3 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "_meta": {
+    "storeOs": {
+      "phase": "Phase 12",
+      "format": "n8n-executable",
+      "sourceSpec": "workflows/subflows/import-shopify-data.json",
+      "setupRequired": [
+        "Replace REPLACE_WITH_N8N_SHOPIFY_CREDENTIAL_ID in all HTTP Request nodes with the actual n8n credential ID",
+        "Ensure STORE_OS_SHOPIFY_SHOP_URL env var is set to your store's .myshopify.com domain",
+        "Ensure STORE_OS_SHOPIFY_API_VERSION env var is set to a supported Shopify API version"
+      ],
+      "knownGaps": [
+        "Pagination: only the first 250 products and collections are fetched. Stores with > 250 items need a pagination loop (Split In Batches node pattern).",
+        "Store-level metafields are not fetched in Phase 12. Add a 5th HTTP Request node targeting /metafields.json?metafield[owner_resource]=shop if needed.",
+        "CREDENTIAL_AUTH_FAILURE retry (1 retry per spec) not implemented — n8n's built-in retry on the HTTP Request node can cover this."
+      ],
+      "invocation": "Called as a subworkflow by orchestrate-phase1. Expects Subworkflow Trigger input: { project_id, runtime_config }",
+      "output": "{ project_id, artifact_path, artifact_name, import_summary, runtime_config, status }"
+    }
+  }
+}

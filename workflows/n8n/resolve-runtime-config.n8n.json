@@ -1,0 +1,42 @@
+{
+  "name": "resolve-runtime-config",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// resolve-runtime-config — Code node\n// Reads and validates all required environment variables.\n// Returns the runtime config object for downstream use.\n//\n// IMPORTANT: No credential values are read here. Only credential NAMES\n// (which identify credentials in n8n's vault) are read from env vars.\n// The actual credential validation requires n8n-internal access — see\n// workflows/runtime/credential-resolution-spec.md open question #1.\n\nconst fs = require('fs');\n\nconst REQUIRED_ENV_VARS = [\n  'STORE_OS_OPENAI_CREDENTIAL_NAME',\n  'STORE_OS_SHOPIFY_CREDENTIAL_NAME',\n  'STORE_OS_SHOPIFY_SHOP_URL',\n  'STORE_OS_LLM_MODEL',\n  'STORE_OS_ENV',\n  'STORE_OS_PROJECT_ROOT',\n  'STORE_OS_SHOPIFY_API_VERSION',\n  'STORE_OS_AJV_SCHEMA_PATH',\n];\n\nconst ALLOWED_ENVS = ['dev', 'staging', 'production'];\n\n// Step 1: Check all required env vars are set and non-empty\nconst missing = REQUIRED_ENV_VARS.filter(\n  (v) => !process.env[v] || !process.env[v].trim()\n);\nif (missing.length > 0) {\n  throw new Error(\n    'CONFIG_MISSING: Required environment variables not set: ' +\n    missing.join(', ') +\n    '. Configure them in n8n Settings > Variables or the n8n process environment.'\n  );\n}\n\n// Step 2: Validate STORE_OS_ENV is an allowed value\nconst env = process.env.STORE_OS_ENV.trim();\nif (!ALLOWED_ENVS.includes(env)) {\n  throw new Error(\n    `CONFIG_MISSING: STORE_OS_ENV must be one of: ${ALLOWED_ENVS.join(', ')}. Got: \"${env}\"`\n  );\n}\n\n// Step 3: Validate STORE_OS_PROJECT_ROOT exists on the filesystem\nconst projectRoot = process.env.STORE_OS_PROJECT_ROOT.trim();\nif (!fs.existsSync(projectRoot)) {\n  throw new Error(\n    `CONFIG_MISSING: STORE_OS_PROJECT_ROOT does not exist: ${projectRoot}. ` +\n    'Create the directory and ensure it is writable by the n8n process.'\n  );\n}\n\n// Step 4: Validate STORE_OS_AJV_SCHEMA_PATH exists\nconst ajvSchemaPath = process.env.STORE_OS_AJV_SCHEMA_PATH.trim();\nif (!fs.existsSync(ajvSchemaPath)) {\n  throw new Error(\n    `CONFIG_MISSING: STORE_OS_AJV_SCHEMA_PATH does not exist: ${ajvSchemaPath}. ` +\n    'Point this to the store-os schemas/ directory.'\n  );\n}\n\n// Step 5: Assemble runtime config (no credential values — names only)\nconst runtimeConfig = {\n  env,\n  project_root: projectRoot,\n  openai_credential_name: process.env.STORE_OS_OPENAI_CREDENTIAL_NAME.trim(),\n  shopify_credential_name: process.env.STORE_OS_SHOPIFY_CREDENTIAL_NAME.trim(),\n  shopify_shop_url: process.env.STORE_OS_SHOPIFY_SHOP_URL.trim(),\n  llm_model: process.env.STORE_OS_LLM_MODEL.trim(),\n  shopify_api_version: process.env.STORE_OS_SHOPIFY_API_VERSION.trim(),\n  ajv_schema_path: ajvSchemaPath,\n  backup_root: process.env.STORE_OS_BACKUP_ROOT\n    ? process.env.STORE_OS_BACKUP_ROOT.trim()\n    : null,\n  resolved_at: new Date().toISOString(),\n};\n\nreturn [{ json: { runtime_config: runtimeConfig, status: 'SUCCESS' } }];\n"
+      },
+      "id": "a1b2c3d4-0001-0001-0001-000000000002",
+      "name": "Resolve Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [{ "node": "Resolve Config", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "_meta": {
+    "storeOs": {
+      "phase": "Phase 12",
+      "format": "n8n-executable",
+      "sourceSpec": "workflows/runtime/credential-resolution-spec.md",
+      "note": "This workflow validates env vars and assembles the runtime config. It does not validate n8n credential store existence — that requires n8n-internal access not available from Code nodes."
+    }
+  }
+}
