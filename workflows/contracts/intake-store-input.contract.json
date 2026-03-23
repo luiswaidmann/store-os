@@ -1,0 +1,174 @@
+{
+  "_meta": {
+    "format": "store-os-runtime-contract",
+    "version": "1.0",
+    "phase_id": "intake-store-input",
+    "category": "data-intake",
+    "cloud_compatibility": "FULL",
+    "description": "Receives raw store input, validates required fields, applies defaults, and produces normalized_intake_payload and project_setup_payload."
+  },
+  "phase_id": "intake-store-input",
+  "category": "data-intake",
+  "cloud_compatibility": "FULL",
+  "upstream_dependencies": ["resolve-runtime-config"],
+  "required_fields": [
+    {
+      "field": "project_id",
+      "type": "string",
+      "description": "Unique project identifier. Must match pattern ^[a-z0-9-]+$. Used as namespace for all artifacts.",
+      "validation_error": "INVALID_PROJECT_ID_FORMAT"
+    },
+    {
+      "field": "primary_market",
+      "type": "string",
+      "description": "ISO country code of primary market, e.g. DE, US, UK"
+    },
+    {
+      "field": "primary_language",
+      "type": "string",
+      "description": "ISO language code, e.g. de, en, fr"
+    },
+    {
+      "field": "primary_currency",
+      "type": "string",
+      "description": "ISO currency code, e.g. EUR, USD, GBP"
+    },
+    {
+      "field": "vertical",
+      "type": "string",
+      "description": "Human-readable product vertical or category"
+    },
+    {
+      "field": "store_type",
+      "type": "string",
+      "description": "Enum: single-brand-store | multi-product-store | category-specialist | editorial-commerce-store | general-commerce-store"
+    },
+    {
+      "field": "business_model",
+      "type": "string",
+      "description": "Enum: ecommerce | dropshipping | hybrid | other"
+    },
+    {
+      "field": "price_positioning",
+      "type": "string",
+      "description": "Enum: budget | mass-market | mass-premium | premium | luxury | to-be-defined"
+    },
+    {
+      "field": "publish_mode",
+      "type": "string",
+      "description": "Enum: no-publish | draft-only | draft-and-review. Maps to operating_mode in store-profile."
+    }
+  ],
+  "optional_fields": [
+    "target_markets",
+    "languages",
+    "currencies",
+    "competitor_urls",
+    "seo_goal",
+    "aeo_goal",
+    "faq_intensity",
+    "knowledge_content_priority",
+    "brand_role",
+    "tone_of_voice",
+    "trust_style",
+    "conversion_style",
+    "must_feel_like",
+    "must_not_feel_like",
+    "special_notes"
+  ],
+  "normalized_fields": [
+    {
+      "field": "target_markets",
+      "default_rule": "If absent or empty, defaults to [primary_market]"
+    },
+    {
+      "field": "languages",
+      "default_rule": "If absent or empty, defaults to [primary_language]"
+    },
+    {
+      "field": "currencies",
+      "default_rule": "If absent or empty, defaults to [primary_currency]"
+    },
+    {
+      "field": "competitor_urls",
+      "default_rule": "If absent, defaults to [] (empty array). Downstream phases treat 0 URLs as archetype mode."
+    },
+    {
+      "field": "seo_goal",
+      "default_rule": "If absent, defaults to null. Optional downstream enrichment."
+    },
+    {
+      "field": "aeo_goal",
+      "default_rule": "If absent, defaults to null."
+    },
+    {
+      "field": "faq_intensity",
+      "default_rule": "If absent, defaults to null."
+    },
+    {
+      "field": "knowledge_content_priority",
+      "default_rule": "If absent, defaults to null."
+    }
+  ],
+  "output_contract": {
+    "normalized_intake_payload": {
+      "description": "Normalized and defaulted intake payload forwarded to all downstream planning phases",
+      "fields": [
+        "project_id",
+        "primary_market",
+        "target_markets",
+        "primary_language",
+        "languages",
+        "primary_currency",
+        "currencies",
+        "vertical",
+        "store_type",
+        "business_model",
+        "price_positioning",
+        "publish_mode",
+        "competitor_urls",
+        "seo_goal",
+        "aeo_goal",
+        "faq_intensity",
+        "knowledge_content_priority",
+        "brand_role",
+        "tone_of_voice",
+        "trust_style",
+        "conversion_style",
+        "must_feel_like",
+        "must_not_feel_like",
+        "special_notes"
+      ]
+    },
+    "project_setup_payload": {
+      "description": "Project initialization data used by orchestrator to set up project directory structure (self-hosted only)",
+      "fields": [
+        "project_id",
+        "project_name",
+        "created_at",
+        "runtime_config"
+      ]
+    }
+  },
+  "validation_errors": [
+    {
+      "code": "MISSING_REQUIRED_FIELD",
+      "severity": "fatal",
+      "description": "A required field is absent or empty in the intake input. Lists all missing fields."
+    },
+    {
+      "code": "INVALID_ENUM_VALUE",
+      "severity": "fatal",
+      "description": "A field value is not within its allowed enum. E.g. store_type, price_positioning."
+    },
+    {
+      "code": "INVALID_PROJECT_ID_FORMAT",
+      "severity": "fatal",
+      "description": "project_id does not match ^[a-z0-9-]+$ pattern. Must be lowercase alphanumeric with hyphens."
+    }
+  ],
+  "cloud_notes": {
+    "compatibility": "Full cloud compatibility. All normalization and validation runs in-memory.",
+    "no_disk_writes": "intake-store-input does not write any files. Output is inline pipeline data only."
+  }
+}

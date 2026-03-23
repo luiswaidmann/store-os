@@ -1,0 +1,185 @@
+{
+  "_meta": {
+    "format": "store-os-runtime-contract",
+    "version": "1.0",
+    "phase_id": "build-store-profile",
+    "category": "planning",
+    "cloud_compatibility": "PARTIAL",
+    "description": "Maps intake and Shopify import data to the store-profile artifact. Derives catalog_type, assortment_shape, and other structural fields. Validates against schema (self-hosted). Writes artifact to disk (self-hosted). Returns store_profile inline (both modes)."
+  },
+  "phase_id": "build-store-profile",
+  "category": "planning",
+  "cloud_compatibility": "PARTIAL",
+  "upstream_dependencies": ["intake-store-input", "import-shopify-data"],
+  "required_inputs": {
+    "from_pipeline": [
+      {
+        "field": "project_id",
+        "source": "intake-store-input"
+      },
+      {
+        "field": "normalized_intake_payload",
+        "source": "intake-store-input",
+        "required_subfields": ["project_id", "primary_market", "primary_language", "primary_currency", "vertical", "price_positioning"]
+      },
+      {
+        "field": "runtime_config",
+        "source": "resolve-runtime-config"
+      },
+      {
+        "field": "shopify_import",
+        "source": "import-shopify-data",
+        "cloud_note": "In cloud mode, shopify_import must be passed inline from orchestrator. In self-hosted mode, read from disk at {project_root}/{project_id}/shopify-import.json.",
+        "required_subfields": ["project_id", "raw_shop_data.shop_name", "raw_shop_data.shop_domain"]
+      }
+    ]
+  },
+  "output_contract": {
+    "store_profile": {
+      "description": "Primary artifact. Written to {project_root}/{project_id}/store-profile.json (self-hosted) or returned inline (cloud).",
+      "artifact_path_pattern": "{project_root}/{project_id}/store-profile.json",
+      "schema_ref": "schemas/store-profile.schema.json",
+      "required_fields": [
+        "store_id",
+        "store_name",
+        "store_type",
+        "platform",
+        "business_model",
+        "primary_market",
+        "target_markets",
+        "primary_language",
+        "languages",
+        "primary_currency",
+        "currencies",
+        "vertical",
+        "price_positioning",
+        "catalog_type",
+        "brand_maturity",
+        "operating_mode"
+      ],
+      "new_optional_fields": [
+        "assortment_shape",
+        "target_audience_hypotheses",
+        "value_proposition_hint",
+        "brand_voice_hint",
+        "ux_merchandising_maturity",
+        "open_questions",
+        "_meta"
+      ]
+    },
+    "envelope": {
+      "description": "Runtime envelope added to output as top-level 'envelope' key. Does not replace any existing key.",
+      "schema_ref": "schemas/runtime/runtime-envelope.schema.json",
+      "fields": ["runtime", "store", "status", "diagnostics"]
+    }
+  },
+  "field_derivations": {
+    "catalog_type": {
+      "description": "Derived from import_summary.active_product_count heuristic",
+      "rules": [
+        { "condition": "active_product_count === 0", "value": "small-curated-catalog", "note": "provisional — no products yet" },
+        { "condition": "active_product_count === 1", "value": "single-product" },
+        { "condition": "active_product_count <= 15", "value": "small-curated-catalog" },
+        { "condition": "active_product_count <= 200", "value": "broad-catalog" },
+        { "condition": "active_product_count > 200", "value": "mixed-catalog" }
+      ]
+    },
+    "assortment_shape": {
+      "description": "Derived from active_product_count",
+      "rules": [
+        { "condition": "active_product_count === 1", "value": "single-hero-product" },
+        { "condition": "active_product_count <= 5", "value": "tight-specialist-range" },
+        { "condition": "active_product_count <= 50", "value": "curated-multi-category" },
+        { "condition": "active_product_count > 50", "value": "broad-generalist" }
+      ]
+    },
+    "operating_mode": {
+      "description": "Mapped from intake.publish_mode",
+      "rules": [
+        { "publish_mode": "no-publish", "operating_mode": "draft-first" },
+        { "publish_mode": "draft-only", "operating_mode": "draft-first" },
+        { "publish_mode": "draft-and-review", "operating_mode": "staging-first" }
+      ],
+      "default": "draft-first"
+    },
+    "brand_maturity": {
+      "description": "Defaults to 'new' — no reliable signal available at intake time",
+      "default": "new"
+    }
+  },
+  "new_optional_outputs": [
+    {
+      "field": "assortment_shape",
+      "derivation": "derived-heuristic from active_product_count"
+    },
+    {
+      "field": "target_audience_hypotheses",
+      "derivation": "derived-heuristic from intake.vertical, primary_market, price_positioning. confidence=low."
+    },
+    {
+      "field": "value_proposition_hint",
+      "derivation": "derived-heuristic: template from vertical, store_type, primary_market, price_positioning"
+    },
+    {
+      "field": "brand_voice_hint",
+      "derivation": "derived-heuristic from price_positioning mapping"
+    },
+    {
+      "field": "ux_merchandising_maturity",
+      "derivation": "derived-heuristic from brand_maturity mapping"
+    },
+    {
+      "field": "open_questions",
+      "derivation": "explicit unknowns: no products, no competitor URLs, no brand direction signals"
+    }
+  ],
+  "validation_errors": [
+    {
+      "code": "MISSING_RUNTIME_CONFIG",
+      "severity": "fatal",
+      "description": "runtime_config is absent from pipeline input"
+    },
+    {
+      "code": "MISSING_ARTIFACT",
+      "severity": "fatal",
+      "description": "A required upstream artifact is absent — shopify-import.json not found, or required fields missing from intake/shopify"
+    },
+    {
+      "code": "PROJECT_ID_MISMATCH",
+      "severity": "fatal",
+      "description": "shopify-import.project_id does not match the runtime project_id"
+    },
+    {
+      "code": "SCHEMA_VIOLATION",
+      "severity": "fatal",
+      "description": "Assembled store_profile fails AJV validation against store-profile.schema.json. Artifact is quarantined."
+    },
+    {
+      "code": "PARSE_ERROR",
+      "severity": "fatal",
+      "description": "shopify-import.json could not be parsed as valid JSON"
+    },
+    {
+      "code": "CLOUD_MODE_ERROR",
+      "severity": "fatal",
+      "description": "In cloud mode, shopify_import was not forwarded inline from the orchestrator"
+    }
+  ],
+  "cloud_behavior": {
+    "skipped": [
+      "AJV schema validation (no local schema files)",
+      "Artifact write to disk",
+      "Checkpoint update",
+      "Execution log write"
+    ],
+    "inline_output": "store_profile returned as JSON in pipeline. artifact_path is null.",
+    "shopify_import_source": "Must be passed inline from orchestrator (Prepare Profile Input node in orchestrate-phase1)"
+  },
+  "self_hosted_behavior": {
+    "validation": "AJV validates store_profile against schemas/store-profile.schema.json before write",
+    "write": "Atomic write via tmp → rename to {project_id}/store-profile.json",
+    "quarantine": "On SCHEMA_VIOLATION: quarantined to {project_id}/.runtime/quarantine/store-profile.{ts}.rejected.json",
+    "checkpoint": "Updates {project_id}/.runtime/checkpoint.json with completed workflow entry",
+    "execution_log": "Appends ARTIFACT_WRITE event to {project_id}/.runtime/execution-log.json"
+  }
+}

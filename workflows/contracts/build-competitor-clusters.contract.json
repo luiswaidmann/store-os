@@ -1,0 +1,170 @@
+{
+  "_meta": {
+    "format": "store-os-runtime-contract",
+    "version": "1.0",
+    "phase_id": "build-competitor-clusters",
+    "category": "planning",
+    "cloud_compatibility": "PARTIAL",
+    "description": "LLM-synthesizes competitor clusters from intake URLs + market intelligence. Operating mode determined by number of competitor_urls. Evidence boundary strictly enforced: no crawling, no external APIs."
+  },
+  "phase_id": "build-competitor-clusters",
+  "category": "planning",
+  "cloud_compatibility": "PARTIAL",
+  "upstream_dependencies": ["build-market-intelligence", "intake-store-input", "build-store-profile"],
+  "required_inputs": {
+    "from_pipeline": [
+      {
+        "field": "store_profile",
+        "source": "build-store-profile",
+        "required_subfields": ["store_id", "vertical", "price_positioning"]
+      },
+      {
+        "field": "market_intelligence",
+        "source": "build-market-intelligence",
+        "required_subfields": ["market_category", "competitor_types", "positioning_goals"]
+      },
+      {
+        "field": "normalized_intake_payload",
+        "source": "intake-store-input"
+      },
+      {
+        "field": "runtime_config",
+        "source": "resolve-runtime-config"
+      },
+      {
+        "field": "project_id",
+        "source": "intake-store-input"
+      }
+    ]
+  },
+  "operating_modes": {
+    "url_seeded": {
+      "trigger": "intake.competitor_urls has >= 2 valid URLs",
+      "description": "LLM groups user-provided URLs into 2-4 clusters. Only user-provided URLs may appear in competitor_examples. No invented URLs allowed.",
+      "cluster_count": "2-4"
+    },
+    "hybrid": {
+      "trigger": "intake.competitor_urls has exactly 1 valid URL",
+      "description": "1 URL-seeded cluster for the provided URL + 1-2 archetype clusters for remaining landscape. Archetype clusters use ARCHETYPE-PLACEHOLDER.",
+      "cluster_count": "2-3"
+    },
+    "archetype": {
+      "trigger": "intake.competitor_urls is empty or absent",
+      "description": "2-3 pure archetype clusters based on competitor_types from market_intelligence. All competitor_examples use ARCHETYPE-PLACEHOLDER.",
+      "cluster_count": "2-3"
+    }
+  },
+  "archetype_placeholder_rule": {
+    "value": "ARCHETYPE-PLACEHOLDER",
+    "usage": "Used as the url field in competitor_examples for all archetype-mode clusters. Signals to downstream phases and human reviewers that no real URL was provided and the example is a hypothetical archetype.",
+    "enforcement": "The Parse/Validate node strips invented URLs from url-seeded clusters and replaces them with ARCHETYPE-PLACEHOLDER for archetype clusters. This is enforced in code, not just in prompt."
+  },
+  "output_contract": {
+    "competitor_clusters": {
+      "description": "Array of cluster objects. Written to {project_root}/{project_id}/competitor-clusters.json (self-hosted) or returned inline (cloud).",
+      "artifact_path_pattern": "{project_root}/{project_id}/competitor-clusters.json",
+      "schema_ref": "schemas/competitor-cluster.schema.json (applied per-item)",
+      "output_type": "array",
+      "required_per_cluster": [
+        "cluster_name",
+        "cluster_role",
+        "description",
+        "competitor_examples",
+        "shared_strengths",
+        "shared_weaknesses",
+        "shared_patterns",
+        "non_copyable_elements",
+        "adaptation_opportunities"
+      ],
+      "new_optional_per_cluster": [
+        "competitor_type_classification",
+        "price_tier",
+        "brand_style",
+        "product_breadth",
+        "trust_signals_used",
+        "strategic_summary"
+      ],
+      "new_optional_per_example": [
+        "competitor_type_classification",
+        "price_tier",
+        "brand_style_note"
+      ]
+    },
+    "envelope": {
+      "description": "Runtime envelope added alongside existing output keys",
+      "schema_ref": "schemas/runtime/runtime-envelope.schema.json"
+    }
+  },
+  "new_optional_outputs": [
+    {
+      "field": "competitor_type_classification",
+      "description": "Per-cluster classification: direct | indirect | substitute | aspirational | mixed",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "price_tier",
+      "description": "Per-cluster price tier: budget | mass-market | mass-premium | premium | luxury | mixed | unknown",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "brand_style",
+      "description": "Brief description of this cluster's visual/brand style",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "product_breadth",
+      "description": "Per-cluster product range breadth: single-product | narrow | moderate | broad | marketplace-scale",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "trust_signals_used",
+      "description": "Types of trust signals this cluster relies on",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "strategic_summary",
+      "description": "1-2 sentence summary of what this cluster means for the store",
+      "derivation": "llm-synthesized"
+    }
+  ],
+  "evidence_boundary": {
+    "description": "Strictly enforced. No external data, no crawling, no competitive intelligence APIs.",
+    "rules": [
+      "competitor_urls are used as naming/labeling hints ONLY — not fetched, crawled, or researched",
+      "All cluster content (strengths, weaknesses, patterns, opportunities) is LLM inference",
+      "All competitor_examples outside user-provided URLs must use ARCHETYPE-PLACEHOLDER",
+      "No invented traffic figures, conversion rates, revenue, or competitive metrics",
+      "All outputs are planning hypotheses requiring human verification"
+    ]
+  },
+  "validation_errors": [
+    {
+      "code": "MISSING_ARTIFACT",
+      "severity": "fatal",
+      "description": "store_profile or market_intelligence or normalized_intake_payload absent from pipeline"
+    },
+    {
+      "code": "LLM_PARSE_ERROR",
+      "severity": "fatal",
+      "description": "LLM response could not be parsed as valid JSON"
+    },
+    {
+      "code": "LLM_ARRAY_PARSE_ERROR",
+      "severity": "fatal",
+      "description": "LLM response was valid JSON but not an array, and could not be unwrapped to an array"
+    },
+    {
+      "code": "SCHEMA_VIOLATION",
+      "severity": "fatal",
+      "description": "One or more clusters fail inline validation (required fields, enum values, minItems). Always runs in both cloud and self-hosted modes."
+    }
+  ],
+  "cloud_behavior": {
+    "skipped": [
+      "AJV schema validation (replaced by inline enum/structure checks)",
+      "Artifact write to disk"
+    ],
+    "inline_output": "competitor_clusters (array) returned in pipeline. artifact_path is null.",
+    "inline_validation": "Inline enum and required-field validation always runs in both modes as Step 3 of Parse node."
+  }
+}

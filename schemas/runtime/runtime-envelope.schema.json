@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "store-os:runtime-envelope",
+  "title": "Runtime Envelope",
+  "description": "Standard wrapper added to all store-os workflow outputs for observability, traceability, and contract validation",
+  "type": "object",
+  "properties": {
+    "runtime": {
+      "type": "object",
+      "required": ["run_id", "phase_id", "execution_ts"],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "description": "Unique run identifier. Format: run-{timestamp}-{random4}"
+        },
+        "phase_id": {
+          "type": "string",
+          "description": "Workflow phase identifier matching workflow id"
+        },
+        "execution_ts": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "cloud_mode": {
+          "type": "boolean"
+        },
+        "env": {
+          "type": "string",
+          "enum": ["dev", "staging", "production", "cloud-smoke"]
+        },
+        "schema_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+$",
+          "description": "Envelope schema version, e.g. 1.0"
+        }
+      }
+    },
+    "store": {
+      "type": "object",
+      "required": ["project_id"],
+      "properties": {
+        "project_id": {
+          "type": "string"
+        },
+        "artifact_name": {
+          "type": "string"
+        },
+        "artifact_path": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "status": {
+      "type": "object",
+      "required": ["code"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": ["SUCCESS", "PARTIAL", "FAILED", "SKIPPED"]
+        },
+        "completed_at": {
+          "type": "string"
+        },
+        "fatal_errors": {
+          "type": "array",
+          "items": {
+            "$ref": "store-os:validation-result#/$defs/issue"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "retryable": {
+          "type": "boolean",
+          "description": "true if a retry may resolve the failure"
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "properties": {
+        "input_summary": {
+          "type": "object",
+          "description": "Key inputs received by this phase"
+        },
+        "output_summary": {
+          "type": "object",
+          "description": "Key outputs produced by this phase"
+        },
+        "validation": {
+          "type": "object",
+          "properties": {
+            "schema_ref": {
+              "type": "string"
+            },
+            "result": {
+              "type": "string",
+              "enum": ["PASS", "FAIL", "SKIPPED"]
+            },
+            "errors": {
+              "type": "array"
+            },
+            "warnings": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "lineage": {
+          "type": "object",
+          "properties": {
+            "upstream_phases": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "upstream_artifacts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "missing_data": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "impact": {
+                "type": "string",
+                "enum": ["degraded-output", "skipped-field", "used-default"]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

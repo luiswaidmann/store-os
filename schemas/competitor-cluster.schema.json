@@ -58,6 +58,15 @@
 },
 "notes": {
 "type": "string"
+},
+"competitor_type_classification": {
+"type": "string"
+},
+"price_tier": {
+"type": "string"
+},
+"brand_style_note": {
+"type": "string"
 }
 }
 }
@@ -166,7 +175,31 @@
 },
 "notes": {
 "type": "string"
+},
+"competitor_type_classification": {
+"type": "string",
+"enum": ["direct", "indirect", "substitute", "aspirational", "mixed"]
+},
+"price_tier": {
+"type": "string",
+"enum": ["budget", "mass-market", "mass-premium", "premium", "luxury", "mixed", "unknown"]
+},
+"brand_style": {
+"type": "string",
+"description": "Brief description of visual/brand style of this cluster"
+},
+"product_breadth": {
+"type": "string",
+"enum": ["single-product", "narrow", "moderate", "broad", "marketplace-scale"]
+},
+"trust_signals_used": {
+"type": "array",
+"items": { "type": "string" },
+"description": "Trust signal types this cluster relies on"
+},
+"strategic_summary": {
+"type": "string",
+"description": "1-2 sentence strategic summary of what this cluster means for the store"
 }
 }
 }
-

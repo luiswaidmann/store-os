@@ -1,0 +1,179 @@
+{
+  "_meta": {
+    "format": "store-os-runtime-contract",
+    "version": "1.0",
+    "phase_id": "build-brand-positioning",
+    "category": "planning",
+    "cloud_compatibility": "PARTIAL",
+    "description": "LLM-synthesizes brand positioning from intake brand signals and market intelligence. Direct intake fields are enforced as hard constraints over LLM output. Returns brand_positioning inline (both modes)."
+  },
+  "phase_id": "build-brand-positioning",
+  "category": "planning",
+  "cloud_compatibility": "PARTIAL",
+  "upstream_dependencies": ["build-store-profile", "build-market-intelligence", "intake-store-input"],
+  "required_inputs": {
+    "from_pipeline": [
+      {
+        "field": "store_profile",
+        "source": "build-store-profile",
+        "required_subfields": ["store_id", "vertical", "price_positioning", "primary_market", "store_type"]
+      },
+      {
+        "field": "market_intelligence",
+        "source": "build-market-intelligence",
+        "required_subfields": ["audience_segments", "core_problems", "purchase_motivators", "trust_factors", "competitor_types", "positioning_goals"]
+      },
+      {
+        "field": "normalized_intake_payload",
+        "source": "intake-store-input"
+      },
+      {
+        "field": "runtime_config",
+        "source": "resolve-runtime-config"
+      },
+      {
+        "field": "project_id",
+        "source": "intake-store-input"
+      }
+    ]
+  },
+  "direct_fields_vs_synthesized": {
+    "description": "Brand positioning fields are split into DIRECT (from intake, must not be overridden by LLM) and SYNTHESIZED (LLM generates from context). Direct fields are enforced post-LLM by the Parse/Enforce node.",
+    "direct_fields": [
+      {
+        "intake_field": "brand_role",
+        "output_field": "brand_role",
+        "description": "User-specified brand archetype. Enforced over LLM output."
+      },
+      {
+        "intake_field": "tone_of_voice",
+        "output_field": "tone_of_voice.style",
+        "description": "User-specified tone style. Enforced over LLM output."
+      },
+      {
+        "intake_field": "trust_style",
+        "output_field": "trust_style.proof_mode",
+        "description": "User-specified trust mode. Enforced over LLM output."
+      },
+      {
+        "intake_field": "conversion_style",
+        "output_field": "conversion_style.cta_style",
+        "description": "User-specified CTA style. Enforced over LLM output."
+      },
+      {
+        "intake_field": "objection_handling_style",
+        "output_field": "objection_handling_style",
+        "description": "User-specified objection handling style. Enforced over LLM output."
+      }
+    ],
+    "synthesized_fields": [
+      "value_proposition",
+      "positioning_statement",
+      "differentiators",
+      "brand_traits",
+      "tone_of_voice.clarity_level",
+      "tone_of_voice.emotional_intensity",
+      "trust_style.reassurance_level",
+      "conversion_style.sales_pressure",
+      "visual_positioning_hint",
+      "media_style_hint",
+      "seo_tone_hint",
+      "aeo_tone_hint",
+      "forbidden_impressions",
+      "emotional_benefits",
+      "functional_benefits",
+      "reason_to_believe",
+      "messaging_pillars",
+      "anti_positioning"
+    ]
+  },
+  "output_contract": {
+    "brand_positioning": {
+      "description": "Primary artifact. Written to {project_root}/{project_id}/brand-positioning.json (self-hosted) or returned inline (cloud).",
+      "artifact_path_pattern": "{project_root}/{project_id}/brand-positioning.json",
+      "schema_ref": "schemas/brand-positioning.schema.json",
+      "required_fields": [
+        "brand_role",
+        "value_proposition",
+        "positioning_statement",
+        "differentiators",
+        "brand_traits",
+        "tone_of_voice",
+        "trust_style",
+        "conversion_style"
+      ],
+      "new_optional_fields": [
+        "emotional_benefits",
+        "functional_benefits",
+        "reason_to_believe",
+        "messaging_pillars",
+        "anti_positioning",
+        "confidence_basis",
+        "_meta"
+      ]
+    },
+    "envelope": {
+      "description": "Runtime envelope added alongside existing output keys",
+      "schema_ref": "schemas/runtime/runtime-envelope.schema.json"
+    }
+  },
+  "new_optional_outputs": [
+    {
+      "field": "emotional_benefits",
+      "description": "2-3 emotional benefits customers gain from this brand",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "functional_benefits",
+      "description": "2-3 functional benefits customers gain",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "reason_to_believe",
+      "description": "2-3 RTB claims with evidence type and strength",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "messaging_pillars",
+      "description": "2-3 messaging pillars with description and example messages",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "anti_positioning",
+      "description": "Explicit brand territories to avoid",
+      "derivation": "llm-synthesized from must_not_feel_like + competitor differentiation"
+    },
+    {
+      "field": "confidence_basis",
+      "description": "NOT LLM-generated. Computed in code from directFields/synthesizeFields tracking.",
+      "derivation": "derived-heuristic",
+      "rule": "evidence_level=high if directFields.length>=3, medium if >=1, assumption-only if 0"
+    }
+  ],
+  "validation_errors": [
+    {
+      "code": "MISSING_ARTIFACT",
+      "severity": "fatal",
+      "description": "store_profile or market_intelligence or normalized_intake_payload absent from pipeline"
+    },
+    {
+      "code": "LLM_PARSE_ERROR",
+      "severity": "fatal",
+      "description": "LLM response could not be parsed as valid JSON"
+    },
+    {
+      "code": "SCHEMA_VIOLATION",
+      "severity": "fatal",
+      "description": "brand_positioning fails inline or AJV validation. Artifact quarantined (self-hosted)."
+    }
+  ],
+  "cloud_behavior": {
+    "skipped": [
+      "AJV schema validation",
+      "Artifact write to disk",
+      "Checkpoint update"
+    ],
+    "inline_output": "brand_positioning returned in pipeline. artifact_path is null.",
+    "full_compatible": "Signal extraction, prompt build, LLM synthesis, and direct-field enforcement all run in cloud mode."
+  }
+}

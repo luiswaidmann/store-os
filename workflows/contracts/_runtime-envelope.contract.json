@@ -1,0 +1,58 @@
+{
+  "_meta": {
+    "format": "store-os-runtime-contract",
+    "version": "1.0",
+    "purpose": "Defines the standard runtime envelope added to all workflow outputs for observability and traceability",
+    "schema_ref": "schemas/runtime/runtime-envelope.schema.json",
+    "applies_to": ["all workflows in the store-os chain"],
+    "cloud_compatibility": "All runtime envelope fields are computed inline — no filesystem access required. Full compatibility with n8n Cloud.",
+    "self_hosted_notes": "In self-hosted mode, runtime.env will reflect the actual STORE_OS_ENV value. persistence_mode will be 'disk' instead of 'cloud-inline'."
+  },
+  "envelope_shape": {
+    "runtime": {
+      "_description": "Identity and execution context of this phase invocation",
+      "run_id": "string — unique run ID, format: run-{yyyymmdd}-{random4}",
+      "phase_id": "string — matches workflow id",
+      "execution_ts": "ISO 8601 timestamp",
+      "cloud_mode": "boolean",
+      "env": "dev | staging | production | cloud-smoke",
+      "schema_version": "1.0"
+    },
+    "store": {
+      "_description": "Project and artifact identity",
+      "project_id": "string",
+      "artifact_name": "string",
+      "artifact_path": "string | null (null in cloud mode)"
+    },
+    "status": {
+      "_description": "Phase outcome. Additive to existing 'status' key — structured expansion",
+      "code": "SUCCESS | PARTIAL | FAILED | SKIPPED",
+      "completed_at": "ISO 8601 timestamp",
+      "fatal_errors": "array of ValidationResult issues with severity=fatal",
+      "warnings": "array of human-readable warning strings",
+      "retryable": "boolean"
+    },
+    "diagnostics": {
+      "_description": "Observability layer — log-friendly summaries and lineage",
+      "input_summary": "object — key input signals received",
+      "output_summary": "object — key output fields produced",
+      "validation": {
+        "schema_ref": "string",
+        "result": "PASS | FAIL | SKIPPED",
+        "errors": "array",
+        "warnings": "array of strings"
+      },
+      "lineage": {
+        "upstream_phases": "array of phase_ids consumed as input",
+        "upstream_artifacts": "array of artifact names consumed"
+      },
+      "missing_data": "array of { field, reason, impact } — explicit unknown fields"
+    }
+  },
+  "implementation_notes": {
+    "additive_only": "The envelope is ADDED alongside existing output keys. Existing keys (project_id, artifact_path, artifact_name, store_profile, status, cloud_mode, cloud_warnings) are preserved unchanged.",
+    "status_key_evolution": "The existing top-level 'status' string key ('SUCCESS') is preserved. The new envelope adds a nested 'envelope.status' object. These are separate keys.",
+    "run_id_generation": "In n8n Cloud (no crypto module): use Date.now() + Math.random().toString(36).slice(2,6). In self-hosted: same pattern is acceptable.",
+    "backward_compatibility": "All envelope fields are optional additions. Orchestrators reading only existing keys will not be affected."
+  }
+}
