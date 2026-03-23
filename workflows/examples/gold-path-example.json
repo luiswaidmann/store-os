@@ -1,0 +1,214 @@
+{
+  "_meta": {
+    "format": "store-os-gold-path",
+    "version": "1.0",
+    "purpose": "Defines the canonical gold path for end-to-end smoke testing of the store-os Phase 1 chain",
+    "chain": [
+      "resolve-runtime-config",
+      "intake-store-input",
+      "import-shopify-data",
+      "build-store-profile",
+      "build-market-intelligence",
+      "build-brand-positioning",
+      "build-competitor-clusters"
+    ],
+    "usage": "Use this file as reference input for manual smoke tests and as acceptance criteria documentation. Do NOT use as production input.",
+    "last_updated": "2026-03-23"
+  },
+  "example_input": {
+    "project_id": "suppliedtech",
+    "project_name": "SuppliedTech",
+    "primary_market": "DE",
+    "target_markets": ["DE", "AT", "CH"],
+    "primary_language": "de",
+    "languages": ["de", "en"],
+    "primary_currency": "EUR",
+    "currencies": ["EUR"],
+    "vertical": "B2B Bürobedarf & Workplace-Supplies",
+    "store_type": "category-specialist",
+    "business_model": "ecommerce",
+    "price_positioning": "mass-premium",
+    "publish_mode": "draft-and-review",
+    "seo_goal": "visibility",
+    "aeo_goal": "answer-engine-ready",
+    "faq_intensity": "high",
+    "knowledge_content_priority": "guides",
+    "competitor_urls": ["https://www.otto.de/office", "https://staples.de"],
+    "special_notes": "Focus on SME customers, emphasize fast delivery and bulk pricing"
+  },
+  "expected_minimum_outputs": {
+    "store_profile": {
+      "required_fields_present": [
+        "store_id",
+        "store_name",
+        "store_type",
+        "platform",
+        "business_model",
+        "primary_market",
+        "target_markets",
+        "primary_language",
+        "languages",
+        "primary_currency",
+        "currencies",
+        "vertical",
+        "price_positioning",
+        "catalog_type",
+        "brand_maturity",
+        "operating_mode"
+      ],
+      "expected_values": {
+        "store_id": "suppliedtech",
+        "platform": "shopify",
+        "price_positioning": "mass-premium",
+        "brand_maturity": "new"
+      }
+    },
+    "market_intelligence": {
+      "required_fields_present": [
+        "market_category",
+        "audience_segments",
+        "core_problems",
+        "purchase_motivators",
+        "search_intents",
+        "trust_factors",
+        "competitor_types",
+        "positioning_goals"
+      ],
+      "minimum_array_lengths": {
+        "audience_segments": 1,
+        "core_problems": 2,
+        "purchase_motivators": 2,
+        "trust_factors": 2,
+        "competitor_types": 2,
+        "positioning_goals": 2
+      }
+    },
+    "brand_positioning": {
+      "required_fields_present": [
+        "brand_role",
+        "value_proposition",
+        "positioning_statement",
+        "differentiators",
+        "brand_traits",
+        "tone_of_voice",
+        "trust_style",
+        "conversion_style"
+      ],
+      "minimum_array_lengths": {
+        "differentiators": 1,
+        "brand_traits": 2
+      }
+    },
+    "competitor_clusters": {
+      "is_array": true,
+      "minimum_cluster_count": 2,
+      "required_per_cluster": [
+        "cluster_name",
+        "cluster_role",
+        "description",
+        "competitor_examples",
+        "shared_strengths",
+        "shared_weaknesses",
+        "shared_patterns",
+        "non_copyable_elements",
+        "adaptation_opportunities"
+      ]
+    }
+  },
+  "acceptance_criteria": {
+    "per_phase": [
+      {
+        "phase_id": "resolve-runtime-config",
+        "pass_conditions": [
+          "status key is present in output",
+          "no MISSING_ENV_VAR errors thrown",
+          "runtime_config is present in output"
+        ],
+        "fail_conditions": [
+          "throws MISSING_ENV_VAR",
+          "throws CREDENTIAL_RESOLUTION_FAILED"
+        ]
+      },
+      {
+        "phase_id": "intake-store-input",
+        "pass_conditions": [
+          "normalized_intake_payload present",
+          "project_id matches input",
+          "no MISSING_REQUIRED_FIELD error"
+        ],
+        "fail_conditions": [
+          "throws MISSING_REQUIRED_FIELD for any required field in example_input"
+        ]
+      },
+      {
+        "phase_id": "build-store-profile",
+        "pass_conditions": [
+          "store_profile present",
+          "all required schema fields present",
+          "status key is 'SUCCESS'",
+          "catalog_type is one of allowed enum values"
+        ],
+        "fail_conditions": [
+          "MISSING_ARTIFACT error",
+          "SCHEMA_VIOLATION"
+        ]
+      },
+      {
+        "phase_id": "build-market-intelligence",
+        "pass_conditions": [
+          "market_intelligence present",
+          "market_category is non-empty string",
+          "audience_segments has at least 1 item",
+          "status is 'SUCCESS'"
+        ],
+        "fail_conditions": [
+          "LLM_PARSE_ERROR",
+          "MISSING_ARTIFACT"
+        ]
+      },
+      {
+        "phase_id": "build-brand-positioning",
+        "pass_conditions": [
+          "brand_positioning present",
+          "brand_role is one of allowed enum values",
+          "tone_of_voice.style is one of allowed enum values"
+        ],
+        "fail_conditions": [
+          "LLM_PARSE_ERROR",
+          "MISSING_ARTIFACT"
+        ]
+      },
+      {
+        "phase_id": "build-competitor-clusters",
+        "pass_conditions": [
+          "competitor_clusters is an array",
+          "at least 2 clusters present (2 URLs provided)",
+          "each cluster has cluster_name and cluster_role",
+          "cluster_role values are valid enum values"
+        ],
+        "fail_conditions": [
+          "LLM_ARRAY_PARSE_ERROR",
+          "empty array returned"
+        ]
+      }
+    ],
+    "chain_level": [
+      "All phases complete with status 'SUCCESS'",
+      "No fatal_errors in any envelope.status",
+      "All artifact names match expected values",
+      "project_id consistent across all phases"
+    ]
+  },
+  "smoke_test_checklist": [
+    "[ ] Trigger orchestrate-phase1 manually with example_input above",
+    "[ ] Verify resolve-runtime-config runs without env var errors",
+    "[ ] Verify intake-store-input normalizes project_id to 'suppliedtech'",
+    "[ ] Verify build-store-profile outputs store_profile with correct store_id and platform='shopify'",
+    "[ ] Verify build-market-intelligence outputs market_intelligence with market_category populated",
+    "[ ] Verify build-brand-positioning outputs brand_positioning with valid brand_role enum value",
+    "[ ] Verify build-competitor-clusters outputs array with ≥2 clusters (url-seeded mode)",
+    "[ ] Verify no MISSING_ARTIFACT errors thrown at any stage",
+    "[ ] Verify envelope.status.code is 'SUCCESS' in all phases (if envelope is present)",
+    "[ ] Verify cloud_mode is true in all phases (n8n Cloud smoke test)"
+  ]
+}

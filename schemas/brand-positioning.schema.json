@@ -172,6 +172,76 @@
 },
 "notes": {
 "type": "string"
+},
+"emotional_benefits": {
+"type": "array",
+"items": { "type": "string" },
+"description": "What customers emotionally gain from this brand"
+},
+"functional_benefits": {
+"type": "array",
+"items": { "type": "string" },
+"description": "What customers functionally gain from this brand"
+},
+"reason_to_believe": {
+"type": "array",
+"items": {
+"type": "object",
+"required": ["claim", "evidence_type"],
+"properties": {
+"claim": { "type": "string" },
+"evidence_type": {
+"type": "string",
+"enum": ["product-fact", "social-proof", "process-claim", "guarantee", "certification", "speculative"]
+},
+"strength": {
+"type": "string",
+"enum": ["strong", "medium", "weak"]
+}
+}
+}
+},
+"messaging_pillars": {
+"type": "array",
+"items": {
+"type": "object",
+"required": ["pillar_name", "description"],
+"properties": {
+"pillar_name": { "type": "string" },
+"description": { "type": "string" },
+"example_messages": {
+"type": "array",
+"items": { "type": "string" }
+}
+}
+}
+},
+"anti_positioning": {
+"type": "array",
+"items": { "type": "string" },
+"description": "Explicit things this brand must NOT position as"
+},
+"confidence_basis": {
+"type": "object",
+"properties": {
+"evidence_level": {
+"type": "string",
+"enum": ["high", "medium", "low", "assumption-only"]
+},
+"direct_fields_from_intake": {
+"type": "array",
+"items": { "type": "string" }
+},
+"synthesized_fields": {
+"type": "array",
+"items": { "type": "string" }
+},
+"review_required": { "type": "boolean" }
+}
+},
+"_meta": {
+"type": "object",
+"description": "Optional artifact metadata envelope"
 }
 }
 }

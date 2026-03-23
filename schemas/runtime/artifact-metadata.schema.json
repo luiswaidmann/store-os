@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "store-os:artifact-metadata",
+  "title": "Artifact Metadata",
+  "type": "object",
+  "required": ["artifact_id", "schema_version", "phase_id", "created_at"],
+  "properties": {
+    "artifact_id": {
+      "type": "string",
+      "description": "Format: {project_id}/{artifact_name}/{run_id}"
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "phase_id": {
+      "type": "string"
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "upstream_dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["artifact_name", "phase_id"],
+        "properties": {
+          "artifact_name": {
+            "type": "string"
+          },
+          "phase_id": {
+            "type": "string"
+          },
+          "artifact_id": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "string",
+      "enum": ["llm-synthesized", "direct-from-intake", "shopify-derived", "derived-heuristic", "mixed"]
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low", "unknown"]
+    },
+    "cloud_mode": {
+      "type": "boolean"
+    },
+    "persistence_mode": {
+      "type": "string",
+      "enum": ["disk", "inline-only", "cloud-inline"]
+    }
+  }
+}

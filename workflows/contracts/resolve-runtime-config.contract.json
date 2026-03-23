@@ -1,0 +1,102 @@
+{
+  "_meta": {
+    "format": "store-os-runtime-contract",
+    "version": "1.0",
+    "phase_id": "resolve-runtime-config",
+    "category": "runtime-infrastructure",
+    "cloud_compatibility": "FULL",
+    "description": "Reads environment variables and resolves the runtime_config payload used by all downstream phases."
+  },
+  "phase_id": "resolve-runtime-config",
+  "category": "runtime-infrastructure",
+  "cloud_compatibility": "FULL",
+  "upstream_dependencies": [],
+  "required_inputs": {
+    "env_vars": [
+      {
+        "name": "STORE_OS_OPENAI_CREDENTIAL_NAME",
+        "description": "Name of the n8n OpenAI credential to use for LLM calls"
+      },
+      {
+        "name": "STORE_OS_SHOPIFY_CREDENTIAL_NAME",
+        "description": "Name of the n8n Shopify credential to use for data import"
+      },
+      {
+        "name": "STORE_OS_ENV",
+        "description": "Deployment environment: dev | staging | production | cloud-smoke"
+      },
+      {
+        "name": "STORE_OS_PROJECT_ROOT",
+        "description": "Absolute path to the projects root directory (self-hosted only)"
+      },
+      {
+        "name": "STORE_OS_LLM_MODEL",
+        "description": "LLM model identifier, e.g. gpt-4o"
+      }
+    ]
+  },
+  "optional_inputs": {
+    "env_vars": [
+      {
+        "name": "STORE_OS_MAX_PRODUCTS",
+        "description": "Maximum number of products to import from Shopify. Defaults to 250.",
+        "default": 250
+      },
+      {
+        "name": "STORE_OS_MAX_COLLECTIONS",
+        "description": "Maximum number of collections to import from Shopify. Defaults to 50.",
+        "default": 50
+      }
+    ]
+  },
+  "output_contract": {
+    "runtime_config_payload": {
+      "description": "Resolved runtime configuration object passed to all downstream phases",
+      "fields": [
+        "cloud_mode",
+        "env",
+        "openai_credential_name",
+        "shopify_credential_name",
+        "project_root",
+        "llm_model",
+        "max_products",
+        "max_collections"
+      ],
+      "persistence": "in-memory only — never written to disk"
+    }
+  },
+  "validation_errors": [
+    {
+      "code": "MISSING_ENV_VAR",
+      "severity": "fatal",
+      "description": "A required environment variable is absent or empty. Halts the chain.",
+      "affected_vars": ["STORE_OS_OPENAI_CREDENTIAL_NAME", "STORE_OS_ENV", "STORE_OS_LLM_MODEL"]
+    },
+    {
+      "code": "INVALID_ENV_VALUE",
+      "severity": "fatal",
+      "description": "An environment variable has a value outside its allowed enum. E.g. STORE_OS_ENV=unknown."
+    },
+    {
+      "code": "CREDENTIAL_RESOLUTION_FAILED",
+      "severity": "fatal",
+      "description": "The named credential could not be resolved in the n8n credential store."
+    }
+  ],
+  "fatal_conditions": [
+    "STORE_OS_ENV is not one of: dev, staging, production, cloud-smoke",
+    "STORE_OS_OPENAI_CREDENTIAL_NAME is empty or missing",
+    "STORE_OS_LLM_MODEL is empty or missing",
+    "In self-hosted mode: STORE_OS_PROJECT_ROOT is empty or path does not exist"
+  ],
+  "cloud_notes": {
+    "cloud_mode_detection": "require('fs') is attempted — throws in n8n Cloud, setting cloudMode=true",
+    "project_root": "Not required in cloud mode. runtime_config.project_root will be null.",
+    "env_var_access": "In n8n Cloud, environment variables are accessed via $env or process.env depending on n8n version. Both are attempted.",
+    "changes_in_cloud_mode": [
+      "project_root is null",
+      "cloud_mode flag is set to true in runtime_config",
+      "ajv_schema_path is null (no local schema files accessible)"
+    ]
+  }
+}

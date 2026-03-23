@@ -153,7 +153,57 @@
 },
 "notes": {
 "type": "string"
+},
+"assortment_shape": {
+"type": "string",
+"enum": [
+"single-hero-product",
+"tight-specialist-range",
+"curated-multi-category",
+"broad-generalist",
+"seasonal-drops",
+"unknown"
+]
+},
+"target_audience_hypotheses": {
+"type": "array",
+"items": {
+"type": "object",
+"required": ["segment_label", "description", "confidence"],
+"properties": {
+"segment_label": { "type": "string" },
+"description": { "type": "string" },
+"confidence": {
+"type": "string",
+"enum": ["high", "medium", "low"]
+},
+"source_signals": {
+"type": "array",
+"items": { "type": "string" }
 }
 }
 }
-
+},
+"value_proposition_hint": {
+"type": "string",
+"description": "Short 1-sentence UVP hint derived from intake/shopify signals"
+},
+"brand_voice_hint": {
+"type": "string",
+"description": "e.g. technical-expert, lifestyle-friendly, budget-pragmatic"
+},
+"ux_merchandising_maturity": {
+"type": "string",
+"enum": ["minimal", "basic", "intermediate", "advanced", "unknown"]
+},
+"open_questions": {
+"type": "array",
+"items": { "type": "string" },
+"description": "Explicit unknowns that downstream phases should flag for human review"
+},
+"_meta": {
+"type": "object",
+"description": "Optional artifact metadata envelope"
+}
+}
+}

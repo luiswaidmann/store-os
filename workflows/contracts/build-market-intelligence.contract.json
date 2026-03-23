@@ -1,0 +1,196 @@
+{
+  "_meta": {
+    "format": "store-os-runtime-contract",
+    "version": "1.0",
+    "phase_id": "build-market-intelligence",
+    "category": "planning",
+    "cloud_compatibility": "PARTIAL",
+    "description": "LLM-synthesizes structured market intelligence from internal store signals. No external research, no crawling. Writes artifact to disk (self-hosted). Returns market_intelligence inline (both modes)."
+  },
+  "phase_id": "build-market-intelligence",
+  "category": "planning",
+  "cloud_compatibility": "PARTIAL",
+  "upstream_dependencies": ["build-store-profile", "intake-store-input"],
+  "required_inputs": {
+    "from_pipeline": [
+      {
+        "field": "store_profile",
+        "source": "build-store-profile",
+        "required_subfields": ["store_id", "vertical", "price_positioning", "primary_market", "store_type", "catalog_type"]
+      },
+      {
+        "field": "normalized_intake_payload",
+        "source": "intake-store-input"
+      },
+      {
+        "field": "runtime_config",
+        "source": "resolve-runtime-config"
+      },
+      {
+        "field": "project_id",
+        "source": "intake-store-input"
+      }
+    ]
+  },
+  "optional_inputs": {
+    "shopify_import": {
+      "description": "Catalog context for richer market_subcategories synthesis. Degrades gracefully if absent — market_subcategories will be omitted from output.",
+      "source": "import-shopify-data (forwarded via orchestrator)"
+    }
+  },
+  "synthesis_boundary": "LLM synthesis from internal signals only — no external research, no crawling, no external APIs. All outputs are planning hypotheses.",
+  "output_contract": {
+    "market_intelligence": {
+      "description": "Primary artifact. Written to {project_root}/{project_id}/market-intelligence.json (self-hosted) or returned inline (cloud).",
+      "artifact_path_pattern": "{project_root}/{project_id}/market-intelligence.json",
+      "schema_ref": "schemas/market-intelligence.schema.json",
+      "required_fields": [
+        "market_category",
+        "audience_segments",
+        "core_problems",
+        "purchase_motivators",
+        "search_intents",
+        "trust_factors",
+        "competitor_types",
+        "positioning_goals"
+      ],
+      "conditional_fields": [
+        {
+          "field": "market_subcategories",
+          "condition": "Only included if shopify catalog context is available"
+        },
+        {
+          "field": "content_opportunities",
+          "condition": "Only included if intake.knowledge_content_priority is set"
+        },
+        {
+          "field": "seo_considerations",
+          "condition": "Only included if intake.seo_goal is set"
+        },
+        {
+          "field": "aeo_considerations",
+          "condition": "Only included if intake.aeo_goal is set"
+        }
+      ],
+      "new_optional_fields": [
+        "market_hypotheses",
+        "trend_signals",
+        "seasonality_hints",
+        "price_band_logic",
+        "risk_flags",
+        "opportunity_flags",
+        "competition_surface",
+        "adjacent_market_hints",
+        "unknown_states",
+        "_meta"
+      ]
+    },
+    "envelope": {
+      "description": "Runtime envelope added alongside existing output keys",
+      "schema_ref": "schemas/runtime/runtime-envelope.schema.json"
+    }
+  },
+  "new_optional_outputs": [
+    {
+      "field": "market_hypotheses",
+      "description": "2-3 strategic market hypotheses with evidence basis and confidence level",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "trend_signals",
+      "description": "2-3 relevant market trends with direction and store relevance",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "seasonality_hints",
+      "description": "Seasonal demand patterns relevant to this vertical",
+      "derivation": "llm-synthesized (omit if vertical is not seasonal)"
+    },
+    {
+      "field": "price_band_logic",
+      "description": "Price band anchors and where the store fits",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "risk_flags",
+      "description": "1-2 market or competitive risks",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "opportunity_flags",
+      "description": "1-2 market opportunities for the store",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "competition_surface",
+      "description": "Competition intensity, key battlegrounds, and differentiation whitespace",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "adjacent_market_hints",
+      "description": "Adjacent markets or categories the store could expand into",
+      "derivation": "llm-synthesized"
+    },
+    {
+      "field": "unknown_states",
+      "description": "Explicit unknowns the LLM could not confidently infer — preferred over hallucination",
+      "derivation": "llm-synthesized"
+    }
+  ],
+  "llm_prompt_strategy": {
+    "model": "gpt-4o (configurable via runtime_config.llm_model)",
+    "temperature": 0.3,
+    "max_tokens": 2000,
+    "input_signals": [
+      "store_profile: vertical, store_type, price_positioning, primary_market, catalog_type, brand_maturity, business_model",
+      "intake: competitor_urls (for archetype labeling only), seo_goal, aeo_goal, faq_intensity, special_notes",
+      "catalog_context: product_types, collection_titles, vendor_names (if shopify data available)"
+    ],
+    "output_format": "Valid JSON only. No markdown fences.",
+    "constraints": [
+      "Do NOT invent statistics, market share figures, search volumes, or demographic data",
+      "All outputs are planning hypotheses — not confirmed research",
+      "search_intents[*].intent_type must be one of allowed enum values",
+      "competitor_urls are used as labeling hints only — not crawled"
+    ]
+  },
+  "hallucination_guards": [
+    "No invented statistics or market share figures",
+    "No invented search volume data",
+    "No demographic data without basis",
+    "unknown_states array must be populated when LLM cannot make confident inference",
+    "competitor_urls are naming hints only — no crawling, no research",
+    "All outputs labeled SYNTHESIS-ONLY in notes field"
+  ],
+  "validation_errors": [
+    {
+      "code": "MISSING_ARTIFACT",
+      "severity": "fatal",
+      "description": "store_profile or normalized_intake_payload absent from pipeline"
+    },
+    {
+      "code": "MISSING_RUNTIME_CONFIG",
+      "severity": "fatal",
+      "description": "runtime_config absent from pipeline"
+    },
+    {
+      "code": "LLM_PARSE_ERROR",
+      "severity": "fatal",
+      "description": "LLM response could not be parsed as valid JSON"
+    },
+    {
+      "code": "SCHEMA_VIOLATION",
+      "severity": "fatal",
+      "description": "Parsed market_intelligence fails AJV validation (self-hosted). Artifact quarantined."
+    }
+  ],
+  "cloud_behavior": {
+    "skipped": [
+      "AJV schema validation",
+      "Artifact write to disk",
+      "Checkpoint update"
+    ],
+    "inline_output": "market_intelligence returned in pipeline. artifact_path is null.",
+    "full_compatible": "LLM synthesis, prompt build, and signal extraction all run in cloud mode."
+  }
+}

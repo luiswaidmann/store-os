@@ -198,7 +198,125 @@
 },
 "notes": {
 "type": "string"
+},
+"market_hypotheses": {
+"type": "array",
+"items": {
+"type": "object",
+"required": ["hypothesis", "evidence_basis", "confidence"],
+"properties": {
+"hypothesis": { "type": "string" },
+"evidence_basis": { "type": "string" },
+"confidence": {
+"type": "string",
+"enum": ["high", "medium", "low", "speculative"]
+},
+"risk_if_wrong": { "type": "string" }
+}
+}
+},
+"trend_signals": {
+"type": "array",
+"items": {
+"type": "object",
+"required": ["trend_name", "direction"],
+"properties": {
+"trend_name": { "type": "string" },
+"direction": {
+"type": "string",
+"enum": ["growing", "stable", "declining", "unknown"]
+},
+"relevance_to_store": { "type": "string" },
+"confidence": {
+"type": "string",
+"enum": ["high", "medium", "low", "speculative"]
 }
 }
 }
-
+},
+"seasonality_hints": {
+"type": "array",
+"items": {
+"type": "object",
+"properties": {
+"period": { "type": "string" },
+"demand_pattern": { "type": "string" },
+"relevance": { "type": "string" }
+}
+}
+},
+"price_band_logic": {
+"type": "object",
+"properties": {
+"low_end_signal": { "type": "string" },
+"mid_market_signal": { "type": "string" },
+"premium_signal": { "type": "string" },
+"store_positioning_fit": { "type": "string" }
+}
+},
+"risk_flags": {
+"type": "array",
+"items": {
+"type": "object",
+"properties": {
+"flag_type": { "type": "string" },
+"description": { "type": "string" },
+"severity": {
+"type": "string",
+"enum": ["high", "medium", "low"]
+}
+}
+}
+},
+"opportunity_flags": {
+"type": "array",
+"items": {
+"type": "object",
+"properties": {
+"opportunity_type": { "type": "string" },
+"description": { "type": "string" },
+"confidence": {
+"type": "string",
+"enum": ["high", "medium", "low", "speculative"]
+}
+}
+}
+},
+"competition_surface": {
+"type": "object",
+"properties": {
+"intensity": {
+"type": "string",
+"enum": ["low", "medium", "high", "fragmented"]
+},
+"key_battlegrounds": {
+"type": "array",
+"items": { "type": "string" }
+},
+"differentiation_whitespace": {
+"type": "array",
+"items": { "type": "string" }
+}
+}
+},
+"adjacent_market_hints": {
+"type": "array",
+"items": { "type": "string" }
+},
+"unknown_states": {
+"type": "array",
+"items": {
+"type": "object",
+"properties": {
+"topic": { "type": "string" },
+"why_unknown": { "type": "string" },
+"impact_on_planning": { "type": "string" }
+}
+}
+},
+"_meta": {
+"type": "object",
+"description": "Optional artifact metadata envelope"
+}
+}
+}

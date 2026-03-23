@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "store-os:validation-result",
+  "title": "Validation Result",
+  "type": "object",
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "required": ["code", "severity", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "Machine-readable error code. Format: CATEGORY_SUBCATEGORY. E.g. MISSING_ARTIFACT, SCHEMA_VIOLATION, FIELD_INVALID, PROJECT_ID_MISMATCH"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["fatal", "retryable", "warning", "info"]
+        },
+        "message": {
+          "type": "string"
+        },
+        "field_path": {
+          "type": "string",
+          "description": "JSON path to affected field, e.g. store_profile.vertical"
+        },
+        "expected": {
+          "type": "string"
+        },
+        "actual": {}
+      }
+    }
+  },
+  "required": ["result", "issues"],
+  "properties": {
+    "result": {
+      "type": "string",
+      "enum": ["PASS", "FAIL", "PARTIAL", "SKIPPED"]
+    },
+    "schema_ref": {
+      "type": "string"
+    },
+    "validated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "fatal_count": {
+      "type": "integer"
+    },
+    "warning_count": {
+      "type": "integer"
+    },
+    "summary": {
+      "type": "string",
+      "description": "Human-readable one-line summary"
+    }
+  }
+}
