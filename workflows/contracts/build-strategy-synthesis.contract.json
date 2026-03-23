@@ -1,0 +1,146 @@
+{
+  "_meta": {
+    "format": "store-os-runtime-contract",
+    "version": "1.0",
+    "phase_id": "build-strategy-synthesis",
+    "category": "planning",
+    "cloud_compatibility": "PARTIAL",
+    "description": "Cross-artifact synthesis phase. Consumes store_profile, market_intelligence, brand_positioning, and competitor_clusters to produce a strategy_synthesis artifact that is the primary strategic input for all downstream planning phases (offer-architecture, content-strategy, gtm-plan)."
+  },
+  "phase_id": "build-strategy-synthesis",
+  "category": "planning",
+  "cloud_compatibility": "PARTIAL",
+  "upstream_dependencies": [
+    "build-competitor-clusters",
+    "build-brand-positioning",
+    "build-market-intelligence",
+    "build-store-profile"
+  ],
+  "required_inputs": {
+    "from_pipeline": [
+      {
+        "field": "store_profile",
+        "source": "build-store-profile",
+        "required_subfields": ["store_id", "vertical", "price_positioning", "store_type", "catalog_type"]
+      },
+      {
+        "field": "market_intelligence",
+        "source": "build-market-intelligence",
+        "required_subfields": ["market_category", "core_problems", "positioning_goals"]
+      },
+      {
+        "field": "brand_positioning",
+        "source": "build-brand-positioning",
+        "required_subfields": ["brand_role", "value_proposition", "differentiators"]
+      },
+      {
+        "field": "competitor_clusters",
+        "source": "build-competitor-clusters",
+        "required_subfields": ["array with at least 1 cluster having cluster_name and cluster_role"]
+      },
+      {
+        "field": "normalized_intake_payload",
+        "source": "intake-store-input"
+      },
+      {
+        "field": "runtime_config",
+        "source": "resolve-runtime-config"
+      },
+      {
+        "field": "project_id",
+        "source": "intake-store-input"
+      }
+    ]
+  },
+  "synthesis_scope": {
+    "description": "This phase synthesizes all four upstream planning artifacts into a single strategic view. The LLM is given structured summaries of all four artifacts and asked to draw cross-cutting strategic conclusions.",
+    "evidence_boundary": "LLM inference from internal signals only. No external research, no crawling, no competitive intelligence APIs. All outputs are planning hypotheses requiring human review.",
+    "cross_signal_examples": [
+      "An opportunity in market_intelligence + a matching gap in competitor_clusters → high-priority opportunity",
+      "A positioning angle in brand_positioning contradicted by a strong competitor cluster → risk",
+      "An unknown_state carried through market_intelligence → surfaces in strategy_synthesis.unknown_states"
+    ]
+  },
+  "output_contract": {
+    "strategy_synthesis": {
+      "description": "Strategic synthesis artifact. Written to {project_root}/{project_id}/strategy-synthesis.json (self-hosted) or returned inline (cloud).",
+      "artifact_path_pattern": "{project_root}/{project_id}/strategy-synthesis.json",
+      "schema_ref": "schemas/strategy-synthesis.schema.json",
+      "required_fields": [
+        "strategic_summary",
+        "growth_thesis",
+        "positioning_focus",
+        "opportunity_priorities",
+        "risk_priorities",
+        "validation_questions"
+      ],
+      "optional_fields": [
+        "moat_hypotheses",
+        "messaging_priorities",
+        "offer_implications",
+        "gtm_implications",
+        "confidence_notes",
+        "unknown_states",
+        "notes"
+      ]
+    },
+    "envelope": {
+      "description": "Runtime envelope",
+      "schema_ref": "schemas/runtime/runtime-envelope.schema.json"
+    }
+  },
+  "field_derivation_notes": {
+    "strategic_summary": "LLM-synthesized 2-4 sentence overview. Draws on store vertical, market category, brand_role, and competitive landscape.",
+    "growth_thesis": "LLM-synthesized. Draws primarily on market positioning_goals, brand_positioning.differentiators, and gaps in competitor_clusters.",
+    "positioning_focus": "LLM-synthesized. Primarily from brand_positioning.brand_role + competitive white-space in competitor_clusters.",
+    "opportunity_priorities": "LLM-synthesized. Source-tagged: each opportunity is attributed to the upstream artifact where the signal originated.",
+    "risk_priorities": "LLM-synthesized. Draws on market risk_flags (if present), competitor cluster strengths, and brand_positioning confidence_basis.",
+    "moat_hypotheses": "LLM-synthesized. Draws on brand_positioning.reason_to_believe + store_profile.value_proposition_hint + competitive white-space.",
+    "messaging_priorities": "LLM-synthesized. Draws on brand_positioning.messaging_pillars (if present) + audience segments + competitor weaknesses.",
+    "offer_implications": "LLM-synthesized. Draws on store_profile.assortment_shape + catalog_type + competitive gaps.",
+    "gtm_implications": "LLM-synthesized. Draws on market_intelligence.search_intents + positioning_goals + audience segments.",
+    "validation_questions": "LLM-synthesized. Surfaces key assumptions and unknown_states from all upstream artifacts.",
+    "unknown_states": "LLM carries forward explicitly flagged unknowns from market_intelligence.unknown_states, brand_positioning.confidence_basis, and any low-confidence upstream fields."
+  },
+  "validation_errors": [
+    {
+      "code": "MISSING_ARTIFACT",
+      "severity": "fatal",
+      "description": "One or more of store_profile, market_intelligence, brand_positioning, competitor_clusters is absent from the pipeline."
+    },
+    {
+      "code": "MISSING_RUNTIME_CONFIG",
+      "severity": "fatal",
+      "description": "runtime_config is not present."
+    },
+    {
+      "code": "LLM_PARSE_ERROR",
+      "severity": "fatal",
+      "description": "LLM response could not be parsed as valid JSON object."
+    },
+    {
+      "code": "SCHEMA_VIOLATION",
+      "severity": "fatal",
+      "description": "Parsed strategy_synthesis object fails inline validation: missing required fields, empty required arrays, or invalid enum values. Always runs in both cloud and self-hosted modes."
+    }
+  ],
+  "cloud_behavior": {
+    "skipped": [
+      "AJV schema validation (replaced by inline required-field and enum checks)",
+      "Artifact write to disk (strategy-synthesis.json)"
+    ],
+    "inline_output": "strategy_synthesis object returned inline in pipeline. artifact_path is null.",
+    "inline_validation": "Inline required-field and enum validation always runs in both modes."
+  },
+  "downstream_consumers": {
+    "primary": [
+      "build-offer-architecture — uses growth_thesis, offer_implications, moat_hypotheses",
+      "build-content-strategy — uses messaging_priorities, gtm_implications, opportunity_priorities",
+      "build-gtm-plan — uses gtm_implications, opportunity_priorities, validation_questions"
+    ],
+    "secondary": [
+      "build-pattern-manifest — uses positioning_focus to inform UX pattern selection",
+      "All SEO/AEO phases — informed by messaging_priorities and gtm_implications"
+    ]
+  }
+}

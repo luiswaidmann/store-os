@@ -10,7 +10,8 @@
       "build-store-profile",
       "build-market-intelligence",
       "build-brand-positioning",
-      "build-competitor-clusters"
+      "build-competitor-clusters",
+      "build-strategy-synthesis"
     ],
     "usage": "Use this file as reference input for manual smoke tests and as acceptance criteria documentation. Do NOT use as production input.",
     "last_updated": "2026-03-23"
@@ -113,6 +114,31 @@
         "non_copyable_elements",
         "adaptation_opportunities"
       ]
+    },
+    "strategy_synthesis": {
+      "is_object": true,
+      "required_fields_present": [
+        "strategic_summary",
+        "growth_thesis",
+        "positioning_focus",
+        "opportunity_priorities",
+        "risk_priorities",
+        "validation_questions"
+      ],
+      "expected_values": {
+        "growth_thesis.confidence": "one of: high, medium, low, speculative",
+        "opportunity_priorities.length": "at least 2",
+        "risk_priorities.length": "at least 2",
+        "validation_questions.length": "at least 3"
+      },
+      "expected_optional_fields": [
+        "moat_hypotheses",
+        "messaging_priorities",
+        "offer_implications",
+        "gtm_implications",
+        "confidence_notes",
+        "unknown_states"
+      ]
     }
   },
   "acceptance_criteria": {
@@ -190,6 +216,25 @@
           "LLM_ARRAY_PARSE_ERROR",
           "empty array returned"
         ]
+      },
+      {
+        "phase_id": "build-strategy-synthesis",
+        "pass_conditions": [
+          "strategy_synthesis is an object",
+          "strategic_summary is a non-empty string",
+          "growth_thesis has statement and rationale",
+          "positioning_focus has primary_angle and rationale",
+          "opportunity_priorities is array with at least 2 items",
+          "risk_priorities is array with at least 2 items",
+          "validation_questions is array with at least 3 items",
+          "status is 'SUCCESS'",
+          "envelope.status.code is 'SUCCESS'"
+        ],
+        "fail_conditions": [
+          "LLM_PARSE_ERROR",
+          "MISSING_ARTIFACT for any of store_profile, market_intelligence, brand_positioning, competitor_clusters",
+          "SCHEMA_VIOLATION"
+        ]
       }
     ],
     "chain_level": [
@@ -207,6 +252,11 @@
     "[ ] Verify build-market-intelligence outputs market_intelligence with market_category populated",
     "[ ] Verify build-brand-positioning outputs brand_positioning with valid brand_role enum value",
     "[ ] Verify build-competitor-clusters outputs array with ≥2 clusters (url-seeded mode)",
+    "[ ] Verify build-strategy-synthesis outputs strategy_synthesis object with strategic_summary populated",
+    "[ ] Verify build-strategy-synthesis outputs growth_thesis with statement and rationale",
+    "[ ] Verify build-strategy-synthesis outputs opportunity_priorities array with ≥2 items",
+    "[ ] Verify build-strategy-synthesis outputs risk_priorities array with ≥2 items",
+    "[ ] Verify build-strategy-synthesis outputs validation_questions array with ≥3 items",
     "[ ] Verify no MISSING_ARTIFACT errors thrown at any stage",
     "[ ] Verify envelope.status.code is 'SUCCESS' in all phases (if envelope is present)",
     "[ ] Verify cloud_mode is true in all phases (n8n Cloud smoke test)"

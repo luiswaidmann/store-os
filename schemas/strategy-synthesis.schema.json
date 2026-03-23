@@ -1,0 +1,332 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/strategy-synthesis.schema.json",
+  "title": "Strategy Synthesis Schema",
+  "description": "Schema for the strategy_synthesis artifact produced by build-strategy-synthesis. Synthesizes store_profile, market_intelligence, brand_positioning, and competitor_clusters into an actionable strategic artifact for downstream planning phases.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "strategic_summary",
+    "growth_thesis",
+    "positioning_focus",
+    "opportunity_priorities",
+    "risk_priorities",
+    "validation_questions"
+  ],
+  "properties": {
+    "strategic_summary": {
+      "type": "string",
+      "minLength": 1,
+      "description": "2-4 sentence synthesis of the store's strategic situation: where it stands, what the market looks like, and what the core strategic challenge is."
+    },
+    "growth_thesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["statement", "rationale"],
+      "description": "Core hypothesis about how this store will grow. LLM-synthesized from all upstream artifacts.",
+      "properties": {
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Single-sentence growth thesis statement."
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Why this growth thesis applies to this store given the market, brand, and competitive context."
+        },
+        "confidence": {
+          "type": "string",
+          "enum": ["high", "medium", "low", "speculative"]
+        },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Key assumptions or conditions that must hold for this thesis to be valid."
+        }
+      }
+    },
+    "positioning_focus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary_angle", "rationale"],
+      "description": "The primary positioning angle to pursue — synthesized from brand_positioning + competitive landscape.",
+      "properties": {
+        "primary_angle": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The single strongest positioning angle (e.g., 'specialist authority in B2B workplace supplies')."
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "differentiating_from": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "What clusters or competitor archetypes this positioning explicitly differentiates from."
+        },
+        "supported_by": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Upstream signal sources that support this focus (e.g., 'brand_positioning.brand_role=specialist', 'competitor_clusters: no specialist cluster present')."
+        }
+      }
+    },
+    "moat_hypotheses": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["hypothesis", "type", "confidence"],
+        "properties": {
+          "hypothesis": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What could constitute a durable competitive advantage."
+          },
+          "type": {
+            "type": "string",
+            "enum": ["brand", "catalog", "customer-relationship", "operations", "content", "pricing", "expertise", "mixed"]
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low", "speculative"]
+          },
+          "evidence_basis": {
+            "type": "string",
+            "description": "Which upstream signals support this hypothesis."
+          },
+          "risk": {
+            "type": "string",
+            "description": "What could undermine this moat hypothesis."
+          }
+        }
+      },
+      "description": "Hypotheses about durable competitive advantage. All speculative — require human validation."
+    },
+    "opportunity_priorities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["opportunity", "source", "priority"],
+        "properties": {
+          "opportunity": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Specific opportunity identified from upstream artifacts."
+          },
+          "source": {
+            "type": "string",
+            "enum": ["market_intelligence", "brand_positioning", "competitor_clusters", "store_profile", "cross_signal"],
+            "description": "Which upstream artifact this opportunity was derived from."
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "phase_implications": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["seo", "aeo", "gtm", "offer", "content", "brand", "ux", "paid"]
+            },
+            "description": "Which downstream planning phases are most affected by this opportunity."
+          }
+        }
+      },
+      "description": "Top prioritized opportunities synthesized from all upstream artifacts."
+    },
+    "risk_priorities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["risk", "source", "severity"],
+        "properties": {
+          "risk": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Specific risk identified from upstream artifacts."
+          },
+          "source": {
+            "type": "string",
+            "enum": ["market_intelligence", "brand_positioning", "competitor_clusters", "store_profile", "cross_signal"]
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          },
+          "mitigation_hint": {
+            "type": "string",
+            "description": "Possible mitigation direction. Not a prescription — planning hypothesis only."
+          }
+        }
+      },
+      "description": "Prioritized risks synthesized from all upstream artifacts."
+    },
+    "messaging_priorities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["message", "priority"],
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Core message that should be communicated."
+          },
+          "audience": {
+            "type": "string",
+            "description": "Primary audience segment this message is for."
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          },
+          "channel_relevance": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["seo", "aeo", "homepage", "pdp", "email", "social", "paid", "content"]
+            }
+          },
+          "rationale": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Priority messages derived from brand positioning and competitive context."
+    },
+    "offer_implications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["implication"],
+        "properties": {
+          "implication": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What the synthesis means for product or offer strategy."
+          },
+          "action_hint": {
+            "type": "string",
+            "description": "A directional suggestion. Planning hypothesis — requires human review."
+          },
+          "urgency": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          }
+        }
+      },
+      "description": "Implications for product, offer, and assortment strategy."
+    },
+    "gtm_implications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["implication", "channel"],
+        "properties": {
+          "implication": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Go-to-market implication derived from the strategic synthesis."
+          },
+          "channel": {
+            "type": "string",
+            "enum": ["seo", "aeo", "paid", "social", "email", "content", "partnerships", "mixed"]
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["high", "medium", "low"]
+          }
+        }
+      },
+      "description": "Go-to-market implications by channel. Inform downstream gtm-plan phase."
+    },
+    "validation_questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Questions that require human validation before acting on this synthesis. Surfaces assumptions and unknown states."
+    },
+    "confidence_notes": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Overall synthesis confidence assessment.",
+      "properties": {
+        "overall_level": {
+          "type": "string",
+          "enum": ["high", "medium", "low", "assumption-only"]
+        },
+        "primary_gaps": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Key data gaps that limit confidence."
+        },
+        "review_required": {
+          "type": "boolean",
+          "description": "Whether human review is required before using this artifact downstream."
+        },
+        "basis_artifacts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["store_profile", "market_intelligence", "brand_positioning", "competitor_clusters"]
+          },
+          "description": "Which upstream artifacts contributed to this synthesis."
+        }
+      }
+    },
+    "unknown_states": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["domain", "unknown", "impact"],
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Which domain this unknown belongs to (e.g., 'catalog', 'audience', 'competition')."
+          },
+          "unknown": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What is not known or assumed — carried forward from upstream phases."
+          },
+          "impact": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": "How much this unknown could affect the synthesis quality."
+          },
+          "source_artifact": {
+            "type": "string",
+            "description": "Which upstream artifact flagged this unknown."
+          }
+        }
+      },
+      "description": "Unknown states carried forward from upstream phases. Explicitly surfaced rather than silently assumed."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Free-form notes about this synthesis. Includes evidence boundary disclaimer."
+    },
+    "_meta": {
+      "type": "object",
+      "description": "Optional artifact metadata envelope (populated by runtime)."
+    }
+  }
+}
