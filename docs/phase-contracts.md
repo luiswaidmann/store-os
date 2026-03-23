@@ -49,6 +49,7 @@ Every contract file follows the `store-os-runtime-contract` format:
 | build-market-intelligence | planning | PARTIAL | build-store-profile, intake-store-input | market-intelligence.json | market_hypotheses, trend_signals, seasonality_hints, price_band_logic, risk_flags, opportunity_flags, competition_surface, adjacent_market_hints, unknown_states |
 | build-brand-positioning | planning | PARTIAL | build-store-profile, build-market-intelligence, intake-store-input | brand-positioning.json | emotional_benefits, functional_benefits, reason_to_believe, messaging_pillars, anti_positioning, confidence_basis |
 | build-competitor-clusters | planning | PARTIAL | build-market-intelligence, intake-store-input, build-store-profile | competitor-clusters.json (array) | competitor_type_classification, price_tier, brand_style, product_breadth, trust_signals_used, strategic_summary |
+| build-strategy-synthesis | planning | PARTIAL | build-competitor-clusters, build-brand-positioning, build-market-intelligence, build-store-profile | strategy-synthesis.json | moat_hypotheses, messaging_priorities, offer_implications, gtm_implications, confidence_notes, unknown_states |
 
 ---
 
@@ -170,6 +171,30 @@ Every contract file follows the `store-os-runtime-contract` format:
 **Error codes**: `MISSING_ARTIFACT`, `LLM_PARSE_ERROR`, `LLM_ARRAY_PARSE_ERROR`, `SCHEMA_VIOLATION`
 
 **Contract file**: `workflows/contracts/build-competitor-clusters.contract.json`
+
+---
+
+### build-strategy-synthesis
+
+**Cloud compatibility**: PARTIAL
+
+**Required inputs**: `store_profile` (with vertical, price_positioning, store_type, catalog_type), `market_intelligence` (with market_category, core_problems, positioning_goals), `brand_positioning` (with brand_role, value_proposition, differentiators), `competitor_clusters` (non-empty array), `normalized_intake_payload`, `runtime_config`
+
+**Synthesis scope**: Cross-artifact synthesis. All four upstream planning artifacts are summarized and passed to the LLM, which produces a single strategic synthesis object with cross-cutting conclusions.
+
+**Required output fields**: `strategic_summary`, `growth_thesis` (with `statement`, `rationale`), `positioning_focus` (with `primary_angle`, `rationale`), `opportunity_priorities` (array, min 1), `risk_priorities` (array, min 1), `validation_questions` (array, min 1)
+
+**Optional output fields**: `moat_hypotheses`, `messaging_priorities`, `offer_implications`, `gtm_implications`, `confidence_notes`, `unknown_states`
+
+**Evidence boundary**: LLM inference from internal signals only. No external research, no crawling, no competitive intelligence APIs. All outputs are planning hypotheses requiring human review.
+
+**Error codes**: `MISSING_ARTIFACT`, `MISSING_RUNTIME_CONFIG`, `LLM_PARSE_ERROR`, `SCHEMA_VIOLATION`
+
+**Cloud skips**: AJV validation, disk write (strategy-synthesis.json)
+
+**Downstream consumers**: `build-offer-architecture`, `build-content-strategy`, `build-gtm-plan` (all Phase 6+ — not yet implemented)
+
+**Contract file**: `workflows/contracts/build-strategy-synthesis.contract.json`
 
 ---
 

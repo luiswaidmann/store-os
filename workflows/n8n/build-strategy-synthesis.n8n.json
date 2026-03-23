@@ -1,0 +1,169 @@
+{
+  "name": "build-strategy-synthesis",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "h9c0d1e2-0009-0009-0009-000000000001",
+      "name": "Subworkflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-strategy-synthesis — Validate Upstream Inputs\n// Checks all required upstream artifacts are present and well-formed.\n// This is a cross-artifact synthesis phase: all four planning artifacts must be present.\n//\n// CLOUD MODE: all data arrives inline via n8n pipeline.\n//             No filesystem access required.\n\nlet cloudMode = false;\ntry { require('fs'); } catch (_e) { cloudMode = true; }\n\nconst input = $input.first().json;\nconst storeProfile = input.store_profile;\nconst marketIntelligence = input.market_intelligence;\nconst brandPositioning = input.brand_positioning;\nconst competitorClusters = input.competitor_clusters;\nconst intakePayload = input.normalized_intake_payload;\nconst runtimeConfig = input.runtime_config;\nconst projectId = input.project_id;\n\n// Propagate cloud_mode from upstream\nif (!cloudMode && runtimeConfig && runtimeConfig.cloud_mode) cloudMode = true;\n\n// Required presence checks\nif (!storeProfile || !storeProfile.store_id) {\n  throw new Error('MISSING_ARTIFACT: store_profile with store_id is required. Run build-store-profile first.');\n}\nif (!marketIntelligence || !marketIntelligence.market_category) {\n  throw new Error('MISSING_ARTIFACT: market_intelligence with market_category is required. Run build-market-intelligence first.');\n}\nif (!brandPositioning || !brandPositioning.brand_role) {\n  throw new Error('MISSING_ARTIFACT: brand_positioning with brand_role is required. Run build-brand-positioning first.');\n}\nif (!Array.isArray(competitorClusters) || competitorClusters.length === 0) {\n  throw new Error('MISSING_ARTIFACT: competitor_clusters must be a non-empty array. Run build-competitor-clusters first.');\n}\nif (!intakePayload) {\n  throw new Error('MISSING_ARTIFACT: normalized_intake_payload is required. Run intake-store-input first.');\n}\nif (!runtimeConfig) {\n  throw new Error('MISSING_RUNTIME_CONFIG: runtime_config is required.');\n}\nif (!projectId) {\n  throw new Error('MISSING_INPUT: project_id is required.');\n}\n\n// Required store_profile fields\nconst profileRequired = ['store_id', 'vertical', 'price_positioning', 'store_type', 'catalog_type'];\nconst profileMissing = profileRequired.filter(function(f) { return !storeProfile[f]; });\nif (profileMissing.length > 0) {\n  throw new Error('MISSING_ARTIFACT: store_profile missing required fields: ' + profileMissing.join(', '));\n}\n\n// Required market_intelligence fields\nif (!Array.isArray(marketIntelligence.core_problems) || marketIntelligence.core_problems.length === 0) {\n  throw new Error('MISSING_ARTIFACT: market_intelligence.core_problems must be a non-empty array.');\n}\nif (!Array.isArray(marketIntelligence.positioning_goals) || marketIntelligence.positioning_goals.length === 0) {\n  throw new Error('MISSING_ARTIFACT: market_intelligence.positioning_goals must be a non-empty array.');\n}\n\n// Required brand_positioning fields\nif (!brandPositioning.value_proposition) {\n  throw new Error('MISSING_ARTIFACT: brand_positioning.value_proposition is required.');\n}\nif (!Array.isArray(brandPositioning.differentiators) || brandPositioning.differentiators.length === 0) {\n  throw new Error('MISSING_ARTIFACT: brand_positioning.differentiators must be a non-empty array.');\n}\n\nconsole.log('build-strategy-synthesis: inputs validated. cluster_count=' + competitorClusters.length + ', cloud=' + cloudMode);\n\nreturn [{\n  json: {\n    project_id: projectId,\n    runtime_config: runtimeConfig,\n    store_profile: storeProfile,\n    market_intelligence: marketIntelligence,\n    brand_positioning: brandPositioning,\n    competitor_clusters: competitorClusters,\n    normalized_intake_payload: intakePayload,\n    cloud_mode: cloudMode,\n  },\n}];\n"
+      },
+      "id": "h9c0d1e2-0009-0009-0009-000000000002",
+      "name": "Validate Upstream Inputs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-strategy-synthesis — Build LLM Synthesis Prompt\n// Assembles a structured cross-artifact synthesis prompt.\n// Extracts key signals from all four upstream artifacts and asks the LLM to\n// produce a strategic synthesis object.\n//\n// Evidence boundary:\n//   - LLM inference from internal signals only.\n//   - No external research, no crawling, no competitive intelligence APIs.\n//   - All outputs are planning hypotheses requiring human verification.\n//\n// Phase 16: strategy_synthesis is the handlungsleitend artifact for\n// downstream phases (offer-architecture, content-strategy, gtm-plan).\n\nconst input = $input.first().json;\nconst sp = input.store_profile;\nconst mi = input.market_intelligence;\nconst bp = input.brand_positioning;\nconst clusters = input.competitor_clusters || [];\nconst cloudMode = input.cloud_mode || false;\n\n// ─── Extract Store Profile signals ──────────────────────────────────────────\nconst vertical = sp.vertical || 'unknown';\nconst pricePositioning = sp.price_positioning || 'unknown';\nconst storeType = sp.store_type || 'unknown';\nconst catalogType = sp.catalog_type || 'unknown';\nconst brandMaturity = sp.brand_maturity || 'new';\nconst assortmentShape = sp.assortment_shape || null;\nconst vpHint = sp.value_proposition_hint || null;\nconst brandVoiceHint = sp.brand_voice_hint || null;\nconst primaryMarket = sp.primary_market || 'unknown';\nconst openQuestions = (sp.open_questions || []).slice(0, 4);\n\n// ─── Extract Market Intelligence signals ────────────────────────────────────\nconst marketCategory = mi.market_category || 'unknown';\nconst coreProblems = (mi.core_problems || []).slice(0, 5).map(function(p) {\n  return typeof p === 'string' ? p : (p.problem || JSON.stringify(p));\n});\nconst positioningGoals = (mi.positioning_goals || []).slice(0, 4).map(function(g) {\n  return typeof g === 'string' ? g : (g.goal || JSON.stringify(g));\n});\nconst audienceSegments = (mi.audience_segments || []).slice(0, 3).map(function(s) {\n  return (s.segment_name || 'unknown') + (s.description ? ': ' + s.description.slice(0, 100) : '');\n});\nconst trustFactors = (mi.trust_factors || []).slice(0, 3).map(function(t) {\n  return typeof t === 'string' ? t : (t.factor || JSON.stringify(t));\n});\nconst opportunityFlags = (mi.opportunity_flags || []).slice(0, 4);\nconst riskFlags = (mi.risk_flags || []).slice(0, 4);\nconst miUnknownStates = (mi.unknown_states || []).slice(0, 4);\n\n// ─── Extract Brand Positioning signals ──────────────────────────────────────\nconst brandRole = bp.brand_role || 'unknown';\nconst valueProposition = bp.value_proposition || '';\nconst positioningStatement = bp.positioning_statement || '';\nconst differentiators = (bp.differentiators || []).slice(0, 5);\nconst brandTraits = (bp.brand_traits || []).slice(0, 4);\nconst toneStyle = (bp.tone_of_voice && bp.tone_of_voice.style) ? bp.tone_of_voice.style : 'unknown';\nconst messagingPillars = (bp.messaging_pillars || []).slice(0, 3).map(function(p) {\n  return p.pillar_name + (p.description ? ': ' + p.description.slice(0, 80) : '');\n});\nconst antiPositioning = (bp.anti_positioning || []).slice(0, 3);\nconst emotionalBenefits = (bp.emotional_benefits || []).slice(0, 3);\nconst confidenceBasis = bp.confidence_basis || null;\n\n// ─── Extract Competitor Cluster signals ─────────────────────────────────────\nconst clusterSummaries = clusters.slice(0, 5).map(function(c, i) {\n  const summary = [\n    'Cluster ' + (i + 1) + ': ' + (c.cluster_name || 'unnamed') + ' [' + (c.cluster_role || 'unknown') + ']',\n    '  Strengths: ' + (c.shared_strengths || []).slice(0, 2).join('; '),\n    '  Weaknesses: ' + (c.shared_weaknesses || []).slice(0, 2).join('; '),\n    '  Non-copyable: ' + (c.non_copyable_elements || []).slice(0, 2).join('; '),\n    '  Opportunities to adapt: ' + (c.adaptation_opportunities || []).slice(0, 2).join('; '),\n  ];\n  if (c.strategic_summary) summary.push('  Strategic note: ' + c.strategic_summary);\n  return summary.join('\\n');\n});\n\n// ─── Build the prompt ────────────────────────────────────────────────────────\nconst prompt = [\n  'You are a senior commerce strategist. Synthesize the following planning artifacts for a ' + vertical + ' store into a strategic synthesis JSON object.',\n  '',\n  '== STORE PROFILE ==',\n  '- Vertical: ' + vertical,\n  '- Store type: ' + storeType,\n  '- Price positioning: ' + pricePositioning,\n  '- Catalog type: ' + catalogType,\n  '- Brand maturity: ' + brandMaturity,\n  '- Primary market: ' + primaryMarket,\n  assortmentShape ? '- Assortment shape: ' + assortmentShape : null,\n  vpHint ? '- Value proposition hint: ' + vpHint : null,\n  brandVoiceHint ? '- Brand voice hint: ' + brandVoiceHint : null,\n  openQuestions.length > 0 ? '- Open questions from profile: ' + openQuestions.join('; ') : null,\n  '',\n  '== MARKET INTELLIGENCE ==',\n  '- Market category: ' + marketCategory,\n  '- Core problems this market solves:',\n  coreProblems.map(function(p) { return '  · ' + p; }).join('\\n'),\n  '- Positioning goals (what to achieve vs competitors):',\n  positioningGoals.map(function(g) { return '  · ' + g; }).join('\\n'),\n  '- Key audience segments:',\n  audienceSegments.map(function(s) { return '  · ' + s; }).join('\\n'),\n  '- Trust factors: ' + trustFactors.join('; '),\n  opportunityFlags.length > 0 ? '- Opportunity flags: ' + opportunityFlags.join('; ') : null,\n  riskFlags.length > 0 ? '- Risk flags: ' + riskFlags.join('; ') : null,\n  miUnknownStates.length > 0 ? '- Unknown states flagged: ' + miUnknownStates.map(function(u) { return typeof u === 'string' ? u : (u.domain + ': ' + u.unknown); }).join('; ') : null,\n  '',\n  '== BRAND POSITIONING ==',\n  '- Brand role: ' + brandRole,\n  '- Value proposition: ' + valueProposition,\n  positioningStatement ? '- Positioning statement: ' + positioningStatement : null,\n  '- Key differentiators: ' + differentiators.join('; '),\n  '- Brand traits: ' + brandTraits.join(', '),\n  '- Tone of voice: ' + toneStyle,\n  messagingPillars.length > 0 ? '- Messaging pillars: ' + messagingPillars.join(' | ') : null,\n  antiPositioning.length > 0 ? '- Anti-positioning (must NOT position as): ' + antiPositioning.join('; ') : null,\n  emotionalBenefits.length > 0 ? '- Emotional benefits: ' + emotionalBenefits.join('; ') : null,\n  confidenceBasis ? '- Positioning confidence: ' + (confidenceBasis.evidence_level || 'unknown') : null,\n  '',\n  '== COMPETITOR CLUSTERS (' + clusters.length + ' clusters) ==',\n  clusterSummaries.join('\\n\\n'),\n  '',\n  '== SYNTHESIS TASK ==',\n  'Produce a strategic synthesis JSON object with ALL of the following required fields:',\n  '',\n  '1. strategic_summary (string) — 2-4 sentence synthesis of where this store stands strategically: market context, brand positioning, competitive landscape, and the core strategic challenge.',\n  '',\n  '2. growth_thesis (object) — the core hypothesis about how this store grows:',\n  '   { \"statement\": string (1 sentence), \"rationale\": string, \"confidence\": \"high\"|\"medium\"|\"low\"|\"speculative\", \"depends_on\": [string] }',\n  '',\n  '3. positioning_focus (object) — the primary positioning angle to pursue:',\n  '   { \"primary_angle\": string, \"rationale\": string, \"differentiating_from\": [string], \"supported_by\": [string] }',\n  '',\n  '4. opportunity_priorities (array, minItems: 2) — top prioritized opportunities from all artifacts:',\n  '   Each item: { \"opportunity\": string, \"source\": \"market_intelligence\"|\"brand_positioning\"|\"competitor_clusters\"|\"store_profile\"|\"cross_signal\", \"priority\": \"high\"|\"medium\"|\"low\", \"rationale\": string, \"phase_implications\": [\"seo\"|\"aeo\"|\"gtm\"|\"offer\"|\"content\"|\"brand\"|\"ux\"|\"paid\"] }',\n  '',\n  '5. risk_priorities (array, minItems: 2) — key risks and challenges:',\n  '   Each item: { \"risk\": string, \"source\": \"market_intelligence\"|\"brand_positioning\"|\"competitor_clusters\"|\"store_profile\"|\"cross_signal\", \"severity\": \"high\"|\"medium\"|\"low\", \"mitigation_hint\": string }',\n  '',\n  '6. validation_questions (array, minItems: 3) — questions that require human validation before acting on this synthesis. Surfaces key assumptions.',\n  '',\n  'ALSO INCLUDE these optional fields when you have meaningful content:',\n  '',\n  '7. moat_hypotheses (array) — hypotheses about durable competitive advantage:',\n  '   Each item: { \"hypothesis\": string, \"type\": \"brand\"|\"catalog\"|\"customer-relationship\"|\"operations\"|\"content\"|\"pricing\"|\"expertise\"|\"mixed\", \"confidence\": \"high\"|\"medium\"|\"low\"|\"speculative\", \"evidence_basis\": string, \"risk\": string }',\n  '',\n  '8. messaging_priorities (array) — priority messages to communicate:',\n  '   Each item: { \"message\": string, \"audience\": string, \"priority\": \"high\"|\"medium\"|\"low\", \"channel_relevance\": [\"seo\"|\"aeo\"|\"homepage\"|\"pdp\"|\"email\"|\"social\"|\"paid\"|\"content\"], \"rationale\": string }',\n  '',\n  '9. offer_implications (array) — what this synthesis means for product/offer strategy:',\n  '   Each item: { \"implication\": string, \"action_hint\": string, \"urgency\": \"high\"|\"medium\"|\"low\" }',\n  '',\n  '10. gtm_implications (array) — go-to-market channel implications:',\n  '    Each item: { \"implication\": string, \"channel\": \"seo\"|\"aeo\"|\"paid\"|\"social\"|\"email\"|\"content\"|\"partnerships\"|\"mixed\", \"priority\": \"high\"|\"medium\"|\"low\" }',\n  '',\n  '11. confidence_notes (object) — overall confidence assessment:',\n  '    { \"overall_level\": \"high\"|\"medium\"|\"low\"|\"assumption-only\", \"primary_gaps\": [string], \"review_required\": boolean, \"basis_artifacts\": [\"store_profile\"|\"market_intelligence\"|\"brand_positioning\"|\"competitor_clusters\"] }',\n  '',\n  '12. unknown_states (array) — unknown states carried forward from upstream phases:',\n  '    Each item: { \"domain\": string, \"unknown\": string, \"impact\": \"high\"|\"medium\"|\"low\", \"source_artifact\": string }',\n  '',\n  'EVIDENCE BOUNDARY:',\n  '- All analysis is LLM inference from the internal signals provided above.',\n  '- Do NOT invent market data, competitor revenue, traffic figures, or conversion metrics.',\n  '- Do NOT claim knowledge of events after your training cutoff.',\n  '- Clearly surface uncertainty via confidence fields and unknown_states.',\n  '- Treat all outputs as planning hypotheses requiring human review.',\n  '',\n  'Return ONLY valid JSON — no markdown code fences, no preamble, no explanation.',\n].filter(function(line) { return line !== null; }).join('\\n');\n\nreturn [{\n  json: {\n    llm_prompt: prompt,\n    project_id: input.project_id,\n    runtime_config: input.runtime_config,\n    store_profile: input.store_profile,\n    market_intelligence: input.market_intelligence,\n    brand_positioning: input.brand_positioning,\n    competitor_clusters: input.competitor_clusters,\n    normalized_intake_payload: input.normalized_intake_payload,\n    cloud_mode: cloudMode,\n  },\n}];\n"
+      },
+      "id": "h9c0d1e2-0009-0009-0009-000000000003",
+      "name": "Build LLM Synthesis Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "complete",
+        "chatModel": "gpt-4o",
+        "prompt": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "={{ $json.llm_prompt }}"
+            }
+          ]
+        },
+        "simplifyOutput": true,
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 4000
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_N8N_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI account"
+        }
+      },
+      "id": "h9c0d1e2-0009-0009-0009-000000000004",
+      "name": "LLM Synthesis: Strategy",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-strategy-synthesis — Parse, Validate, and Write\n//\n// Steps:\n//   1. Parse LLM JSON object response\n//   2. Inline schema validation (required fields, enum values, minItems)\n//   3. AJV full schema validation (self-hosted only)\n//   4. Write strategy-synthesis.json artifact (self-hosted only)\n//   5. Return strategy_synthesis inline (both modes) with envelope\n//\n// CLOUD MODE: steps 3 and 4 are skipped. Inline validation (step 2) always runs.\n\nfunction buildRunId() {\n  const ts = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);\n  const rand = Math.random().toString(36).slice(2, 6);\n  return 'run-' + ts + '-' + rand;\n}\n\nlet fs, path;\nlet cloudMode = false;\ntry {\n  fs = require('fs');\n  path = require('path');\n} catch (_e) {\n  cloudMode = true;\n}\n\nconst llmOutput = $input.first().json;\nconst upstream = $node['Build LLM Synthesis Prompt'].json;\n\nif (!cloudMode && upstream.cloud_mode) cloudMode = true;\nif (!cloudMode && upstream.runtime_config && upstream.runtime_config.cloud_mode) cloudMode = true;\n\nconst projectId = upstream.project_id;\nconst runtimeConfig = upstream.runtime_config;\nconst storeProfile = upstream.store_profile;\nconst marketIntelligence = upstream.market_intelligence;\nconst brandPositioning = upstream.brand_positioning;\nconst competitorClusters = upstream.competitor_clusters;\n\n// Extract text from OpenAI node (simplifyOutput: true → message.content)\nconst rawText = (llmOutput.message && llmOutput.message.content)\n  ? llmOutput.message.content\n  : (typeof llmOutput === 'string' ? llmOutput : JSON.stringify(llmOutput));\n\n// ─── Step 1: Parse LLM response ─────────────────────────────────────────────\nlet synthesis;\ntry {\n  let cleaned = rawText.trim();\n  if (cleaned.startsWith('```')) {\n    cleaned = cleaned.replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '').trim();\n  }\n  const parsed = JSON.parse(cleaned);\n  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {\n    synthesis = parsed;\n  } else {\n    throw new Error('Expected a JSON object at root, got: ' + typeof parsed);\n  }\n} catch (err) {\n  throw new Error(\n    'LLM_PARSE_ERROR: Failed to parse LLM response as JSON object: ' + err.message +\n    '. Raw response (first 500 chars): ' + String(rawText).slice(0, 500)\n  );\n}\n\n// ─── Step 2: Inline schema validation ───────────────────────────────────────\nconst REQUIRED_FIELDS = [\n  'strategic_summary',\n  'growth_thesis',\n  'positioning_focus',\n  'opportunity_priorities',\n  'risk_priorities',\n  'validation_questions',\n];\nconst ARRAY_FIELDS_MIN1 = ['opportunity_priorities', 'risk_priorities', 'validation_questions'];\nconst CONFIDENCE_ENUM = ['high', 'medium', 'low', 'speculative'];\nconst PRIORITY_ENUM = ['high', 'medium', 'low'];\nconst SEVERITY_ENUM = ['high', 'medium', 'low'];\nconst SOURCE_ENUM = ['market_intelligence', 'brand_positioning', 'competitor_clusters', 'store_profile', 'cross_signal'];\nconst MOAT_TYPE_ENUM = ['brand', 'catalog', 'customer-relationship', 'operations', 'content', 'pricing', 'expertise', 'mixed'];\nconst GTM_CHANNEL_ENUM = ['seo', 'aeo', 'paid', 'social', 'email', 'content', 'partnerships', 'mixed'];\n\nconst validationErrors = [];\n\n// Required top-level fields\nREQUIRED_FIELDS.forEach(function(f) {\n  if (synthesis[f] === undefined || synthesis[f] === null || synthesis[f] === '') {\n    validationErrors.push('missing required field \"' + f + '\"');\n  }\n});\n\n// strategic_summary: string\nif (synthesis.strategic_summary && typeof synthesis.strategic_summary !== 'string') {\n  validationErrors.push('strategic_summary must be a string');\n}\n\n// growth_thesis: object with required subfields\nif (synthesis.growth_thesis && typeof synthesis.growth_thesis === 'object') {\n  if (!synthesis.growth_thesis.statement) validationErrors.push('growth_thesis.statement is required');\n  if (!synthesis.growth_thesis.rationale) validationErrors.push('growth_thesis.rationale is required');\n  if (synthesis.growth_thesis.confidence && !CONFIDENCE_ENUM.includes(synthesis.growth_thesis.confidence)) {\n    validationErrors.push('growth_thesis.confidence must be one of: ' + CONFIDENCE_ENUM.join(', '));\n  }\n} else if (synthesis.growth_thesis) {\n  validationErrors.push('growth_thesis must be an object');\n}\n\n// positioning_focus: object with required subfields\nif (synthesis.positioning_focus && typeof synthesis.positioning_focus === 'object') {\n  if (!synthesis.positioning_focus.primary_angle) validationErrors.push('positioning_focus.primary_angle is required');\n  if (!synthesis.positioning_focus.rationale) validationErrors.push('positioning_focus.rationale is required');\n} else if (synthesis.positioning_focus) {\n  validationErrors.push('positioning_focus must be an object');\n}\n\n// Array fields with minItems: 1\nARRAY_FIELDS_MIN1.forEach(function(f) {\n  if (!Array.isArray(synthesis[f]) || synthesis[f].length === 0) {\n    validationErrors.push('\"' + f + '\" must be a non-empty array (minItems: 1)');\n  }\n});\n\n// opportunity_priorities items\nif (Array.isArray(synthesis.opportunity_priorities)) {\n  synthesis.opportunity_priorities.forEach(function(item, i) {\n    const label = 'opportunity_priorities[' + i + ']';\n    if (!item.opportunity) validationErrors.push(label + ': missing required field \"opportunity\"');\n    if (item.source && !SOURCE_ENUM.includes(item.source)) {\n      validationErrors.push(label + ': source \"' + item.source + '\" not in enum');\n    }\n    if (item.priority && !PRIORITY_ENUM.includes(item.priority)) {\n      validationErrors.push(label + ': priority \"' + item.priority + '\" not in enum');\n    }\n  });\n}\n\n// risk_priorities items\nif (Array.isArray(synthesis.risk_priorities)) {\n  synthesis.risk_priorities.forEach(function(item, i) {\n    const label = 'risk_priorities[' + i + ']';\n    if (!item.risk) validationErrors.push(label + ': missing required field \"risk\"');\n    if (item.source && !SOURCE_ENUM.includes(item.source)) {\n      validationErrors.push(label + ': source \"' + item.source + '\" not in enum');\n    }\n    if (item.severity && !SEVERITY_ENUM.includes(item.severity)) {\n      validationErrors.push(label + ': severity \"' + item.severity + '\" not in enum');\n    }\n  });\n}\n\n// moat_hypotheses items (optional array)\nif (synthesis.moat_hypotheses !== undefined && synthesis.moat_hypotheses !== null) {\n  if (!Array.isArray(synthesis.moat_hypotheses)) {\n    validationErrors.push('moat_hypotheses must be an array');\n  } else {\n    synthesis.moat_hypotheses.forEach(function(item, i) {\n      const label = 'moat_hypotheses[' + i + ']';\n      if (!item.hypothesis) validationErrors.push(label + ': missing required field \"hypothesis\"');\n      if (item.type && !MOAT_TYPE_ENUM.includes(item.type)) {\n        validationErrors.push(label + ': type \"' + item.type + '\" not in enum');\n      }\n      if (item.confidence && !CONFIDENCE_ENUM.includes(item.confidence)) {\n        validationErrors.push(label + ': confidence \"' + item.confidence + '\" not in enum');\n      }\n    });\n  }\n}\n\n// gtm_implications items (optional array)\nif (synthesis.gtm_implications !== undefined && synthesis.gtm_implications !== null) {\n  if (!Array.isArray(synthesis.gtm_implications)) {\n    validationErrors.push('gtm_implications must be an array');\n  } else {\n    synthesis.gtm_implications.forEach(function(item, i) {\n      const label = 'gtm_implications[' + i + ']';\n      if (!item.implication) validationErrors.push(label + ': missing required field \"implication\"');\n      if (item.channel && !GTM_CHANNEL_ENUM.includes(item.channel)) {\n        validationErrors.push(label + ': channel \"' + item.channel + '\" not in enum');\n      }\n    });\n  }\n}\n\nif (validationErrors.length > 0) {\n  throw new Error('SCHEMA_VIOLATION: ' + validationErrors.join(' | '));\n}\n\n// ─── Step 3: AJV full validation — self-hosted only ─────────────────────────\nconst cloudWarnings = [];\nif (!cloudMode) {\n  try {\n    const Ajv = require('ajv/dist/ajv.js') || require('ajv');\n    const ajv = new Ajv({ allErrors: true, strict: false });\n    const schemaFile = path.join(runtimeConfig.ajv_schema_path, 'strategy-synthesis.schema.json');\n    const schema = JSON.parse(fs.readFileSync(schemaFile, 'utf8'));\n    const validate = ajv.compile(schema);\n    const valid = validate(synthesis);\n    if (!valid) {\n      const errs = (validate.errors || []).map(function(e) { return e.instancePath + ' ' + e.message; }).join('; ');\n      throw new Error('AJV_VALIDATION_FAILED: ' + errs);\n    }\n  } catch (e) {\n    if (e.message && e.message.startsWith('AJV_VALIDATION_FAILED')) throw e;\n    cloudWarnings.push('AJV schema validation skipped: ' + e.message);\n  }\n} else {\n  cloudWarnings.push('AJV schema validation skipped — cloud mode (no local schema files). Inline validation passed.');\n}\n\n// ─── Step 4: Write artifact — self-hosted only ──────────────────────────────\nlet artifactPath = null;\nif (!cloudMode) {\n  try {\n    const projectDir = path.join(runtimeConfig.project_root, projectId);\n    if (!fs.existsSync(projectDir)) fs.mkdirSync(projectDir, { recursive: true });\n    artifactPath = path.join(projectDir, 'strategy-synthesis.json');\n    fs.writeFileSync(artifactPath, JSON.stringify(synthesis, null, 2), 'utf8');\n  } catch (e) {\n    cloudWarnings.push('Artifact write skipped: ' + e.message);\n  }\n} else {\n  cloudWarnings.push('Artifact write skipped — cloud mode (no filesystem).');\n}\n\n// ─── Log summary ─────────────────────────────────────────────────────────────\nconst oppCount = Array.isArray(synthesis.opportunity_priorities) ? synthesis.opportunity_priorities.length : 0;\nconst riskCount = Array.isArray(synthesis.risk_priorities) ? synthesis.risk_priorities.length : 0;\nconst moatCount = Array.isArray(synthesis.moat_hypotheses) ? synthesis.moat_hypotheses.length : 0;\nconsole.log(\n  'build-strategy-synthesis: completed.' +\n  ' opportunities=' + oppCount +\n  ', risks=' + riskCount +\n  ', moats=' + moatCount +\n  ', cloud=' + cloudMode\n);\n\n// ─── Build runtime envelope ──────────────────────────────────────────────────\nconst runId = buildRunId();\nconst executionTs = new Date().toISOString();\n\nconst envelope = {\n  runtime: {\n    run_id: runId,\n    phase_id: 'build-strategy-synthesis',\n    execution_ts: executionTs,\n    cloud_mode: cloudMode,\n    env: cloudMode ? 'cloud-smoke' : (runtimeConfig.env || 'dev'),\n    schema_version: '1.0'\n  },\n  store: {\n    project_id: projectId,\n    artifact_name: 'strategy-synthesis',\n    artifact_path: artifactPath\n  },\n  status: {\n    code: 'SUCCESS',\n    completed_at: executionTs,\n    fatal_errors: [],\n    warnings: cloudWarnings,\n    retryable: false\n  },\n  diagnostics: {\n    input_summary: {\n      project_id: projectId,\n      vertical: storeProfile.vertical,\n      market_category: marketIntelligence.market_category,\n      brand_role: brandPositioning.brand_role,\n      cluster_count: competitorClusters.length,\n    },\n    output_summary: {\n      opportunity_count: oppCount,\n      risk_count: riskCount,\n      moat_hypothesis_count: moatCount,\n      has_messaging_priorities: Array.isArray(synthesis.messaging_priorities) && synthesis.messaging_priorities.length > 0,\n      has_gtm_implications: Array.isArray(synthesis.gtm_implications) && synthesis.gtm_implications.length > 0,\n      has_offer_implications: Array.isArray(synthesis.offer_implications) && synthesis.offer_implications.length > 0,\n      has_unknown_states: Array.isArray(synthesis.unknown_states) && synthesis.unknown_states.length > 0,\n      validation_question_count: Array.isArray(synthesis.validation_questions) ? synthesis.validation_questions.length : 0,\n      confidence_level: (synthesis.confidence_notes && synthesis.confidence_notes.overall_level) || 'unknown'\n    },\n    validation: {\n      schema_ref: 'schemas/strategy-synthesis.schema.json',\n      result: cloudMode ? 'SKIPPED' : (cloudWarnings.some(function(w) { return w.includes('AJV schema validation skipped'); }) ? 'SKIPPED' : 'PASS'),\n      errors: [],\n      warnings: cloudMode ? ['AJV validation skipped — cloud mode'] : []\n    },\n    lineage: {\n      upstream_phases: [\n        'resolve-runtime-config',\n        'intake-store-input',\n        'build-store-profile',\n        'build-market-intelligence',\n        'build-brand-positioning',\n        'build-competitor-clusters',\n      ],\n      upstream_artifacts: [\n        'store_profile',\n        'market_intelligence',\n        'brand_positioning',\n        'competitor_clusters',\n        'normalized_intake_payload',\n      ]\n    },\n    missing_data: []\n  }\n};\n\nreturn [{\n  json: {\n    project_id: projectId,\n    artifact_name: 'strategy-synthesis',\n    artifact_path: artifactPath,\n    strategy_synthesis: synthesis,\n    runtime_config: runtimeConfig,\n    status: 'SUCCESS',\n    cloud_mode: cloudMode,\n    cloud_warnings: cloudWarnings,\n    notes: [],\n    envelope: envelope,\n  },\n}];\n"
+      },
+      "id": "h9c0d1e2-0009-0009-0009-000000000005",
+      "name": "Parse Validate Write",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Subworkflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Upstream Inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Upstream Inputs": {
+      "main": [
+        [
+          {
+            "node": "Build LLM Synthesis Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LLM Synthesis Prompt": {
+      "main": [
+        [
+          {
+            "node": "LLM Synthesis: Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Synthesis: Strategy": {
+      "main": [
+        [
+          {
+            "node": "Parse Validate Write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "_meta": {
+    "storeOs": {
+      "phase": "Phase 16",
+      "format": "n8n-executable",
+      "sourceSpec": "workflows/contracts/build-strategy-synthesis.contract.json",
+      "outputSchema": "schemas/strategy-synthesis.schema.json",
+      "cloudCompatibility": "PARTIAL — validate, prompt-build, and LLM synthesis run in both modes. In cloud mode: (1) AJV schema validation is skipped (replaced by inline required-field and enum checks in Node 5), (2) artifact write (strategy-synthesis.json) is skipped, (3) strategy_synthesis returned inline. Inline validation always runs in both modes.",
+      "invocation": "Called as a subworkflow by orchestrate-phase1 (after build-competitor-clusters). Expects Subworkflow Trigger input: { project_id, runtime_config, store_profile, market_intelligence, brand_positioning, competitor_clusters, normalized_intake_payload }",
+      "output": "{ project_id, artifact_name, artifact_path, strategy_synthesis, runtime_config, status, cloud_mode, cloud_warnings, notes, envelope }",
+      "synthesisScope": "Cross-artifact synthesis. Consumes all four upstream planning artifacts (store_profile, market_intelligence, brand_positioning, competitor_clusters) and produces a single strategy_synthesis object that is the primary strategic input for all downstream planning phases.",
+      "evidenceBoundary": "LLM inference from internal signals only. No external research, no crawling, no competitive intelligence APIs. All outputs (growth_thesis, moat_hypotheses, opportunity_priorities, etc.) are planning hypotheses requiring human review.",
+      "setupRequired": [
+        "Replace REPLACE_WITH_N8N_OPENAI_CREDENTIAL_ID in 'LLM Synthesis: Strategy' with your n8n OpenAI credential ID.",
+        "Self-hosted: ensure STORE_OS_AJV_SCHEMA_PATH points to the schemas/ directory containing strategy-synthesis.schema.json and ajv@8 is installed in n8n node_modules.",
+        "Cloud mode: OpenAI credential must be configured in n8n. strategy_synthesis is returned inline — no disk write."
+      ],
+      "cloudSkipped": [
+        "AJV schema validation — no local schema files in n8n Cloud (replaced by inline required-field and enum checks in Node 5)",
+        "Artifact write (strategy-synthesis.json) — no filesystem in n8n Cloud"
+      ],
+      "downstreamConsumers": [
+        "build-offer-architecture (not yet implemented)",
+        "build-content-strategy (not yet implemented)",
+        "build-gtm-plan (not yet implemented)"
+      ],
+      "notes": [
+        "Phase 16: New phase. strategy_synthesis is the handlungsleitend artifact for all downstream planning phases. Synthesis draws on all four upstream planning artifacts."
+      ]
+    }
+  }
+}

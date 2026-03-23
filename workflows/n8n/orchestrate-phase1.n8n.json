@@ -407,7 +407,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// orchestrate-phase1 — Phase 4 Complete\n// build-competitor-clusters succeeded.\n// Terminal node for Phase 4. competitor_clusters returned inline in cloud mode.\n//\n// CLOUD MODE: competitor_clusters returned inline (no disk artifact).\n// SELF-HOSTED: artifact_path points to competitor-clusters.json on disk.\n\nconst ccOutput = $input.first().json;\nconst cloudMode = ccOutput.cloud_mode || false;\n\nconst summary = {\n  status:           'PHASE_4_COMPLETE',\n  project_id:       ccOutput.project_id,\n  artifact_written: ccOutput.artifact_path,\n  cluster_count:    ccOutput.cluster_count || 0,\n  mode:             ccOutput.mode,\n  completed_at:     new Date().toISOString(),\n  next_phase:       'Phase 5+ — Pattern Manifest and downstream planning (not yet implemented)',\n  cloud_mode:       cloudMode,\n  cloud_warnings:   ccOutput.cloud_warnings || [],\n  notes:            (ccOutput.notes || []).filter(Boolean),\n  message:          cloudMode\n    ? [\n        `Phase 4 chain completed (cloud mode) for project: ${ccOutput.project_id}`,\n        `No artifacts were written to disk. competitor_clusters (${ccOutput.cluster_count || 0} clusters, mode: ${ccOutput.mode}) available in this output.`,\n        'Next: build-pattern-manifest (Phase 5+ — not yet implemented).',\n      ].join(' | ')\n    : [\n        `Phase 4 chain completed for project: ${ccOutput.project_id}`,\n        `competitor-clusters.json written to: ${ccOutput.artifact_path} (${ccOutput.cluster_count || 0} clusters, mode: ${ccOutput.mode}).`,\n        'Next: build-pattern-manifest (Phase 5+ — not yet implemented).',\n      ].join(' | '),\n};\n\n// Carry competitor_clusters forward for inspection and downstream use\nif (ccOutput.competitor_clusters) {\n  summary.competitor_clusters = ccOutput.competitor_clusters;\n}\n\n// Also carry all prior artifacts forward for inspection\nconst phase3Output = $node['Phase 3 Complete'].json;\nif (phase3Output.brand_positioning) summary.brand_positioning = phase3Output.brand_positioning;\nif (phase3Output.store_profile) summary.store_profile = phase3Output.store_profile;\nif (phase3Output.market_intelligence) summary.market_intelligence = phase3Output.market_intelligence;\n\nreturn [{ json: summary }];\n"
+        "jsCode": "// orchestrate-phase1 — Phase 4 Complete\n// build-competitor-clusters succeeded.\n// Terminal node for Phase 4. competitor_clusters returned inline in cloud mode.\n//\n// CLOUD MODE: competitor_clusters returned inline (no disk artifact).\n// SELF-HOSTED: artifact_path points to competitor-clusters.json on disk.\n\nconst ccOutput = $input.first().json;\nconst cloudMode = ccOutput.cloud_mode || false;\n\nconst phase3Output = $node['Phase 3 Complete'].json;\n\nconst summary = {\n  status:           'PHASE_4_COMPLETE',\n  project_id:       ccOutput.project_id,\n  artifact_written: ccOutput.artifact_path,\n  cluster_count:    ccOutput.cluster_count || 0,\n  mode:             ccOutput.mode,\n  completed_at:     new Date().toISOString(),\n  next_phase:       'Phase 5 — Strategy Synthesis (build-strategy-synthesis)',\n  cloud_mode:       cloudMode,\n  cloud_warnings:   ccOutput.cloud_warnings || [],\n  notes:            (ccOutput.notes || []).filter(Boolean),\n  runtime_config:   ccOutput.runtime_config || phase3Output.runtime_config,\n  message:          cloudMode\n    ? [\n        `Phase 4 chain completed (cloud mode) for project: ${ccOutput.project_id}`,\n        `No artifacts were written to disk. competitor_clusters (${ccOutput.cluster_count || 0} clusters, mode: ${ccOutput.mode}) available in this output.`,\n        'Continuing to Phase 5: build-strategy-synthesis.',\n      ].join(' | ')\n    : [\n        `Phase 4 chain completed for project: ${ccOutput.project_id}`,\n        `competitor-clusters.json written to: ${ccOutput.artifact_path} (${ccOutput.cluster_count || 0} clusters, mode: ${ccOutput.mode}).`,\n        'Continuing to Phase 5: build-strategy-synthesis.',\n      ].join(' | '),\n};\n\n// Carry competitor_clusters forward for inspection and downstream use\nif (ccOutput.competitor_clusters) {\n  summary.competitor_clusters = ccOutput.competitor_clusters;\n}\n\n// Also carry all prior artifacts forward for Phase 5 (build-strategy-synthesis)\nif (phase3Output.brand_positioning) summary.brand_positioning = phase3Output.brand_positioning;\nif (phase3Output.store_profile) summary.store_profile = phase3Output.store_profile;\nif (phase3Output.market_intelligence) summary.market_intelligence = phase3Output.market_intelligence;\n// normalized_intake_payload needed for build-strategy-synthesis input validation\nif (phase3Output.normalized_intake_payload) summary.normalized_intake_payload = phase3Output.normalized_intake_payload;\n\nreturn [{ json: summary }];\n"
       },
       "id": "e5f6a7b8-0005-0005-0005-000000000028",
       "name": "Phase 4 Complete",
@@ -415,6 +415,80 @@
       "typeVersion": 2,
       "position": [
         5500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Bridge: Prepare build-strategy-synthesis input\n// Assembles the input payload for the build-strategy-synthesis subworkflow.\n// build-strategy-synthesis expects: project_id, runtime_config, store_profile,\n// market_intelligence, brand_positioning, competitor_clusters, normalized_intake_payload.\n//\n// All artifacts flow inline in both cloud and self-hosted modes.\n\nconst phase4Output = $input.first().json;\n\nconst output = {\n  project_id:                phase4Output.project_id,\n  runtime_config:            phase4Output.runtime_config,\n  store_profile:             phase4Output.store_profile,\n  market_intelligence:       phase4Output.market_intelligence,\n  brand_positioning:         phase4Output.brand_positioning,\n  competitor_clusters:       phase4Output.competitor_clusters,\n  normalized_intake_payload: phase4Output.normalized_intake_payload,\n  chain_step:                'pre-build-strategy-synthesis',\n};\n\nreturn [{ json: output }];\n"
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000029",
+      "name": "Prepare Strategy Synthesis Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_WITH_BUILD_STRATEGY_SYNTHESIS_WORKFLOW_ID",
+        "options": {}
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000030",
+      "name": "Run build-strategy-synthesis",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        6000,
+        300
+      ],
+      "notes": "SETUP: Replace REPLACE_WITH_BUILD_STRATEGY_SYNTHESIS_WORKFLOW_ID with the n8n workflow ID of build-strategy-synthesis. Find it in the URL when editing that workflow in n8n."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "value2": "SUCCESS"
+            }
+          ]
+        }
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000031",
+      "name": "Strategy Synthesis Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        6250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Strategy Synthesis HALT\nconst input    = $input.first().json;\nconst errorMsg = `CHAIN_HALT: build-strategy-synthesis failed. Status: ${input.status}.`;\nconsole.error(errorMsg);\nthrow new Error(errorMsg);\n"
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000032",
+      "name": "Halt - Strategy Synthesis Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6250,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Phase 5 Complete\n// build-strategy-synthesis succeeded.\n// Terminal node for Phase 5. strategy_synthesis returned inline in cloud mode.\n//\n// CLOUD MODE: strategy_synthesis returned inline (no disk artifact).\n// SELF-HOSTED: artifact_path points to strategy-synthesis.json on disk.\n\nconst ssOutput = $input.first().json;\nconst cloudMode = ssOutput.cloud_mode || false;\n\n// Collect output summary from envelope if present\nconst envSummary = (ssOutput.envelope && ssOutput.envelope.diagnostics && ssOutput.envelope.diagnostics.output_summary) || {};\n\nconst summary = {\n  status:           'PHASE_5_COMPLETE',\n  project_id:       ssOutput.project_id,\n  artifact_written: ssOutput.artifact_path,\n  completed_at:     new Date().toISOString(),\n  next_phase:       'Phase 6+ — Offer Architecture / Content Strategy / GTM Plan (not yet implemented)',\n  cloud_mode:       cloudMode,\n  cloud_warnings:   ssOutput.cloud_warnings || [],\n  notes:            (ssOutput.notes || []).filter(Boolean),\n  output_summary:   envSummary,\n  message:          cloudMode\n    ? [\n        `Phase 5 chain completed (cloud mode) for project: ${ssOutput.project_id}`,\n        `No artifacts were written to disk. strategy_synthesis available in this output.`,\n        `Opportunities: ${envSummary.opportunity_count || 0}, Risks: ${envSummary.risk_count || 0}, Moats: ${envSummary.moat_hypothesis_count || 0}.`,\n        'Next: build-offer-architecture / build-content-strategy / build-gtm-plan (Phase 6+ — not yet implemented).',\n      ].join(' | ')\n    : [\n        `Phase 5 chain completed for project: ${ssOutput.project_id}`,\n        `strategy-synthesis.json written to: ${ssOutput.artifact_path}`,\n        `Opportunities: ${envSummary.opportunity_count || 0}, Risks: ${envSummary.risk_count || 0}, Moats: ${envSummary.moat_hypothesis_count || 0}.`,\n        'Next: build-offer-architecture / build-content-strategy / build-gtm-plan (Phase 6+ — not yet implemented).',\n      ].join(' | '),\n  // Pass strategy_synthesis forward\n  strategy_synthesis: ssOutput.strategy_synthesis || null,\n  runtime_config:     ssOutput.runtime_config,\n};\n\nreturn [{ json: summary }];\n"
+      },
+      "id": "e5f6a7b8-0005-0005-0005-000000000033",
+      "name": "Phase 5 Complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6500,
         300
       ]
     }
@@ -692,6 +766,57 @@
           }
         ]
       ]
+    },
+    "Phase 4 Complete": {
+      "main": [
+        [
+          {
+            "node": "Prepare Strategy Synthesis Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Strategy Synthesis Input": {
+      "main": [
+        [
+          {
+            "node": "Run build-strategy-synthesis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run build-strategy-synthesis": {
+      "main": [
+        [
+          {
+            "node": "Strategy Synthesis Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Strategy Synthesis Success?": {
+      "main": [
+        [
+          {
+            "node": "Phase 5 Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Halt - Strategy Synthesis Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -700,10 +825,10 @@
   },
   "_meta": {
     "storeOs": {
-      "phase": "Phase 12/13/14/15",
+      "phase": "Phase 12/13/14/15/16",
       "format": "n8n-executable",
       "sourceSpec": "workflows/runtime/n8n-implementation-map.md",
-      "cloudCompatibility": "PARTIAL — the full chain runs in both modes. In cloud mode: no artifact persistence, no schema validation, no checkpoint/log writes. shopify_import, store_profile, market_intelligence, brand_positioning, and competitor_clusters flow inline through bridge nodes. Config is supplied via smoke_test_config in the trigger input (no process.env access).",
+      "cloudCompatibility": "PARTIAL — the full chain runs in both modes. In cloud mode: no artifact persistence, no schema validation, no checkpoint/log writes. shopify_import, store_profile, market_intelligence, brand_positioning, competitor_clusters, and strategy_synthesis flow inline through bridge nodes. Config is supplied via smoke_test_config in the trigger input (no process.env access).",
       "intakePayloadExample": {
         "intake_payload": {
           "project_id": "suppliedtech",
@@ -731,7 +856,7 @@
           "STORE_OS_SHOPIFY_API_VERSION": "2024-01"
         }
       },
-      "chainCoverage": "resolve-runtime-config → intake-store-input → import-shopify-data → build-store-profile → build-market-intelligence → build-brand-positioning → build-competitor-clusters",
+      "chainCoverage": "resolve-runtime-config → intake-store-input → import-shopify-data → build-store-profile → build-market-intelligence → build-brand-positioning → build-competitor-clusters → build-strategy-synthesis",
       "setupRequired": [
         "Replace REPLACE_WITH_INTAKE_STORE_INPUT_WORKFLOW_ID with the n8n workflow ID of intake-store-input",
         "Replace REPLACE_WITH_IMPORT_SHOPIFY_DATA_WORKFLOW_ID with the n8n workflow ID of import-shopify-data",
@@ -739,13 +864,15 @@
         "Replace REPLACE_WITH_BUILD_MARKET_INTELLIGENCE_WORKFLOW_ID with the n8n workflow ID of build-market-intelligence",
         "Replace REPLACE_WITH_BUILD_BRAND_POSITIONING_WORKFLOW_ID with the n8n workflow ID of build-brand-positioning",
         "Replace REPLACE_WITH_BUILD_COMPETITOR_CLUSTERS_WORKFLOW_ID with the n8n workflow ID of build-competitor-clusters",
+        "Replace REPLACE_WITH_BUILD_STRATEGY_SYNTHESIS_WORKFLOW_ID with the n8n workflow ID of build-strategy-synthesis",
         "Replace REPLACE_WITH_N8N_OPENAI_CREDENTIAL_ID in build-market-intelligence with your OpenAI credential ID",
         "Replace REPLACE_WITH_N8N_OPENAI_CREDENTIAL_ID in build-brand-positioning with your OpenAI credential ID",
         "Replace REPLACE_WITH_N8N_OPENAI_CREDENTIAL_ID in build-competitor-clusters with your OpenAI credential ID",
+        "Replace REPLACE_WITH_N8N_OPENAI_CREDENTIAL_ID in build-strategy-synthesis with your OpenAI credential ID",
         "Self-hosted: set all STORE_OS_* environment variables. n8n Cloud: pass values as smoke_test_config in trigger input.",
         "Configure Shopify API credential in n8n and update import-shopify-data with its credential ID"
       ],
-      "notYetImplemented": "build-pattern-manifest and all subsequent workflows (Phase 5+)"
+      "notYetImplemented": "build-offer-architecture, build-content-strategy, build-gtm-plan, build-pattern-manifest and all subsequent workflows (Phase 6+)"
     }
   }
 }

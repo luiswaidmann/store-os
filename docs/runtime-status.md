@@ -8,10 +8,11 @@ Branch baseline:
 
 Latest confirmed merge relevant to executable runtime progression:
 
-- `eff416f` Merge pull request #9 from `feature/phase-15-competitor-clusters-runtime`
+- `633c80d` Merge pull request #10 from `feature/runtime-hardening-artifact-contracts` (Phase 16 hardening)
 
 Recent runtime progression merges:
 
+- `eff416f` Merge pull request #9 from `feature/phase-15-competitor-clusters-runtime`
 - `e25fe42` Merge pull request #8 from `feature/phase-14-brand-positioning-runtime`
 - `35c8d51` Merge pull request #7 from `feature/phase-13-market-intelligence-runtime`
 - `4a37e26` Merge pull request #6 from `feature/phase-12-cloud-aggregation-fix`
@@ -21,7 +22,7 @@ Recent runtime progression merges:
 
 ## Current confirmed executable chain
 
-The currently confirmed n8n Cloud smoke-test path is:
+The currently confirmed n8n Cloud smoke-test path (post `feature/phase-16-strategy-synthesis-runtime`) is:
 
 - `resolve-runtime-config`
 - `intake-store-input`
@@ -30,6 +31,7 @@ The currently confirmed n8n Cloud smoke-test path is:
 - `build-market-intelligence`
 - `build-brand-positioning`
 - `build-competitor-clusters`
+- `build-strategy-synthesis` ← **NEW** (Phase 16, `feature/phase-16-strategy-synthesis-runtime`)
 
 ## Current confirmed inline outputs
 
@@ -39,6 +41,7 @@ The chain currently returns these runtime artifacts inline in cloud mode:
 - `market_intelligence`
 - `brand_positioning`
 - `competitor_clusters`
+- `strategy_synthesis` ← **NEW**
 
 ## Runtime Hardening (Phase 16)
 
@@ -122,15 +125,53 @@ Manual n8n setup remains expected for:
 - workflow ID replacement
 - cloud smoke-test trigger input execution
 
+## Strategy Synthesis (Phase 16 — feature/phase-16-strategy-synthesis-runtime)
+
+Branch: `feature/phase-16-strategy-synthesis-runtime`
+
+This phase adds the first cross-artifact synthesis phase to the chain: `build-strategy-synthesis`.
+
+### What was added
+
+**New artifact schema**: `schemas/strategy-synthesis.schema.json`
+- Required fields: `strategic_summary`, `growth_thesis`, `positioning_focus`, `opportunity_priorities`, `risk_priorities`, `validation_questions`
+- Optional fields: `moat_hypotheses`, `messaging_priorities`, `offer_implications`, `gtm_implications`, `confidence_notes`, `unknown_states`
+
+**New contract**: `workflows/contracts/build-strategy-synthesis.contract.json`
+
+**New n8n workflow**: `workflows/n8n/build-strategy-synthesis.n8n.json`
+- 5-node pattern: Subworkflow Trigger → Validate Upstream Inputs → Build LLM Synthesis Prompt → LLM Synthesis: Strategy → Parse Validate Write
+- Inline validation always runs (both modes)
+- AJV validation and disk write: self-hosted only
+
+**Updated orchestrator**: `workflows/n8n/orchestrate-phase1.n8n.json`
+- 5 new nodes added after Phase 4 Complete: Prepare Strategy Synthesis Input, Run build-strategy-synthesis, Strategy Synthesis Success?, Halt - Strategy Synthesis Failed, Phase 5 Complete
+- Phase 4 Complete updated to carry `normalized_intake_payload` forward and point to Phase 5
+
+**Updated gold path**: `workflows/examples/gold-path-example.json`
+- Added `build-strategy-synthesis` to chain, expected_minimum_outputs, acceptance_criteria, and smoke_test_checklist
+
+**Updated documentation**: `docs/phase-contracts.md`, `docs/runtime-status.md`, `docs/phase-16-strategy-synthesis-runtime.md`
+
+### Synthesis scope
+
+`build-strategy-synthesis` consumes all four upstream planning artifacts and produces a single strategic synthesis that is the primary input for downstream phases (build-offer-architecture, build-content-strategy, build-gtm-plan).
+
+### Backward compatibility
+
+All changes are additive. No existing output keys were removed or renamed. Cloud smoke-test compatibility preserved.
+
 ## Confirmed next planned runtime step
 
-Next likely executable phase:
+Current in-progress branch:
 
-- `feature/runtime-hardening-artifact-contracts` — contract layer, envelope, enriched schemas (this branch, in progress)
+- `feature/phase-16-strategy-synthesis-runtime` — strategy synthesis phase (this branch)
 
-After merge, next likely step:
+After merge, next likely steps (Phase 6+):
 
-- Phase 17: next planning phase (e.g., `build-pattern-manifest` or `build-section-library`)
+- `build-offer-architecture` — uses growth_thesis, offer_implications, moat_hypotheses
+- `build-content-strategy` — uses messaging_priorities, gtm_implications, opportunity_priorities
+- `build-gtm-plan` — uses gtm_implications, opportunity_priorities, validation_questions
 
 ## Operational warning
 
