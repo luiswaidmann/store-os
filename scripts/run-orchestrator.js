@@ -325,6 +325,119 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
   console.log('');
 }
 
+// ── Persistence ──────────────────────────────────────────────────────────
+
+const RUNS_DIR = path.join(ROOT, 'outputs', 'runs');
+
+/**
+ * Build a structured run record from a completed (or failed) execution result.
+ * result  — the extracted artifact chain JSON (may be null on failure)
+ * error   — Error instance if the run failed, null on success
+ */
+function buildRunRecord(result, executionId, startedAt, finishedAt, error) {
+  const record = {
+    execution_id:   executionId || (result && result.execution_id) || 'unknown',
+    project_id:     (result && result.project_id) || 'unknown',
+    started_at:     new Date(startedAt).toISOString(),
+    finished_at:    new Date(finishedAt).toISOString(),
+    duration_ms:    finishedAt - startedAt,
+    status:         error ? 'error' : 'success',
+    terminal_status: (result && result.status) || null,
+    cloud_mode:     (result && result.cloud_mode !== undefined) ? result.cloud_mode : null,
+    artifacts:      null,
+    error:          error ? error.message : null,
+  };
+
+  if (result && !error) {
+    const ss = result.strategy_synthesis || {};
+    const oa = result.offer_architecture || {};
+    const cs = result.content_strategy || {};
+    const gp = result.gtm_plan || {};
+    const sb = result.store_blueprint || {};
+    const ls = (gp.launch_sequence) || {};
+
+    record.artifacts = {
+      strategy_synthesis: {
+        strategic_summary: typeof ss.strategic_summary === 'string'
+          ? ss.strategic_summary.slice(0, 300) : null,
+        positioning_focus: typeof ss.positioning_focus === 'object'
+          ? (ss.positioning_focus.primary_angle || JSON.stringify(ss.positioning_focus)).slice(0, 180)
+          : String(ss.positioning_focus || '').slice(0, 180) || null,
+      },
+      offer_architecture: {
+        headline:          ((oa.core_offer || {}).headline) || null,
+        target_buyer:      ((oa.core_offer || {}).target_buyer || '').slice(0, 160) || null,
+        pricing_tier:      ((oa.pricing_logic || {}).tier) || null,
+        bundles_count:     (oa.bundle_opportunities || []).length,
+        upsell_paths_count: (oa.upsell_paths || []).length,
+      },
+      content_strategy: {
+        primary_message:      ((cs.messaging_hierarchy || {}).primary_message || '').slice(0, 200) || null,
+        content_pillars_count: (cs.content_pillars || []).length,
+        editorial_tone:        ((cs.editorial_voice || {}).tone) || null,
+        keyword_clusters_count: ((cs.seo_content_plan || {}).primary_keyword_clusters || []).length,
+        faq_clusters_count:     ((cs.seo_content_plan || {}).faq_topic_clusters || []).length,
+      },
+      gtm_plan: {
+        gtm_narrative:      typeof gp.gtm_narrative === 'string'
+          ? gp.gtm_narrative.slice(0, 200) : null,
+        launch_phases_count: [ls.phase_1, ls.phase_2, ls.phase_3].filter(Boolean).length,
+        channels_count:      (gp.channel_strategy || []).length,
+        kpis_count:          (gp.kpis || []).length,
+      },
+      store_blueprint: {
+        blueprint_narrative: typeof sb.blueprint_narrative === 'string'
+          ? sb.blueprint_narrative.slice(0, 300) : null,
+        products_count:      (sb.products       || []).length,
+        collections_count:   (sb.collections    || []).length,
+        pages_count:         (sb.pages          || []).length,
+        theme_sections_count: (sb.theme_sections || []).length,
+        assets_count:        (sb.assets         || []).length,
+      },
+    };
+  }
+
+  return record;
+}
+
+/**
+ * Write a run record to outputs/runs/{execution_id}.json and update the index.
+ * Returns the path written.
+ */
+function persistRunRecord(record, silent) {
+  try {
+    if (!fs.existsSync(RUNS_DIR)) fs.mkdirSync(RUNS_DIR, { recursive: true });
+
+    const recordPath = path.join(RUNS_DIR, `${record.execution_id}.json`);
+    fs.writeFileSync(recordPath, JSON.stringify(record, null, 2));
+
+    const indexPath = path.join(RUNS_DIR, 'index.json');
+    let index = [];
+    if (fs.existsSync(indexPath)) {
+      try { index = JSON.parse(fs.readFileSync(indexPath, 'utf8')); } catch (_) { index = []; }
+    }
+
+    const summary = {
+      execution_id:    record.execution_id,
+      project_id:      record.project_id,
+      started_at:      record.started_at,
+      finished_at:     record.finished_at,
+      duration_ms:     record.duration_ms,
+      status:          record.status,
+      terminal_status: record.terminal_status,
+    };
+    const existing = index.findIndex((e) => e.execution_id === record.execution_id);
+    if (existing >= 0) { index[existing] = summary; } else { index.unshift(summary); }
+    fs.writeFileSync(indexPath, JSON.stringify(index, null, 2));
+
+    if (!silent) console.log(`\n  Persisted: outputs/runs/${record.execution_id}.json`);
+    return recordPath;
+  } catch (e) {
+    if (!silent) console.error(`\n  WARN: Could not persist run record: ${e.message}`);
+    return null;
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -347,15 +460,27 @@ async function main() {
       process.exit(1);
     }
     if (!args.silent) console.log(`\nPolling execution ${args.executionId}...`);
-    const startedAt = Date.now();
-    const ex = await pollExecution(args.executionId, N8N_API_KEY, N8N_BASE_URL, args.timeout, args.pollInterval, args.silent);
-    const finalResult = extractResultFromExecution(ex);
-    const durationMs = Date.now() - startedAt;
+    const pollStartedAt = Date.now();
+    let ex, pollError;
+    try {
+      ex = await pollExecution(args.executionId, N8N_API_KEY, N8N_BASE_URL, args.timeout, args.pollInterval, args.silent);
+    } catch (e) {
+      pollError = e;
+    }
+    const pollFinishedAt = Date.now();
+    const finalResult = ex ? extractResultFromExecution(ex) : null;
+    const durationMs = pollFinishedAt - pollStartedAt;
+
+    const record = buildRunRecord(finalResult, args.executionId, pollStartedAt, pollFinishedAt, pollError || null);
+    persistRunRecord(record, args.silent);
+
+    if (pollError) { console.error('\nFATAL:', pollError.message); process.exit(1); }
+
     if (finalResult) {
       if (args.silent) {
         console.log(JSON.stringify(finalResult, null, 2));
       } else {
-        printSummary(finalResult, 200, durationMs, startedAt);
+        printSummary(finalResult, 200, durationMs, pollStartedAt);
       }
       const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                                  'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE']);
@@ -474,16 +599,25 @@ async function main() {
     console.log(`\n  Waiting for chain to complete (polling every ${args.pollInterval / 1000}s)...`);
   }
 
-  let executionData;
+  let executionData, runError;
   try {
     executionData = await pollExecution(executionId, N8N_API_KEY, N8N_BASE_URL, args.timeout, args.pollInterval, args.silent);
   } catch (e) {
-    console.error('\nFATAL:', e.message);
-    process.exit(1);
+    runError = e;
   }
 
-  const finalResult = extractResultFromExecution(executionData);
-  const durationMs  = Date.now() - startedAt;
+  const finishedAt  = Date.now();
+  const durationMs  = finishedAt - startedAt;
+  const finalResult = executionData ? extractResultFromExecution(executionData) : null;
+
+  // Persist regardless of success or failure
+  const record = buildRunRecord(finalResult, executionId, startedAt, finishedAt, runError || null);
+  persistRunRecord(record, args.silent);
+
+  if (runError) {
+    console.error('\nFATAL:', runError.message);
+    process.exit(1);
+  }
 
   if (!finalResult) {
     console.error('\nERROR: Could not extract final result from completed execution.');
