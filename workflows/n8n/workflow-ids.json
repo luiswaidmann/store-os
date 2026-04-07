@@ -1,0 +1,36 @@
+{
+  "_meta": {
+    "description": "Canonical n8n workflow ID manifest for this store-os instance.",
+    "purpose": "Used by scripts/deploy-workflow.js to substitute REPLACE_WITH_* placeholders before deploying repo workflow JSON to n8n.",
+    "instance": "n8n Cloud — Claude - Code & GPT - Shopify Webbuilder Workflow",
+    "warning": "These IDs are instance-specific. Do not use for a different n8n instance without updating all values.",
+    "last_verified": "2026-04-07"
+  },
+  "workflows": {
+    "orchestrate-phase1":        "SCRLaQ9jFVo12zNR",
+    "resolve-runtime-config":    "eTYCcPaj66bFYeXL",
+    "intake-store-input":        "0k7UOXQww8hkavdc",
+    "import-shopify-data":       "z5ERPSJ9hibBbu70",
+    "build-store-profile":       "5Lc1BPZljbIAkuPI",
+    "build-market-intelligence": "YAZ26MzB1Z6TMfZ8",
+    "build-brand-positioning":   "AVoZ30VqPvmIYJUq",
+    "build-competitor-clusters": "jaCEHCKyJHesH1w6",
+    "build-strategy-synthesis":  "OLwntMMSgSElgwmU"
+  },
+  "placeholder_map": {
+    "REPLACE_WITH_INTAKE_STORE_INPUT_WORKFLOW_ID":        "intake-store-input",
+    "REPLACE_WITH_IMPORT_SHOPIFY_DATA_WORKFLOW_ID":       "import-shopify-data",
+    "REPLACE_WITH_BUILD_STORE_PROFILE_WORKFLOW_ID":       "build-store-profile",
+    "REPLACE_WITH_BUILD_MARKET_INTELLIGENCE_WORKFLOW_ID": "build-market-intelligence",
+    "REPLACE_WITH_BUILD_BRAND_POSITIONING_WORKFLOW_ID":   "build-brand-positioning",
+    "REPLACE_WITH_BUILD_COMPETITOR_CLUSTERS_WORKFLOW_ID": "build-competitor-clusters",
+    "REPLACE_WITH_BUILD_STRATEGY_SYNTHESIS_WORKFLOW_ID":  "build-strategy-synthesis"
+  },
+  "known_duplicates": {
+    "build-brand-positioning": {
+      "canonical": "AVoZ30VqPvmIYJUq",
+      "legacy":    "eUXnAlZ0gmv6qOhL",
+      "note": "Two copies exist in n8n. AVoZ30VqPvmIYJUq (created 2026-03-23) is treated as canonical. Verify which ID the live orchestrate-phase1 references before assuming this is correct."
+    }
+  }
+}
