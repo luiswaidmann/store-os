@@ -28,14 +28,14 @@ Recent runtime progression merges (on `main`):
 ## Last confirmed end-to-end smoke test
 
 **Date:** 2026-04-07
-**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async model)
+**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async model + persistence)
 **Input:** `test-data/golden-input.json` (project: `suppliedtech`)
-**Result:** `PHASE_7A_COMPLETE` — n8n execution 14361, status: success, ~117s — cloud mode
-**Async response:** HTTP 202 returned in ~2s with `execution_id`; CLI polled n8n API until complete
+**Result:** `PHASE_7A_COMPLETE` — n8n execution 14380, status: success, ~108s — cloud mode
+**Async response:** HTTP 202 returned in ~2s; CLI polled to completion; persisted to `outputs/runs/14380.json`
 **Chain:** All Phase 1–7A nodes succeeded (Webhook Trigger → Respond to Webhook → … → Phase 7A Complete)
 **Artifacts returned:** `store_profile`, `market_intelligence`, `brand_positioning`, `competitor_clusters`, `strategy_synthesis`, `offer_architecture`, `content_strategy`, `gtm_plan`, `store_blueprint`
 **Store blueprint highlights:**
-- Blueprint narrative: "SuppliedTech is a reliable specialist for SMEs seeking high-quality electronic accessories."
+- Blueprint narrative: "SuppliedTech is a specialist store offering high-quality tech accessories tailored for SMEs at competitive prices."
 - Products: 3 | Collections: 2 | Pages: 3 | Theme sections: 4 | Assets: 3
 
 Previous confirmed test (Phase 6c):
@@ -269,6 +269,7 @@ These changes harden the system for production use and establish the API-ready i
 # Set in .env: N8N_BASE_URL, N8N_API_KEY, (optional) STORE_OS_API_TOKEN
 node scripts/run-orchestrator.js --input test-data/golden-input.json
 # → returns HTTP 202 with execution_id in ~2s, then polls until PHASE_7A_COMPLETE
+# → persists result to outputs/runs/{execution_id}.json automatically
 
 # Trigger only — get execution_id, do not poll:
 node scripts/run-orchestrator.js --input test-data/golden-input.json --no-poll
@@ -284,6 +285,18 @@ node scripts/run-orchestrator.js --input test-data/golden-input.json --dry-run
 # Silent (output raw JSON only):
 node scripts/run-orchestrator.js --input test-data/golden-input.json --silent
 ```
+
+### Inspect persisted run history
+
+```bash
+node scripts/inspect-run.js --list                          # all runs
+node scripts/inspect-run.js --latest                        # most recent run
+node scripts/inspect-run.js --project suppliedtech --latest # latest for project
+node scripts/inspect-run.js 14380                           # specific run
+node scripts/inspect-run.js 14380 --json                    # raw JSON
+```
+
+See `docs/execution-persistence.md` for full persistence documentation.
 
 ### Via webhook (direct)
 

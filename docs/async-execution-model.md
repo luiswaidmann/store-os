@@ -149,8 +149,22 @@ The CLI (`run-orchestrator.js`) detects legacy synchronous responses (where `sta
 
 ---
 
+## Persistence
+
+Each completed run is automatically persisted to `outputs/runs/{execution_id}.json` by the CLI. This provides durable, repo-local storage that survives n8n API expiry.
+
+See `docs/execution-persistence.md` for full details, read path, and record schema.
+
+```bash
+node scripts/inspect-run.js --latest
+node scripts/inspect-run.js --list
+node scripts/inspect-run.js <execution_id>
+```
+
+---
+
 ## Limitations
 
-- n8n Cloud free tier: executions expire from the API after a short retention window. Poll promptly after triggering.
+- n8n Cloud free tier: executions expire from the API after a short retention window. Poll promptly after triggering; results are permanently stored in `outputs/runs/` after polling.
 - The n8n API key must have read access to executions.
 - If the execution errors before "Respond to Webhook", the caller may receive an empty HTTP 200 (the default n8n error response for failed webhook workflows). In that case, check n8n execution logs directly.
