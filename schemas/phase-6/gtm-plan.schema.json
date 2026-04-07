@@ -1,0 +1,101 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "store-os/gtm-plan",
+  "title": "Go-To-Market Plan",
+  "description": "Output of build-gtm-plan. Defines the launch sequence, channel strategy, and acquisition plan derived from strategy_synthesis, offer_architecture, and content_strategy.",
+  "type": "object",
+  "required": ["launch_sequence", "channel_strategy", "acquisition_priorities", "gtm_narrative"],
+  "additionalProperties": true,
+  "properties": {
+    "launch_sequence": {
+      "type": "object",
+      "description": "Phased launch plan.",
+      "required": ["phase_1", "phase_2"],
+      "properties": {
+        "phase_1": {
+          "type": "object",
+          "description": "Foundation phase (pre-launch to launch day).",
+          "properties": {
+            "name": { "type": "string" },
+            "duration": { "type": "string" },
+            "objectives": { "type": "array", "items": { "type": "string" } },
+            "key_actions": { "type": "array", "items": { "type": "string" } },
+            "success_metrics": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "phase_2": {
+          "type": "object",
+          "description": "Growth phase (post-launch).",
+          "properties": {
+            "name": { "type": "string" },
+            "duration": { "type": "string" },
+            "objectives": { "type": "array", "items": { "type": "string" } },
+            "key_actions": { "type": "array", "items": { "type": "string" } },
+            "success_metrics": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "phase_3": {
+          "type": "object",
+          "description": "Scale phase (optional)."
+        }
+      }
+    },
+    "channel_strategy": {
+      "type": "array",
+      "description": "Prioritised acquisition and marketing channels.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["channel", "priority", "rationale"],
+        "properties": {
+          "channel": { "type": "string", "description": "Channel name (e.g. 'Organic Search', 'Google Shopping', 'Email')." },
+          "priority": { "type": "string", "enum": ["primary", "secondary", "exploratory"] },
+          "rationale": { "type": "string" },
+          "estimated_impact": { "type": "string" },
+          "budget_signal": { "type": "string" }
+        }
+      }
+    },
+    "acquisition_priorities": {
+      "type": "array",
+      "description": "Top customer acquisition tactics for the launch window.",
+      "items": {
+        "type": "object",
+        "required": ["tactic", "rationale"],
+        "properties": {
+          "tactic": { "type": "string" },
+          "rationale": { "type": "string" },
+          "timeline": { "type": "string" },
+          "owner": { "type": "string" }
+        }
+      }
+    },
+    "gtm_narrative": {
+      "type": "string",
+      "description": "1–3 paragraph executive summary of the GTM plan."
+    },
+    "risk_flags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "GTM-specific risks (market timing, budget, competitive response)."
+    },
+    "kpis": {
+      "type": "array",
+      "description": "Key performance indicators for the launch.",
+      "items": {
+        "type": "object",
+        "required": ["kpi", "target"],
+        "properties": {
+          "kpi": { "type": "string" },
+          "target": { "type": "string" },
+          "timeframe": { "type": "string" }
+        }
+      }
+    },
+    "validation_questions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "_meta": { "type": "object" }
+  }
+}
