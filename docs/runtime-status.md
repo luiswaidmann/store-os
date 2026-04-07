@@ -27,6 +27,25 @@ Recent runtime progression merges (on `main`):
 
 ## Last confirmed end-to-end smoke test
 
+**Phase 7B.2 CONFIRMED (PARTIAL):**
+**Date:** 2026-04-07
+**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async) + `node scripts/poll-execution.js 14457 --json`
+**Input:** `test-data/golden-input.json` (project: `suppliedtech`)
+**Result:** `PHASE_7B2_PARTIAL` — n8n execution 14457, status: success, ~117s — cloud mode
+**Shopify target:** `8zw111-cj.myshopify.com`
+**Pages side effects:**
+- pages_created: 1 (about — new)
+- pages_updated: 2 (faq, contact — pre-existing handles updated)
+- Safety verified: all pages created with `published: false`
+**Navigation side effects:**
+- navigation_created: 0 | navigation_updated: 0
+- errors: 2 × HTTP 406 on link_lists POST
+- Root cause: OAuth credential `edgLmgVntFGX6QYN` lacks `write_online_store_navigation` scope
+- Impact: pages fully deployed; navigation requires scope grant (non-fatal, no incorrect writes)
+**Artifacts returned:** full 11-artifact chain + `shopify_pages_navigation_deployment`
+**Persisted:** `outputs/runs/14457.json`
+**PARTIAL verdict:** Pages deployment: PASS. Navigation deployment: BLOCKED (scope). PHASE_7B2_PARTIAL is correct terminal status.
+
 **Phase 7B.1 CONFIRMED:**
 **Date:** 2026-04-07
 **Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async) + `node scripts/poll-execution.js 14430 --json`

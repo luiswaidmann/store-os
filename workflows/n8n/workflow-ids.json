@@ -20,7 +20,8 @@
     "build-content-strategy":    "O4KhaCgA0itCazMu",
     "build-gtm-plan":            "8aCUkx6RlfdklCBH",
     "build-store-blueprint":     "j1JVNqqyidlKUIHX",
-    "build-shopify-catalog":     "oZE0Z9fb4ojnKiDd"
+    "build-shopify-catalog":          "oZE0Z9fb4ojnKiDd",
+    "build-shopify-pages-navigation": "LADq8PuMRuswIxJa"
   },
   "placeholder_map": {
     "REPLACE_WITH_INTAKE_STORE_INPUT_WORKFLOW_ID":           "intake-store-input",
@@ -34,7 +35,8 @@
     "REPLACE_WITH_BUILD_CONTENT_STRATEGY_WORKFLOW_ID":       "build-content-strategy",
     "REPLACE_WITH_BUILD_GTM_PLAN_WORKFLOW_ID":               "build-gtm-plan",
     "REPLACE_WITH_BUILD_STORE_BLUEPRINT_WORKFLOW_ID":        "build-store-blueprint",
-    "REPLACE_WITH_BUILD_SHOPIFY_CATALOG_WORKFLOW_ID":        "build-shopify-catalog"
+    "REPLACE_WITH_BUILD_SHOPIFY_CATALOG_WORKFLOW_ID":             "build-shopify-catalog",
+    "REPLACE_WITH_BUILD_SHOPIFY_PAGES_NAVIGATION_WORKFLOW_ID":    "build-shopify-pages-navigation"
   },
   "credential_placeholders": {
     "_note": "Credential IDs are instance-specific and must be set manually in n8n. These placeholders appear in subworkflow JSON files and require the numeric credential ID from n8n Settings > Credentials (visible in the URL when editing a credential).",
@@ -52,11 +54,11 @@
       "note": "import-shopify-data uses the older shopifyApi credential type. build-shopify-catalog uses shopifyOAuth2Api (edgLmgVntFGX6QYN) — no placeholder needed."
     },
     "STORE_OS_SHOPIFY_OAUTH2_CREDENTIAL_ID": {
-      "used_in": ["build-shopify-catalog.n8n.json"],
+      "used_in": ["build-shopify-catalog.n8n.json", "build-shopify-pages-navigation.n8n.json"],
       "credential_type": "shopifyOAuth2Api",
       "n8n_credential_name": "Shopify SuppliedTech Admin",
       "value": "edgLmgVntFGX6QYN",
-      "note": "Hardcoded in build-shopify-catalog.n8n.json. Replace if deploying to a different n8n instance."
+      "note": "Hardcoded in build-shopify-catalog.n8n.json and build-shopify-pages-navigation.n8n.json. Replace if deploying to a different n8n instance."
     }
   },
   "known_duplicates": {

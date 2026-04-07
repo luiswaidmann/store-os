@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "schemas/phase-7b/shopify-pages-navigation-deployment.schema.json",
+  "title": "shopify_pages_navigation_deployment",
+  "description": "Output of build-shopify-pages-navigation (Phase 7B.2). Confirms Shopify pages and navigation (link lists) created/updated from store_blueprint.",
+  "type": "object",
+  "required": [
+    "status",
+    "project_id",
+    "shop_url",
+    "completed_at",
+    "pages_created",
+    "pages_updated",
+    "navigation_created",
+    "navigation_updated",
+    "errors",
+    "warnings",
+    "blueprint_summary",
+    "safety_notes"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["PHASE_7B2_COMPLETE", "PHASE_7B2_PARTIAL", "PHASE_7B2_FAILED"],
+      "description": "Terminal status of the pages/navigation deployment stage."
+    },
+    "project_id": {
+      "type": "string",
+      "description": "Project identifier (from runtime_config or top-level trigger input)."
+    },
+    "shop_url": {
+      "type": "string",
+      "description": "Shopify shop domain (e.g. my-store.myshopify.com)."
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the summary was compiled."
+    },
+    "pages_created": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of new Shopify pages created (HTTP 201)."
+    },
+    "pages_updated": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of existing Shopify pages updated (HTTP 200)."
+    },
+    "navigation_created": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of new Shopify link lists (navigation menus) created (HTTP 201)."
+    },
+    "navigation_updated": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of existing Shopify link lists (navigation menus) updated (HTTP 200)."
+    },
+    "errors": {
+      "type": "array",
+      "description": "Per-resource errors collected during deployment.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "resource": { "type": "string" },
+          "handle":   { "type": "string" },
+          "status":   { "type": "integer" },
+          "message":  { "type": "string" }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Non-fatal warnings (e.g. noop, unexpected status).",
+      "items": { "type": "string" }
+    },
+    "blueprint_summary": {
+      "type": "object",
+      "description": "Input counts for observability.",
+      "properties": {
+        "pages_in_blueprint":      { "type": "integer" },
+        "navigation_in_blueprint": { "type": "integer" }
+      }
+    },
+    "safety_notes": {
+      "type": "array",
+      "description": "Confirms no-delete and unpublished-only guarantees.",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": true
+}

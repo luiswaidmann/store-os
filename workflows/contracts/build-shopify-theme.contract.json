@@ -1,0 +1,98 @@
+{
+  "name": "build-shopify-theme",
+  "phase": "Phase 7B.3",
+  "status": "SCAFFOLD — NOT YET IMPLEMENTED",
+  "description": "Controlled Shopify theme sections and asset configuration. Consumes store_blueprint.theme_sections and store_blueprint.assets and writes theme asset files to the targeted Shopify theme. Requires explicit opt-in via runtime_config.allow_theme_writes: true. Supports dry-run mode (default when allow_theme_writes is not set).",
+  "implementation_note": "Phase 7B.3 is scaffolded but not yet deployed. The workflow JSON (build-shopify-theme.n8n.json) is a non-live scaffold. Live writes require allow_theme_writes: true in runtime_config and a verified non-production theme target.",
+
+  "trigger": "n8n-nodes-base.executeWorkflowTrigger",
+  "callerPolicy": "any",
+
+  "input": {
+    "required": ["project_id", "runtime_config", "store_blueprint"],
+    "optional": ["content_strategy", "offer_architecture"],
+    "fields": {
+      "project_id":        "top-level project identifier",
+      "runtime_config":    "resolved runtime config — must include shopify_shop_url; optional: shopify_theme_id (defaults to active theme), allow_theme_writes (default: false)",
+      "store_blueprint":   "Phase 7A output — uses theme_sections[] and assets[]",
+      "content_strategy":  "Phase 6b output — used for section copy generation",
+      "offer_architecture": "Phase 5 output — used for value prop sections"
+    }
+  },
+
+  "output": {
+    "schema": "schemas/phase-7b/shopify-theme-deployment.schema.json",
+    "terminal_statuses": ["PHASE_7B3_COMPLETE", "PHASE_7B3_PARTIAL", "PHASE_7B3_FAILED", "PHASE_7B3_DRY_RUN"],
+    "fields": {
+      "status":            "PHASE_7B3_COMPLETE | PHASE_7B3_PARTIAL | PHASE_7B3_FAILED | PHASE_7B3_DRY_RUN",
+      "theme_id":          "Shopify theme ID that was targeted (null in dry_run)",
+      "sections_written":  "count of theme section asset keys written",
+      "assets_written":    "count of other theme assets written (logo, favicon, images)",
+      "dry_run":           "true when allow_theme_writes is not set — no writes performed",
+      "dry_run_plan":      "planned write operations (when dry_run: true)",
+      "errors":            "per-asset errors (key, status, message)",
+      "warnings":          "non-fatal warnings",
+      "blueprint_summary": "input counts for observability",
+      "safety_notes":      "confirms which theme was targeted and dry-run status"
+    }
+  },
+
+  "shopify_api_operations": [
+    { "method": "GET",  "endpoint": "/themes.json",                              "purpose": "List all themes to find active/target theme ID" },
+    { "method": "GET",  "endpoint": "/themes/{theme_id}/assets.json",            "purpose": "List existing theme assets to check what already exists" },
+    { "method": "PUT",  "endpoint": "/themes/{theme_id}/assets.json",            "purpose": "Create or update a theme asset file (idempotent by key)" }
+  ],
+
+  "section_write_strategy": {
+    "target_key_pattern": "sections/{section_type}.json",
+    "approach": "Write section JSON files to the theme. Each theme_sections entry becomes one asset PUT. Section files follow Shopify Dawn/OS 2.0 section schema.",
+    "note": "Does NOT modify templates/*.json or config/settings_data.json in this phase — section files only."
+  },
+
+  "theme_targeting": {
+    "default":      "Active theme (role: main) — HIGHEST RISK",
+    "recommended":  "Development/preview theme specified by runtime_config.shopify_theme_id",
+    "opt_in_flag":  "runtime_config.allow_theme_writes: true required for any writes",
+    "dry_run_default": "When allow_theme_writes is absent or false, return PHASE_7B3_DRY_RUN with plan only"
+  },
+
+  "safety_model": {
+    "opt_in_required": "allow_theme_writes: true must be explicitly set in runtime_config to perform any writes",
+    "dry_run_default": "Without opt-in, the workflow validates, plans, and returns PHASE_7B3_DRY_RUN — no Shopify writes",
+    "no_template_overwrites": "This phase DOES NOT modify templates/*.json or config/settings_data.json",
+    "no_deletes": "No existing theme files are deleted",
+    "no_active_theme_publish": "Workflow does not publish themes or change which theme is active",
+    "idempotent": "PUT to /themes/{id}/assets is inherently idempotent — repeated writes are safe",
+    "recommended_workflow": "1) Run with dry_run (default), review plan, 2) Set allow_theme_writes: true, 3) Target development theme, 4) Verify visually, 5) Manually switch to active theme"
+  },
+
+  "section_types_from_blueprint": [
+    "hero",
+    "featured-collection",
+    "value-prop",
+    "trust/social-proof"
+  ],
+
+  "planned_node_pattern": "13-node (Trigger → Validate → IF dry_run → [Dry Run Plan Return] | [Fetch Theme → Fetch Assets → Merge → Build Write Plan → IF has_sections → Write Section Assets → Write Other Assets → Merge → Summary])",
+  "node_count_planned": 13,
+
+  "credentials": {
+    "type": "shopifyOAuth2Api",
+    "id": "edgLmgVntFGX6QYN",
+    "name": "Shopify SuppliedTech Admin",
+    "note": "Same credential as Phase 7B.1 and 7B.2. Replace credential id if deploying to a different n8n instance."
+  },
+
+  "orchestration_integration": {
+    "follows": "Phase 7B.2 Complete",
+    "bridge_nodes": [
+      "Prepare Theme Input",
+      "Run build-shopify-theme",
+      "Shopify Theme Success?",
+      "Phase 7B.3 Complete",
+      "Halt - Shopify Theme Failed"
+    ],
+    "terminal_statuses": ["PHASE_7B3_COMPLETE", "PHASE_7B3_PARTIAL", "PHASE_7B3_DRY_RUN"],
+    "note": "PHASE_7B3_DRY_RUN is treated as non-fatal success — the orchestrator continues."
+  }
+}

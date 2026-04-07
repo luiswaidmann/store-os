@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "schemas/phase-7b/shopify-theme-deployment.schema.json",
+  "title": "shopify_theme_deployment",
+  "description": "Output of build-shopify-theme (Phase 7B.3). Confirms Shopify theme sections and assets configured from store_blueprint.theme_sections and store_blueprint.assets. NOT YET IMPLEMENTED — this schema defines the contract for the eventual live deployment.",
+  "type": "object",
+  "required": [
+    "status",
+    "project_id",
+    "shop_url",
+    "theme_id",
+    "completed_at",
+    "sections_written",
+    "assets_written",
+    "dry_run",
+    "errors",
+    "warnings",
+    "blueprint_summary",
+    "safety_notes"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["PHASE_7B3_COMPLETE", "PHASE_7B3_PARTIAL", "PHASE_7B3_FAILED", "PHASE_7B3_DRY_RUN"],
+      "description": "Terminal status. PHASE_7B3_DRY_RUN indicates no live writes were performed."
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "shop_url": {
+      "type": "string"
+    },
+    "theme_id": {
+      "type": ["string", "integer", "null"],
+      "description": "Shopify theme ID that was targeted. Null in dry_run mode."
+    },
+    "theme_name": {
+      "type": ["string", "null"],
+      "description": "Human-readable name of the targeted theme."
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "sections_written": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of theme section asset keys written (PUT to /themes/{id}/assets)."
+    },
+    "assets_written": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of other theme assets written (logo, favicon, images)."
+    },
+    "dry_run": {
+      "type": "boolean",
+      "description": "If true, no writes were performed — plan only."
+    },
+    "dry_run_plan": {
+      "type": "array",
+      "description": "When dry_run: true, contains the planned write operations.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "operation": { "type": "string", "enum": ["write_section", "write_asset"] },
+          "key":       { "type": "string" },
+          "section_type": { "type": "string" },
+          "reason":    { "type": "string" }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key":      { "type": "string" },
+          "status":   { "type": "integer" },
+          "message":  { "type": "string" }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "blueprint_summary": {
+      "type": "object",
+      "properties": {
+        "theme_sections_in_blueprint": { "type": "integer" },
+        "assets_in_blueprint":         { "type": "integer" }
+      }
+    },
+    "safety_notes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": true
+}
