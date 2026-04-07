@@ -30,13 +30,18 @@ Recent runtime progression merges (on `main`):
 **Date:** 2026-04-07
 **Method:** Webhook POST via `scripts/run-orchestrator.js`
 **Input:** `test-data/golden-input.json` (project: `suppliedtech`)
-**Result:** `PHASE_6A_COMPLETE` — HTTP 200, ~77s, cloud mode
-**Chain:** All Phase 1–6a nodes succeeded (Webhook Trigger → Phase 6a Complete)
-**Artifacts returned:** `store_profile`, `market_intelligence`, `brand_positioning`, `competitor_clusters`, `strategy_synthesis`, `offer_architecture`
-**Offer headline:** "Your one-stop shop for reliable tech accessories tailored for SMEs" | pricing: mass-premium | bundles: 1 | upsell paths: 1
+**Result:** `PHASE_6B_COMPLETE` — HTTP 200, ~81-104s, cloud mode
+**Chain:** All Phase 1–6b nodes succeeded (Webhook Trigger → Phase 6b Complete)
+**Artifacts returned:** `store_profile`, `market_intelligence`, `brand_positioning`, `competitor_clusters`, `strategy_synthesis`, `offer_architecture`, `content_strategy`
+**Content strategy highlights:**
+- Primary message: "SuppliedTech is your trusted partner for quality tech accessories tailored for SMEs."
+- Tone: Technical-trustworthy | Pillars: 2 | Keyword clusters: 2 | FAQ clusters: 2
 
-Previous confirmed test (Phase 5 only):
-**Date:** 2026-04-07 | **Result:** `PHASE_5_COMPLETE` — HTTP 200, ~90s, cloud mode
+Previous confirmed test (Phase 6a):
+**Date:** 2026-04-07 | **Result:** `PHASE_6A_COMPLETE` — HTTP 200, ~77s
+
+Previous confirmed test (Phase 5):
+**Date:** 2026-04-07 | **Result:** `PHASE_5_COMPLETE` — HTTP 200, ~90s
 
 ## Current confirmed executable chain
 
@@ -50,7 +55,8 @@ The currently confirmed n8n Cloud smoke-test path (Phase 6a — 2026-04-07) is:
 - `build-brand-positioning`
 - `build-competitor-clusters`
 - `build-strategy-synthesis` (Phase 16)
-- `build-offer-architecture` ← **NEW** (Phase 6a, `feature/phase-16-strategy-synthesis-runtime`)
+- `build-offer-architecture` (Phase 6a)
+- `build-content-strategy` ← **NEW** (Phase 6b, `feature/phase-16-strategy-synthesis-runtime`)
 
 ## Current confirmed inline outputs
 
@@ -61,7 +67,8 @@ The chain currently returns these runtime artifacts inline in cloud mode:
 - `brand_positioning`
 - `competitor_clusters`
 - `strategy_synthesis`
-- `offer_architecture` ← **NEW**
+- `offer_architecture`
+- `content_strategy` ← **NEW**
 
 ## Runtime Hardening (Phase 16)
 

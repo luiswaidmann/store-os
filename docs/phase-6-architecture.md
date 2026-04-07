@@ -211,12 +211,14 @@ Phase 7 uses this to drive:
 - [ ] `workflows/contracts/build-content-strategy.contract.json`
 - [ ] `workflows/contracts/build-gtm-plan.contract.json`
 - [x] `workflows/n8n/build-offer-architecture.n8n.json` ✓ **EXECUTABLE** (deployed: `aEkB4Bwp8pN57JB9`, activated 2026-04-07)
-- [ ] `workflows/n8n/build-content-strategy.n8n.json`
+- [x] `workflows/n8n/build-content-strategy.n8n.json` ✓ **EXECUTABLE** (deployed: `O4KhaCgA0itCazMu`, activated 2026-04-07)
 - [ ] `workflows/n8n/build-gtm-plan.n8n.json`
 - [x] Extend `orchestrate-phase1` with Phase 6a nodes (+5 nodes; total: 40)
-- [ ] Extend `orchestrate-phase1` with Phase 6b+c nodes (+10 nodes planned)
+- [x] Extend `orchestrate-phase1` with Phase 6b nodes (+5 nodes; total: 45)
+- [ ] Extend `orchestrate-phase1` with Phase 6c nodes (+5 nodes planned)
 - [x] `workflow-ids.json`: `build-offer-architecture` ID recorded
-- [ ] `workflow-ids.json`: `build-content-strategy` + `build-gtm-plan` IDs
+- [x] `workflow-ids.json`: `build-content-strategy` ID recorded
+- [ ] `workflow-ids.json`: `build-gtm-plan` ID
 - [x] `docs/runtime-status.md` updated
 
 ## Phase 6a Status (2026-04-07)
@@ -226,6 +228,20 @@ Phase 7 uses this to drive:
 Smoke test: `PHASE_6A_COMPLETE` — HTTP 200 — ~77s — cloud mode
 Offer: "Your one-stop shop for reliable tech accessories tailored for SMEs" | mass-premium | 1 bundle | 1 upsell path
 
-## Architecture Note: Artifact Forwarding Gap
+## Phase 6b Status (2026-04-07)
 
-`build-strategy-synthesis` does not forward upstream artifacts in its output — it only returns `strategy_synthesis + runtime_config`. The `Prepare Offer Architecture Input` bridge resolves this by reading from `$node['Prepare Strategy Synthesis Input'].json`. This pattern must be applied to all subsequent Phase 6 bridge nodes.
+**EXECUTABLE.** `build-content-strategy` is deployed, activated, and end-to-end confirmed.
+
+Smoke test: `PHASE_6B_COMPLETE` — HTTP 200 — ~81-104s — cloud mode
+Primary message: "SuppliedTech is your trusted partner for quality tech accessories tailored for SMEs."
+Tone: Technical-trustworthy | Pillars: 2 | Keyword clusters: 2 | FAQ clusters: 2
+
+## Architecture Note: Artifact Forwarding Pattern
+
+Subworkflows in store-os only return their immediate output artifact + runtime_config. They do NOT forward upstream artifacts. All Phase 6 bridge nodes must explicitly source upstream artifacts using `$node[...]` references:
+
+| Bridge node | `offer_architecture` | `strategy_synthesis` | `brand_positioning` etc. |
+|---|---|---|---|
+| `Prepare Offer Architecture Input` | — | — | `$node['Prepare Strategy Synthesis Input']` |
+| `Prepare Content Strategy Input` | `$node['Phase 6a Complete']` | `$node['Phase 5 Complete']` | `$node['Prepare Strategy Synthesis Input']` |
+| `Prepare GTM Plan Input` (planned) | `$node['Phase 6a Complete']` | `$node['Phase 5 Complete']` | `$node['Prepare Strategy Synthesis Input']` + `$node['Phase 6b Complete']` for `content_strategy` |
