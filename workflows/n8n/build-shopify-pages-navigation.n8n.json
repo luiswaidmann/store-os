@@ -1,0 +1,377 @@
+{
+  "name": "build-shopify-pages-navigation",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "7b2a0001-0007-07b2-07b2-000000000001",
+      "name": "Subworkflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-shopify-pages-navigation \u2014 Validate Pages/Nav Input\n// Validates store_blueprint (pages + navigation) and runtime_config; extracts shop_url.\n// Safety rules: no deletes, idempotent upsert by handle, new pages never auto-published.\n\nconst input = $input.first().json;\n\nconst runtimeConfig  = input.runtime_config   || {};\nconst storeBlueprint = input.store_blueprint   || null;\nconst contentStrategy = input.content_strategy || {};\n// project_id is top-level; runtime_config does not carry it directly\nconst projectId      = input.project_id        || runtimeConfig.project_id || null;\n\nif (!projectId) {\n  throw new Error('MISSING_RUNTIME_CONFIG: build-shopify-pages-navigation requires project_id (top-level) or runtime_config.project_id');\n}\n\nif (!storeBlueprint) {\n  throw new Error('MISSING_ARTIFACT: store_blueprint is required but was not found in trigger input');\n}\n\nconst pages      = storeBlueprint.pages      || [];\nconst navigation = storeBlueprint.navigation || [];\n\nif (pages.length === 0 && navigation.length === 0) {\n  throw new Error('INVALID_BLUEPRINT: store_blueprint.pages and store_blueprint.navigation are both empty \u2014 nothing to deploy');\n}\n\n// resolve-runtime-config uses keys: shopify_shop_url, shopify_api_version\nconst shopUrl    = runtimeConfig.shopify_shop_url    || runtimeConfig.shop_url    || runtimeConfig.STORE_OS_SHOPIFY_SHOP_URL    || null;\nconst apiVersion = runtimeConfig.shopify_api_version || runtimeConfig.api_version || runtimeConfig.STORE_OS_SHOPIFY_API_VERSION || '2025-01';\n\nif (!shopUrl) {\n  throw new Error(\n    'MISSING_CONFIG: shop_url not found in runtime_config. ' +\n    'Ensure STORE_OS_SHOPIFY_SHOP_URL is set in env or passed as smoke_test_config.STORE_OS_SHOPIFY_SHOP_URL'\n  );\n}\n\nconst shopDomain  = shopUrl.replace(/^https?:\\/\\//, '').replace(/\\/$/, '');\nconst shopifyBase = 'https://' + shopDomain + '/admin/api/' + apiVersion;\n\n// Page strategy snippet from content_strategy for body generation\nconst pageStrategy = (contentStrategy.page_strategy || {});\n\nconsole.log(\n  `build-shopify-pages-navigation: project=${projectId}, shop=${shopDomain}, ` +\n  `pages=${pages.length}, navigation=${navigation.length}`\n);\n\nreturn [{\n  json: {\n    project_id:       projectId,\n    runtime_config:   runtimeConfig,\n    store_blueprint:  storeBlueprint,\n    content_strategy: contentStrategy,\n    page_strategy:    pageStrategy,\n    shop_url:         shopUrl,\n    shop_domain:      shopDomain,\n    api_version:      apiVersion,\n    shopify_base:     shopifyBase,\n    pages_count:      pages.length,\n    navigation_count: navigation.length,\n  },\n}];\n"
+      },
+      "id": "7b2a0001-0007-07b2-07b2-000000000002",
+      "name": "Validate Pages/Nav Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.shopify_base + '/pages.json?limit=250&published_status=any&fields=id,title,handle,published_at' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "options": {}
+      },
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "edgLmgVntFGX6QYN",
+          "name": "Shopify SuppliedTech Admin"
+        }
+      },
+      "id": "7b2a0001-0007-07b2-07b2-000000000003",
+      "name": "Fetch Existing Pages",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        750,
+        180
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.shopify_base + '/link_lists.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "options": {}
+      },
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "edgLmgVntFGX6QYN",
+          "name": "Shopify SuppliedTech Admin"
+        }
+      },
+      "id": "7b2a0001-0007-07b2-07b2-000000000004",
+      "name": "Fetch Existing Link Lists",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        750,
+        420
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "7b2a0001-0007-07b2-07b2-000000000005",
+      "name": "Merge Fetch Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-shopify-pages-navigation \u2014 Build Upsert Plan\n// Compares existing Shopify pages and link_lists against store_blueprint.\n// Produces one action item per resource: {resource, action, handle, url, body, ...}\n// Safety: no deletes, new pages published: false (hidden until manually published).\n\nconst items = $input.all();\n\n// Pull validated config from Validate Pages/Nav Input node\nconst validated      = $node['Validate Pages/Nav Input'].json;\nconst blueprint      = validated.store_blueprint;\nconst shopifyBase    = validated.shopify_base;\nconst projectId      = validated.project_id;\nconst pageStrategy   = validated.page_strategy || {};\n\n// Parse Merge Fetch Results \u2014 one item has pages, other has link_lists\nlet existingPages     = [];\nlet existingLinkLists = [];\n\nfor (const item of items) {\n  // continueOnFail: true on Fetch nodes means errors arrive as items with item.json.error\n  // Treat fetch errors as empty arrays (credential may lack read_content scope \u2014 creates only)\n  if (item.json.error) {\n    console.log('Fetch node returned error (treating as empty):', JSON.stringify(item.json.error).slice(0, 200));\n    continue;\n  }\n  if (item.json.pages !== undefined)      existingPages     = item.json.pages      || [];\n  if (item.json.link_lists !== undefined) existingLinkLists = item.json.link_lists || [];\n}\n\n// Index existing by handle for O(1) lookup\nconst pagesByHandle     = {};\nfor (const p of existingPages)     { if (p.handle) pagesByHandle[p.handle] = p; }\nconst linkListsByHandle = {};\nfor (const l of existingLinkLists) { if (l.handle) linkListsByHandle[l.handle] = l; }\n\nconsole.log(\n  `Build Upsert Plan: existing pages=${existingPages.length}, existing link_lists=${existingLinkLists.length}`\n);\n\n// \u2500\u2500 Link type mapping helper \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nfunction mapLinkType(linkType, target) {\n  // Maps store_blueprint navigation link_type to Shopify link_list link type and URL.\n  const t = (linkType || '').toLowerCase();\n  if (t === 'frontpage' || t === 'home' || t === 'homepage') {\n    return { type: 'frontpage', url: '/' };\n  } else if (t === 'page') {\n    return { type: 'page', url: '/pages/' + (target || '') };\n  } else if (t === 'collection') {\n    return { type: 'collection', url: '/collections/' + (target || '') };\n  } else if (t === 'product') {\n    return { type: 'product', url: '/products/' + (target || '') };\n  } else if (t === 'blog') {\n    return { type: 'blog', url: '/blogs/' + (target || '') };\n  }\n  // Default: http link using target as URL if it looks like a URL, else ignore\n  return { type: 'http', url: target || '/' };\n}\n\n// \u2500\u2500 Page body generation helper \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nfunction generatePageHtml(page) {\n  const safeText = (s) => String(s || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n  const title   = safeText(page.title || '');\n  const purpose = safeText(page.purpose || '');\n  const seo     = safeText(page.seo_focus || '');\n  let html = '';\n  if (purpose) html += '<p>' + purpose + '</p>';\n  if (seo && seo !== purpose) html += '<p>' + seo + '</p>';\n  return html || '<p>Page content coming soon.</p>';\n}\n\nconst actions = [];\n\n// \u2500\u2500 Pages \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nfor (const page of (blueprint.pages || [])) {\n  const handle = page.handle || page.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');\n  const bodyHtml = page.body_html || generatePageHtml(page);\n\n  const pageBody = {\n    page: {\n      title:      page.title,\n      handle:     handle,\n      body_html:  bodyHtml,\n      author:     'store-os',\n      published:  false,  // Safety: never auto-publish \u2014 must be reviewed before publishing\n    },\n  };\n\n  if (pagesByHandle[handle]) {\n    const existingId = pagesByHandle[handle].id;\n    actions.push({\n      resource:        'page',\n      action:          'update',\n      handle:          handle,\n      shopify_id:      existingId,\n      url:             shopifyBase + '/pages/' + existingId + '.json',\n      body:            pageBody,\n      blueprint_title: page.title,\n    });\n  } else {\n    actions.push({\n      resource:        'page',\n      action:          'create',\n      handle:          handle,\n      shopify_id:      null,\n      url:             shopifyBase + '/pages.json',\n      body:            pageBody,\n      blueprint_title: page.title,\n    });\n  }\n}\n\n// \u2500\u2500 Navigation / Link Lists \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nfor (const menu of (blueprint.navigation || [])) {\n  const handle = menu.menu_handle || menu.handle || (menu.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');\n\n  // Build Shopify link_list links array from blueprint items\n  const links = (menu.items || []).map((item) => {\n    const mapped = mapLinkType(item.link_type, item.target);\n    return {\n      title: item.label || item.title || item.target || '',\n      type:  mapped.type,\n      url:   mapped.url,\n    };\n  });\n\n  const linkListBody = {\n    link_list: {\n      title:  menu.title,\n      handle: handle,\n      links:  links,\n    },\n  };\n\n  if (linkListsByHandle[handle]) {\n    const existingId = linkListsByHandle[handle].id;\n    actions.push({\n      resource:        'link_list',\n      action:          'update',\n      handle:          handle,\n      shopify_id:      existingId,\n      url:             shopifyBase + '/link_lists/' + existingId + '.json',\n      body:            linkListBody,\n      blueprint_title: menu.title,\n    });\n  } else {\n    actions.push({\n      resource:        'link_list',\n      action:          'create',\n      handle:          handle,\n      shopify_id:      null,\n      url:             shopifyBase + '/link_lists.json',\n      body:            linkListBody,\n      blueprint_title: menu.title,\n    });\n  }\n}\n\nconsole.log(\n  `Build Upsert Plan: planned actions=${actions.length} ` +\n  `(creates=${actions.filter(a=>a.action==='create').length}, ` +\n  `updates=${actions.filter(a=>a.action==='update').length})`\n);\n\nif (actions.length === 0) {\n  return [{ json: { action: 'noop', resource: 'none', handle: null, url: null, body: null, blueprint_title: null, shopify_id: null } }];\n}\n\nreturn actions.map(a => ({ json: a }));\n"
+      },
+      "id": "7b2a0001-0007-07b2-07b2-000000000006",
+      "name": "Build Upsert Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.action }}",
+              "operation": "equal",
+              "value2": "create"
+            }
+          ]
+        }
+      },
+      "id": "7b2a0001-0007-07b2-07b2-000000000007",
+      "name": "Create or Update?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "edgLmgVntFGX6QYN",
+          "name": "Shopify SuppliedTech Admin"
+        }
+      },
+      "continueOnFail": true,
+      "id": "7b2a0001-0007-07b2-07b2-000000000008",
+      "name": "Create Resource",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1750,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "edgLmgVntFGX6QYN",
+          "name": "Shopify SuppliedTech Admin"
+        }
+      },
+      "continueOnFail": true,
+      "id": "7b2a0001-0007-07b2-07b2-000000000009",
+      "name": "Update Resource",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1750,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "7b2a0001-0007-07b2-07b2-000000000010",
+      "name": "Merge Action Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-shopify-pages-navigation \u2014 Compile Deployment Summary\n// Aggregates HTTP results from Create Resource and Update Resource nodes.\n// Counts by statusCode and resource type (page vs link_list).\n// Returns PHASE_7B2_COMPLETE with deployment summary.\n\nconst results = $input.all();\n\nconst validated  = $node['Validate Pages/Nav Input'].json;\nconst projectId  = validated.project_id;\nconst shopDomain = validated.shop_domain;\nconst blueprint  = validated.store_blueprint;\n\nlet pagesCreated      = 0;\nlet pagesUpdated      = 0;\nlet navigationCreated = 0;\nlet navigationUpdated = 0;\nconst errors   = [];\nconst warnings = [];\n\nfor (const item of results) {\n  const d = item.json;\n\n  // noop sentinel\n  if (d.action === 'noop') {\n    warnings.push('No pages/navigation actions were planned \u2014 store_blueprint may be empty or all resources already match');\n    continue;\n  }\n\n  const statusCode = d.statusCode || 0;\n  const body       = d.body || d;\n\n  if (statusCode >= 400 || d.error) {\n    const errMsg = (body.errors ? JSON.stringify(body.errors) : null)\n      || d.message\n      || `HTTP ${statusCode} error`;\n    errors.push({\n      resource: d._resource || 'unknown',\n      handle:   d._handle   || 'unknown',\n      status:   statusCode,\n      message:  errMsg,\n    });\n    continue;\n  }\n\n  const isPage     = !!(body.page);\n  const isLinkList = !!(body.link_list);\n\n  if (statusCode === 201) {\n    if (isPage)     pagesCreated++;\n    if (isLinkList) navigationCreated++;\n  } else if (statusCode === 200) {\n    if (isPage)     pagesUpdated++;\n    if (isLinkList) navigationUpdated++;\n  } else {\n    warnings.push(\n      `Unexpected HTTP ${statusCode} for ${ isPage ? 'page' : isLinkList ? 'link_list' : 'resource' }`\n    );\n  }\n}\n\nconst totalActioned = pagesCreated + pagesUpdated + navigationCreated + navigationUpdated;\nconst totalErrors   = errors.length;\nconst terminalStatus = totalErrors > 0 && totalActioned === 0\n  ? 'PHASE_7B2_FAILED'\n  : totalErrors > 0\n    ? 'PHASE_7B2_PARTIAL'\n    : 'PHASE_7B2_COMPLETE';\n\nconsole.log(\n  `Compile Deployment Summary: status=${terminalStatus}, ` +\n  `pages_created=${pagesCreated}, pages_updated=${pagesUpdated}, ` +\n  `navigation_created=${navigationCreated}, navigation_updated=${navigationUpdated}, ` +\n  `errors=${totalErrors}`\n);\n\nreturn [{\n  json: {\n    status:               terminalStatus,\n    project_id:           projectId,\n    shop_url:             shopDomain,\n    completed_at:         new Date().toISOString(),\n\n    pages_created:        pagesCreated,\n    pages_updated:        pagesUpdated,\n    navigation_created:   navigationCreated,\n    navigation_updated:   navigationUpdated,\n\n    errors:   errors,\n    warnings: warnings,\n\n    blueprint_summary: {\n      pages_in_blueprint:      (blueprint.pages      || []).length,\n      navigation_in_blueprint: (blueprint.navigation || []).length,\n    },\n\n    safety_notes: [\n      'No Shopify resources were deleted \u2014 only create and update operations were performed',\n      'All new pages were created with published: false \u2014 not visible until manually published',\n    ],\n  },\n}];\n"
+      },
+      "id": "7b2a0001-0007-07b2-07b2-000000000011",
+      "name": "Compile Deployment Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2250,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Subworkflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Pages/Nav Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Pages/Nav Input": {
+      "main": [
+        [
+          {
+            "node": "Fetch Existing Pages",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Existing Link Lists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Existing Pages": {
+      "main": [
+        [
+          {
+            "node": "Merge Fetch Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Existing Link Lists": {
+      "main": [
+        [
+          {
+            "node": "Merge Fetch Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Fetch Results": {
+      "main": [
+        [
+          {
+            "node": "Build Upsert Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Upsert Plan": {
+      "main": [
+        [
+          {
+            "node": "Create or Update?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create or Update?": {
+      "main": [
+        [
+          {
+            "node": "Create Resource",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Resource",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Resource": {
+      "main": [
+        [
+          {
+            "node": "Merge Action Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Resource": {
+      "main": [
+        [
+          {
+            "node": "Merge Action Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Action Results": {
+      "main": [
+        [
+          {
+            "node": "Compile Deployment Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "any"
+  },
+  "_meta": {
+    "storeOs": {
+      "phase": "Phase 7B.2",
+      "format": "n8n-executable",
+      "outputSchema": "schemas/phase-7b/shopify-pages-navigation-deployment.schema.json",
+      "cloudCompatibility": "FULL \u2014 no filesystem access, no AJV. All Shopify API calls use shopifyOAuth2Api credential injected by n8n.",
+      "invocation": "Called as a subworkflow by orchestrate-phase1. Expects Subworkflow Trigger input: { project_id, runtime_config, store_blueprint, content_strategy }",
+      "output": "{ status: 'PHASE_7B2_COMPLETE' | 'PHASE_7B2_PARTIAL' | 'PHASE_7B2_FAILED', project_id, shop_url, pages_created, pages_updated, navigation_created, navigation_updated, errors, warnings, blueprint_summary, safety_notes }",
+      "safetyGuarantees": [
+        "No Shopify resources are ever deleted \u2014 only create (POST) and update (PUT) operations",
+        "Upsert by handle: existing handles are updated, new handles are created",
+        "All new pages are created with published: false \u2014 not visible until manually published",
+        "continueOnFail: true on HTTP nodes \u2014 errors are collected, not fatal",
+        "neverError: true on HTTP nodes \u2014 HTTP 4xx/5xx return as items, not exceptions"
+      ],
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "edgLmgVntFGX6QYN",
+          "name": "Shopify SuppliedTech Admin",
+          "note": "Replace id with your n8n shopifyOAuth2Api credential ID if deploying to a different instance"
+        }
+      },
+      "nodeCount": 11,
+      "terminalStatuses": [
+        "PHASE_7B2_COMPLETE",
+        "PHASE_7B2_PARTIAL",
+        "PHASE_7B2_FAILED"
+      ]
+    }
+  }
+}

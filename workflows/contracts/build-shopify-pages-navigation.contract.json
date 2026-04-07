@@ -1,0 +1,68 @@
+{
+  "name": "build-shopify-pages-navigation",
+  "phase": "Phase 7B.2",
+  "description": "Controlled Shopify pages and navigation deployment. Consumes store_blueprint.pages and store_blueprint.navigation and deploys them to Shopify using idempotent upsert-by-handle. No deletes. New pages created as unpublished (published: false).",
+  "trigger": "n8n-nodes-base.executeWorkflowTrigger",
+  "callerPolicy": "any",
+  "input": {
+    "required": ["project_id", "runtime_config", "store_blueprint"],
+    "optional": ["content_strategy"],
+    "fields": {
+      "project_id":       "top-level project identifier",
+      "runtime_config":   "resolved runtime config (shopify_shop_url, shopify_api_version)",
+      "store_blueprint":  "Phase 7A output — must contain pages[] and/or navigation[]",
+      "content_strategy": "Phase 6b output — page_strategy used for page body generation"
+    }
+  },
+  "output": {
+    "schema": "schemas/phase-7b/shopify-pages-navigation-deployment.schema.json",
+    "terminal_statuses": ["PHASE_7B2_COMPLETE", "PHASE_7B2_PARTIAL", "PHASE_7B2_FAILED"],
+    "fields": {
+      "status":               "PHASE_7B2_COMPLETE | PHASE_7B2_PARTIAL | PHASE_7B2_FAILED",
+      "pages_created":        "count of new pages created (HTTP 201)",
+      "pages_updated":        "count of existing pages updated (HTTP 200)",
+      "navigation_created":   "count of new link lists created (HTTP 201)",
+      "navigation_updated":   "count of existing link lists updated (HTTP 200)",
+      "errors":               "array of per-resource errors (resource, handle, status, message)",
+      "warnings":             "non-fatal warnings (noop, unexpected status)",
+      "blueprint_summary":    "input counts for observability cross-reference",
+      "safety_notes":         "confirms no-delete and unpublished-only guarantees"
+    }
+  },
+  "shopify_api_operations": [
+    { "method": "GET",  "endpoint": "/pages.json?limit=250&published_status=any",  "purpose": "Fetch existing pages for handle comparison" },
+    { "method": "GET",  "endpoint": "/link_lists.json",                             "purpose": "Fetch existing navigation menus for handle comparison" },
+    { "method": "POST", "endpoint": "/pages.json",                                  "purpose": "Create new page (published: false)" },
+    { "method": "PUT",  "endpoint": "/pages/{id}.json",                             "purpose": "Update existing page" },
+    { "method": "POST", "endpoint": "/link_lists.json",                             "purpose": "Create new navigation menu" },
+    { "method": "PUT",  "endpoint": "/link_lists/{id}.json",                        "purpose": "Update existing navigation menu" }
+  ],
+  "upsert_logic": {
+    "pages": "GET existing pages → index by handle → PUT (update) if handle exists, POST (create, published: false) if new",
+    "navigation": "GET existing link_lists → index by handle → PUT (update) if handle exists, POST (create) if new",
+    "handle_derivation": "blueprint.handle if present, otherwise title.toLowerCase().replace(/[^a-z0-9]+/g, '-')"
+  },
+  "link_type_mapping": {
+    "page":       "type: 'page',      url: '/pages/{target}'",
+    "collection": "type: 'collection', url: '/collections/{target}'",
+    "home":       "type: 'frontpage',  url: '/'",
+    "homepage":   "type: 'frontpage',  url: '/'",
+    "product":    "type: 'product',    url: '/products/{target}'",
+    "blog":       "type: 'blog',       url: '/blogs/{target}'",
+    "default":    "type: 'http',       url: target"
+  },
+  "safety_guarantees": [
+    "No Shopify resources are ever deleted — only create (POST) and update (PUT) operations",
+    "Upsert by handle: existing handles are updated, new handles are created",
+    "All new pages are created with published: false — not visible until manually published",
+    "continueOnFail: true on HTTP nodes — individual API errors are collected, not fatal",
+    "neverError: true on HTTP nodes — HTTP 4xx/5xx return as items, not exceptions"
+  ],
+  "credentials": {
+    "type": "shopifyOAuth2Api",
+    "id": "edgLmgVntFGX6QYN",
+    "name": "Shopify SuppliedTech Admin",
+    "note": "Replace credential id if deploying to a different n8n instance"
+  },
+  "node_pattern": "11-node (Subworkflow Trigger → Validate → Fetch×2 → Merge → Build Plan → IF → Create/Update → Merge → Summary)"
+}

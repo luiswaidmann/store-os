@@ -9,6 +9,23 @@
     "terminal_status": "PHASE_7A_COMPLETE"
   },
   {
+    "execution_id": "14457",
+    "project_id": "suppliedtech",
+    "started_at": "2026-04-07T14:03:44.916Z",
+    "finished_at": "2026-04-07T14:05:41.916Z",
+    "duration_ms": 117000,
+    "status": "success",
+    "terminal_status": "PHASE_7B2_PARTIAL",
+    "shopify_pages_navigation_deployment": {
+      "pages_created": 1,
+      "pages_updated": 2,
+      "navigation_created": 0,
+      "navigation_updated": 0,
+      "errors": 2,
+      "notes": "navigation 406 = missing write_online_store_navigation OAuth scope"
+    }
+  },
+  {
     "execution_id": "14430",
     "project_id": "suppliedtech",
     "started_at": "2026-04-07T13:34:56.925Z",

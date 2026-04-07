@@ -77,8 +77,8 @@ function extractResultFromExecution(exData) {
   const lastNode   = resultData.lastNodeExecuted;
 
   const terminalNodes = [
-    'Phase 7B.1 Complete', 'Phase 7A Complete', 'Phase 6c Complete', 'Phase 6b Complete',
-    'Phase 6a Complete', 'Phase 5 Complete',
+    'Phase 7B.2 Complete', 'Phase 7B.1 Complete', 'Phase 7A Complete', 'Phase 6c Complete',
+    'Phase 6b Complete', 'Phase 6a Complete', 'Phase 5 Complete',
   ];
 
   for (const nodeName of terminalNodes) {
@@ -174,7 +174,8 @@ async function main() {
       } else {
         const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                                    'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
-                                   'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL']);
+                                   'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
+                                   'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL']);
         console.log(`  STATUS:   ${result.status || 'UNKNOWN'}`);
         console.log(`  PROJECT:  ${result.project_id || '—'}`);
         if (result.store_blueprint) {
@@ -195,7 +196,8 @@ async function main() {
 
       const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                                  'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
-                                 'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL']);
+                                 'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
+                                 'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL']);
       if (result && !TERMINAL.has(result.status)) process.exit(1);
       return;
     }

@@ -121,8 +121,8 @@ function extractResultFromExecution(exData) {
 
   // Try known terminal nodes in priority order
   const terminalNodes = [
-    'Phase 7B.1 Complete', 'Phase 7A Complete', 'Phase 6c Complete', 'Phase 6b Complete',
-    'Phase 6a Complete', 'Phase 5 Complete',
+    'Phase 7B.2 Complete', 'Phase 7B.1 Complete', 'Phase 7A Complete', 'Phase 6c Complete',
+    'Phase 6b Complete', 'Phase 6a Complete', 'Phase 5 Complete',
   ];
 
   for (const nodeName of terminalNodes) {
@@ -202,7 +202,8 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
 
   const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                              'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
-                             'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL']);
+                             'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
+                             'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL']);
   const isSuccess = TERMINAL.has(d.status);
 
   console.log('');
@@ -319,6 +320,24 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
     }
   }
 
+  if (d.shopify_pages_navigation_deployment) {
+    const pn = d.shopify_pages_navigation_deployment;
+    console.log('');
+    console.log('  SHOPIFY PAGES + NAVIGATION DEPLOYMENT:');
+    console.log(`    status:              ${pn.status || '—'}`);
+    console.log(`    shop:                ${pn.shop_url || '—'}`);
+    console.log(`    pages_created:       ${pn.pages_created ?? '—'}`);
+    console.log(`    pages_updated:       ${pn.pages_updated ?? '—'}`);
+    console.log(`    navigation_created:  ${pn.navigation_created ?? '—'}`);
+    console.log(`    navigation_updated:  ${pn.navigation_updated ?? '—'}`);
+    if (pn.errors && pn.errors.length > 0) {
+      console.log(`    errors:              ${pn.errors.length} (${pn.errors.map((e) => e.handle).join(', ')})`);
+    }
+    if (pn.warnings && pn.warnings.length > 0) {
+      console.log(`    warnings:            ${pn.warnings.length}`);
+    }
+  }
+
   if (d.next_phase) {
     console.log('');
     console.log(`  NEXT PHASE:  ${d.next_phase}`);
@@ -331,7 +350,9 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
 
   console.log('');
   if (isSuccess) {
-    const chainDesc = d.status === 'PHASE_7B1_COMPLETE' ? 'Phase 1–7B.1 chain finished (Shopify catalog deployed).'
+    const chainDesc = d.status === 'PHASE_7B2_COMPLETE' ? 'Phase 1–7B.2 chain finished (catalog + pages + navigation deployed).'
+      : d.status === 'PHASE_7B2_PARTIAL' ? 'Phase 1–7B.2 finished with partial deployment (some errors).'
+      : d.status === 'PHASE_7B1_COMPLETE' ? 'Phase 1–7B.1 chain finished (Shopify catalog deployed).'
       : d.status === 'PHASE_7B1_PARTIAL' ? 'Phase 1–7B.1 finished with partial deployment (some errors).'
       : d.status === 'PHASE_7A_COMPLETE' ? 'Phase 1–7A chain finished.'
       : d.status === 'PHASE_6C_COMPLETE' ? 'Phase 1–6c chain finished.'
@@ -428,6 +449,20 @@ function buildRunRecord(result, executionId, startedAt, finishedAt, error) {
         collections_updated:  cd.collections_updated ?? 0,
         errors_count:         (cd.errors || []).length,
         warnings_count:       (cd.warnings || []).length,
+      };
+    }
+
+    if (result.shopify_pages_navigation_deployment) {
+      const pn = result.shopify_pages_navigation_deployment;
+      record.artifacts.shopify_pages_navigation_deployment = {
+        status:             pn.status || null,
+        shop_url:           pn.shop_url || null,
+        pages_created:      pn.pages_created ?? 0,
+        pages_updated:      pn.pages_updated ?? 0,
+        navigation_created: pn.navigation_created ?? 0,
+        navigation_updated: pn.navigation_updated ?? 0,
+        errors_count:       (pn.errors || []).length,
+        warnings_count:     (pn.warnings || []).length,
       };
     }
   }
