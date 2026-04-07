@@ -13,7 +13,7 @@
     "import-shopify-data":       "z5ERPSJ9hibBbu70",
     "build-store-profile":       "5Lc1BPZljbIAkuPI",
     "build-market-intelligence": "YAZ26MzB1Z6TMfZ8",
-    "build-brand-positioning":   "AVoZ30VqPvmIYJUq",
+    "build-brand-positioning":   "eUXnAlZ0gmv6qOhL",
     "build-competitor-clusters": "jaCEHCKyJHesH1w6",
     "build-strategy-synthesis":  "OLwntMMSgSElgwmU"
   },
@@ -43,9 +43,9 @@
   },
   "known_duplicates": {
     "build-brand-positioning": {
-      "canonical": "AVoZ30VqPvmIYJUq",
-      "legacy":    "eUXnAlZ0gmv6qOhL",
-      "note": "Two copies exist in n8n. AVoZ30VqPvmIYJUq (created 2026-03-23) is treated as canonical. Verify which ID the live orchestrate-phase1 references before assuming this is correct."
+      "canonical":   "eUXnAlZ0gmv6qOhL",
+      "deprecated":  "AVoZ30VqPvmIYJUq",
+      "note": "eUXnAlZ0gmv6qOhL is the confirmed canonical workflow. AVoZ30VqPvmIYJUq is a deprecated duplicate and should not be used."
     }
   }
 }
