@@ -4,13 +4,18 @@
 
 Branch baseline:
 
-- `main`
+- `feature/phase-16-strategy-synthesis-runtime` (in progress — pending PR to `main`)
 
-Latest confirmed merge relevant to executable runtime progression:
+Latest commits (unmerged, branch tip):
+
+- `04c4bf3` fix: align brand-positioning direct-field enums with golden-input and validate node
+- `c254936` feat: webhook trigger, auth hardening, input validation, observability, Phase 6 schemas
+
+Latest confirmed merge on `main` relevant to executable runtime progression:
 
 - `633c80d` Merge pull request #10 from `feature/runtime-hardening-artifact-contracts` (Phase 16 hardening)
 
-Recent runtime progression merges:
+Recent runtime progression merges (on `main`):
 
 - `eff416f` Merge pull request #9 from `feature/phase-15-competitor-clusters-runtime`
 - `e25fe42` Merge pull request #8 from `feature/phase-14-brand-positioning-runtime`
@@ -19,6 +24,15 @@ Recent runtime progression merges:
 - `1f54815` Merge pull request #5 from `feature/phase-12-cloud-config-fix`
 - `0404ef5` Merge pull request #4 from `feature/phase-12-cloud-hardening`
 - `8ad40d5` Merge pull request #3 from `feature/phase-12-executable-foundation`
+
+## Last confirmed end-to-end smoke test
+
+**Date:** 2026-04-07
+**Method:** Webhook POST via `scripts/run-orchestrator.js`
+**Input:** `test-data/golden-input.json` (project: `suppliedtech`)
+**Result:** `PHASE_5_COMPLETE` — HTTP 200, ~90s, cloud mode
+**Chain:** All 8 nodes succeeded (Webhook Trigger → Phase 5 Complete)
+**Artifacts returned:** `store_profile`, `market_intelligence`, `brand_positioning`, `competitor_clusters`, `strategy_synthesis`
 
 ## Current confirmed executable chain
 
@@ -294,6 +308,22 @@ OUTPUT
 ```
 
 ---
+
+## Input contract alignment
+
+The following `intake_payload` fields are validated at two layers:
+
+| Field | Validated in orchestrator | Enforced in subworkflow |
+|---|---|---|
+| `vertical` | `Validate Orchestrate Input` (enum) | `build-store-profile` |
+| `price_positioning` | `Validate Orchestrate Input` (enum) | `build-store-profile` |
+| `brand_style` | `Validate Orchestrate Input` (enum) | `build-brand-positioning` |
+| `brand_role` | `Validate Orchestrate Input` (enum) | `build-brand-positioning` (DIRECT field) |
+| `tone_of_voice` | `Validate Orchestrate Input` (enum) | `build-brand-positioning` (DIRECT field) |
+| `trust_style` | `Validate Orchestrate Input` (enum) | `build-brand-positioning` (DIRECT field) |
+| `conversion_style` | `Validate Orchestrate Input` (enum) | `build-brand-positioning` (DIRECT field) |
+
+DIRECT fields are passed through verbatim and override any LLM-generated values.
 
 ## Confirmed next planned runtime step
 
