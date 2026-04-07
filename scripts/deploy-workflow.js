@@ -103,7 +103,7 @@ async function main() {
 
   let rawJson = fs.readFileSync(jsonFile, 'utf8');
 
-  // Substitute REPLACE_WITH_* placeholders
+  // Substitute REPLACE_WITH_* placeholders (workflow IDs)
   let substitutions = 0;
   for (const [placeholder, workflowKey] of Object.entries(placeholderMap)) {
     const resolvedId = workflowIds[workflowKey];
@@ -118,6 +118,24 @@ async function main() {
       substitutions++;
     }
   }
+
+  // Substitute credential placeholders (from credential_placeholders section)
+  const credentialPlaceholders = idsManifest.credential_placeholders || {};
+  for (const [placeholder, info] of Object.entries(credentialPlaceholders)) {
+    if (placeholder.startsWith('_')) continue; // skip _note etc.
+    const credId = typeof info === 'object' ? info.value : String(info);
+    if (!credId || credId.startsWith('NOT_YET_RECORDED')) {
+      console.warn(`WARN: Credential placeholder ${placeholder} has no recorded value — skipping`);
+      continue;
+    }
+    const before = rawJson;
+    rawJson = rawJson.split(placeholder).join(credId);
+    if (rawJson !== before) {
+      console.log(`  Substituted credential: ${placeholder} → ${credId}`);
+      substitutions++;
+    }
+  }
+
   console.log(`\nSubstitutions applied: ${substitutions}`);
 
   // Parse, inject the correct workflow ID, and strip non-API fields
@@ -126,8 +144,8 @@ async function main() {
 
   // n8n API v1 PUT /workflows/{id} rejects any unknown top-level properties.
   // Strip store-os internal fields (_meta, etc.) before sending.
-  // id, active are read-only — managed by n8n, not sent in body
-  const API_ALLOWED_KEYS = new Set(['name', 'nodes', 'connections', 'settings', 'staticData', 'tags', 'pinData']);
+  // id, active, staticData, tags, pinData are not accepted by the PUT endpoint.
+  const API_ALLOWED_KEYS = new Set(['name', 'nodes', 'connections', 'settings']);
   for (const key of Object.keys(workflowJson)) {
     if (!API_ALLOWED_KEYS.has(key)) {
       console.log(`  Stripped non-API field: ${key}`);

@@ -521,6 +521,91 @@
         6500,
         300
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 \u2014 Bridge: Prepare build-offer-architecture input\n// Assembles the input payload for the build-offer-architecture subworkflow.\n// build-offer-architecture expects: project_id, strategy_synthesis,\n// brand_positioning, market_intelligence, normalized_intake_payload, runtime_config.\n//\n// strategy_synthesis flows from Phase 5 Complete (current $input).\n// brand_positioning, market_intelligence, normalized_intake_payload are sourced\n// from Prepare Strategy Synthesis Input (which had the full artifact context\n// before the Phase 5 subworkflow call consumed and returned only strategy_synthesis).\n\nconst phase5Output = $input.first().json;\nconst preSynthesis  = $node['Prepare Strategy Synthesis Input'].json;\n\nconst output = {\n  project_id:                phase5Output.project_id,\n  runtime_config:            phase5Output.runtime_config,\n  strategy_synthesis:        phase5Output.strategy_synthesis,\n  brand_positioning:         preSynthesis.brand_positioning || null,\n  market_intelligence:       preSynthesis.market_intelligence || null,\n  normalized_intake_payload: preSynthesis.normalized_intake_payload || null,\n};\n\nconsole.log('Prepare Offer Architecture Input: project=' + phase5Output.project_id +\n  ' strategy_synthesis=' + (phase5Output.strategy_synthesis ? 'present' : 'MISSING') +\n  ' brand_positioning=' + (output.brand_positioning ? 'present' : 'MISSING'));\n\nreturn [{ json: output }];\n"
+      },
+      "id": "f0a1b2c3-0006-0006-0006-000000000011",
+      "name": "Prepare Offer Architecture Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_WITH_BUILD_OFFER_ARCHITECTURE_WORKFLOW_ID",
+        "options": {}
+      },
+      "id": "f0a1b2c3-0006-0006-0006-000000000012",
+      "name": "Run build-offer-architecture",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        7000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "f0a1b2c3-cond-0006-0006-000000000001",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "SUCCESS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f0a1b2c3-0006-0006-0006-000000000013",
+      "name": "Offer Architecture Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        7250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 \u2014 Offer Architecture HALT\nconst input    = $input.first().json;\nconst errorMsg = `CHAIN_HALT: build-offer-architecture failed. Status: ${input.status}.`;\nconsole.error(errorMsg);\nthrow new Error(errorMsg);\n"
+      },
+      "id": "f0a1b2c3-0006-0006-0006-000000000014",
+      "name": "Halt - Offer Architecture Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7250,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 \u2014 Phase 6a Complete\n// build-offer-architecture succeeded. Forwards all artifacts inline.\n\nconst oaOutput  = $input.first().json;\nconst cloudMode = oaOutput.cloud_mode || false;\n\nconst summary = {\n  status:             'PHASE_6A_COMPLETE',\n  project_id:         oaOutput.project_id,\n  cloud_mode:         cloudMode,\n  offer_architecture: oaOutput.offer_architecture || null,\n  // Forward upstream artifacts for Phase 6b/7 chain\n  strategy_synthesis:         oaOutput.strategy_synthesis || null,\n  brand_positioning:           oaOutput.brand_positioning || null,\n  market_intelligence:         oaOutput.market_intelligence || null,\n  normalized_intake_payload:   oaOutput.normalized_intake_payload || null,\n  runtime_config:              oaOutput.runtime_config,\n  cloud_warnings:              oaOutput.cloud_warnings || [],\n  envelope:                    oaOutput.envelope || null,\n  next_phase: 'Phase 6b \u2014 Content Strategy (build-content-strategy)',\n};\n\nconst oa = oaOutput.offer_architecture || {};\nconst core = oa.core_offer || {};\nsummary.message = `Phase 6a complete for project: ${oaOutput.project_id} | offer: ${core.headline || 'no headline'} | bundles: ${(oa.bundle_opportunities||[]).length} | upsell paths: ${(oa.upsell_paths||[]).length}`;\n\nreturn [{ json: summary }];\n"
+      },
+      "id": "f0a1b2c3-0006-0006-0006-000000000015",
+      "name": "Phase 6a Complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7500,
+        300
+      ]
     }
   ],
   "connections": {
@@ -864,6 +949,57 @@
         [
           {
             "node": "Run intake-store-input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 5 Complete": {
+      "main": [
+        [
+          {
+            "node": "Prepare Offer Architecture Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Offer Architecture Input": {
+      "main": [
+        [
+          {
+            "node": "Run build-offer-architecture",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run build-offer-architecture": {
+      "main": [
+        [
+          {
+            "node": "Offer Architecture Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Offer Architecture Success?": {
+      "main": [
+        [
+          {
+            "node": "Phase 6a Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Halt - Offer Architecture Failed",
             "type": "main",
             "index": 0
           }
