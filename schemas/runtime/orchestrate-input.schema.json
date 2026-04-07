@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "store-os/orchestrate-input",
+  "title": "Orchestrate Phase 1 Input",
+  "description": "Input contract for the orchestrate-phase1 webhook and manual trigger. Defines the structure of intake_payload accepted by the full Phase 1–5 chain.",
+  "type": "object",
+  "required": ["intake_payload"],
+  "additionalProperties": false,
+  "properties": {
+    "intake_payload": {
+      "type": "object",
+      "description": "The store configuration payload. Drives all downstream planning phases.",
+      "required": ["project_id", "primary_market", "primary_language", "primary_currency", "vertical", "price_positioning"],
+      "additionalProperties": true,
+      "properties": {
+        "project_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9_-]{1,64}$",
+          "description": "Unique identifier for this store project. Lowercase, digits, hyphens, underscores. Used as directory name in self-hosted mode.",
+          "examples": ["suppliedtech", "my-store-de"]
+        },
+        "project_name": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "Human-readable store name used in generated content.",
+          "examples": ["SuppliedTech", "My Store"]
+        },
+        "primary_market": {
+          "type": "string",
+          "enum": ["DE", "AT", "CH", "DACH", "EU", "US", "UK", "Global"],
+          "description": "Primary geographic market for the store."
+        },
+        "target_markets": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["DE", "AT", "CH", "DACH", "EU", "US", "UK", "Global"] },
+          "description": "All markets the store will serve. Must include primary_market."
+        },
+        "primary_language": {
+          "type": "string",
+          "enum": ["de", "en", "fr", "it", "es"],
+          "description": "Primary content language (ISO 639-1)."
+        },
+        "languages": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["de", "en", "fr", "it", "es"] },
+          "description": "All supported languages. Must include primary_language."
+        },
+        "primary_currency": {
+          "type": "string",
+          "enum": ["EUR", "USD", "GBP", "CHF"],
+          "description": "Primary currency for pricing."
+        },
+        "currencies": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["EUR", "USD", "GBP", "CHF"] },
+          "description": "All accepted currencies."
+        },
+        "vertical": {
+          "type": "string",
+          "enum": ["consumer-tech-accessories", "fashion-textiles", "pet-products", "home-living", "fitness-accessories", "beauty", "general-commerce", "other"],
+          "description": "Product vertical. Drives market intelligence and competitor analysis."
+        },
+        "store_type": {
+          "type": "string",
+          "enum": ["single-brand-store", "multi-product-store", "category-specialist", "editorial-commerce-store", "other"],
+          "description": "Store format. Defaults to multi-product-store if omitted."
+        },
+        "business_model": {
+          "type": "string",
+          "enum": ["ecommerce", "dropshipping", "hybrid", "other"],
+          "description": "Operational business model. Defaults to ecommerce if omitted."
+        },
+        "price_positioning": {
+          "type": "string",
+          "enum": ["budget", "mass-market", "mass-premium", "premium", "luxury", "to-be-defined"],
+          "description": "Price tier positioning. Used to calibrate tone and competitor clustering."
+        },
+        "brand_style": {
+          "type": "string",
+          "enum": ["minimal", "bold", "editorial", "playful", "premium", "technical", "other"],
+          "description": "Visual and tone brand style direction. Used in brand positioning and design system phases."
+        },
+        "publish_mode": {
+          "type": "string",
+          "enum": ["no-publish", "draft-only", "draft-and-review"],
+          "description": "Controls whether generated content is auto-published to Shopify. Defaults to draft-and-review."
+        },
+        "seo_goal": {
+          "type": "string",
+          "description": "Primary SEO objective (e.g. 'visibility', 'conversion', 'local')."
+        },
+        "aeo_goal": {
+          "type": "string",
+          "description": "Answer engine optimization objective (e.g. 'answer-engine-ready', 'featured-snippet')."
+        },
+        "faq_intensity": {
+          "type": "string",
+          "enum": ["none", "low", "medium", "high"],
+          "description": "How aggressively to generate FAQ content."
+        },
+        "knowledge_content_priority": {
+          "type": "string",
+          "description": "Type of editorial content to prioritize (e.g. 'guides', 'comparisons', 'news')."
+        },
+        "competitor_urls": {
+          "type": "array",
+          "items": { "type": "string", "format": "uri" },
+          "maxItems": 10,
+          "description": "URLs of known competitor stores. Used in competitor cluster analysis."
+        },
+        "brand_role": {
+          "type": "string",
+          "enum": ["specialist", "curator", "problem-solver", "premium-innovator", "editorial-guide", "value-leader"],
+          "description": "Optional: The role the brand plays for the customer. Must match the enum enforced by build-brand-positioning."
+        },
+        "tone_of_voice": {
+          "type": "string",
+          "enum": ["clear-direct", "premium-confident", "warm-helpful", "editorial-smart", "playful-bold", "technical-trustworthy"],
+          "description": "Optional: Tone of voice style. Must match the enum enforced by build-brand-positioning (tone_of_voice.style)."
+        },
+        "trust_style": {
+          "type": "string",
+          "enum": ["evidence-led", "social-proof-led", "authority-led", "guarantee-led", "mixed"],
+          "description": "Optional: Trust proof mode. Must match the enum enforced by build-brand-positioning (trust_style.proof_mode)."
+        },
+        "conversion_style": {
+          "type": "string",
+          "enum": ["subtle", "balanced", "assertive"],
+          "description": "Optional: CTA style. Must match the enum enforced by build-brand-positioning (conversion_style.cta_style)."
+        },
+        "must_feel_like": {
+          "type": "string",
+          "description": "Optional: Free-text brand feel descriptor (positive direction)."
+        },
+        "must_not_feel_like": {
+          "type": "string",
+          "description": "Optional: Free-text brand feel descriptor (exclusion direction)."
+        },
+        "special_notes": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "Optional: Free-text notes passed to LLM synthesis phases as additional context."
+        }
+      }
+    },
+    "smoke_test_config": {
+      "type": "object",
+      "description": "Cloud-mode only: supply STORE_OS_* env vars inline when process.env is unavailable.",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

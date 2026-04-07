@@ -1,0 +1,47 @@
+{
+  "_meta": {
+    "description": "Golden path smoke-test input for the full Phase 1–5 chain via webhook.",
+    "usage": "node scripts/run-orchestrator.js --input test-data/golden-input.json",
+    "project": "suppliedtech",
+    "last_verified": "2026-04-07"
+  },
+  "intake_payload": {
+    "project_id": "suppliedtech",
+    "project_name": "SuppliedTech",
+    "primary_market": "DE",
+    "target_markets": ["DE", "AT", "CH"],
+    "primary_language": "de",
+    "languages": ["de", "en"],
+    "primary_currency": "EUR",
+    "currencies": ["EUR"],
+    "vertical": "general-commerce",
+    "store_type": "category-specialist",
+    "business_model": "ecommerce",
+    "price_positioning": "mass-premium",
+    "brand_style": "technical",
+    "publish_mode": "draft-and-review",
+    "seo_goal": "visibility",
+    "aeo_goal": "answer-engine-ready",
+    "faq_intensity": "high",
+    "knowledge_content_priority": "guides",
+    "competitor_urls": [
+      "https://www.otto.de/office",
+      "https://staples.de"
+    ],
+    "brand_role": "specialist",
+    "tone_of_voice": "technical-trustworthy",
+    "trust_style": "evidence-led",
+    "conversion_style": "balanced",
+    "must_feel_like": "professional, reliable, efficient",
+    "must_not_feel_like": "cheap, generic, consumer-oriented",
+    "special_notes": "Focus on SME customers. Emphasize fast delivery, bulk pricing, and account management."
+  },
+  "smoke_test_config": {
+    "STORE_OS_OPENAI_CREDENTIAL_NAME": "OpenAI store-os",
+    "STORE_OS_SHOPIFY_CREDENTIAL_NAME": "Shopify SuppliedTech Admin",
+    "STORE_OS_SHOPIFY_SHOP_URL": "8zw111-cj.myshopify.com",
+    "STORE_OS_LLM_MODEL": "gpt-4o-mini",
+    "STORE_OS_ENV": "dev",
+    "STORE_OS_SHOPIFY_API_VERSION": "2025-01"
+  }
+}

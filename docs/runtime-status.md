@@ -4,13 +4,18 @@
 
 Branch baseline:
 
-- `main`
+- `feature/phase-16-strategy-synthesis-runtime` (in progress — pending PR to `main`)
 
-Latest confirmed merge relevant to executable runtime progression:
+Latest commits (unmerged, branch tip):
+
+- `04c4bf3` fix: align brand-positioning direct-field enums with golden-input and validate node
+- `c254936` feat: webhook trigger, auth hardening, input validation, observability, Phase 6 schemas
+
+Latest confirmed merge on `main` relevant to executable runtime progression:
 
 - `633c80d` Merge pull request #10 from `feature/runtime-hardening-artifact-contracts` (Phase 16 hardening)
 
-Recent runtime progression merges:
+Recent runtime progression merges (on `main`):
 
 - `eff416f` Merge pull request #9 from `feature/phase-15-competitor-clusters-runtime`
 - `e25fe42` Merge pull request #8 from `feature/phase-14-brand-positioning-runtime`
@@ -20,9 +25,30 @@ Recent runtime progression merges:
 - `0404ef5` Merge pull request #4 from `feature/phase-12-cloud-hardening`
 - `8ad40d5` Merge pull request #3 from `feature/phase-12-executable-foundation`
 
+## Last confirmed end-to-end smoke test
+
+**Date:** 2026-04-07
+**Method:** Webhook POST via `scripts/run-orchestrator.js`
+**Input:** `test-data/golden-input.json` (project: `suppliedtech`)
+**Result:** `PHASE_6C_COMPLETE` — HTTP 200, ~83s, cloud mode
+**Chain:** All Phase 1–6c nodes succeeded (Webhook Trigger → Phase 6c Complete)
+**Artifacts returned:** `store_profile`, `market_intelligence`, `brand_positioning`, `competitor_clusters`, `strategy_synthesis`, `offer_architecture`, `content_strategy`, `gtm_plan`
+**GTM plan highlights:**
+- GTM narrative: "SuppliedTech's GTM plan focuses on positioning the store as the trusted partner for SMEs seeking high-quality tech solutions."
+- Launch phases: 3 | Channels: 2 (Organic Search/SEO, Email Marketing) | KPIs: 3
+
+Previous confirmed test (Phase 6b):
+**Date:** 2026-04-07 | **Result:** `PHASE_6B_COMPLETE` — HTTP 200, ~81-104s
+
+Previous confirmed test (Phase 6a):
+**Date:** 2026-04-07 | **Result:** `PHASE_6A_COMPLETE` — HTTP 200, ~77s
+
+Previous confirmed test (Phase 5):
+**Date:** 2026-04-07 | **Result:** `PHASE_5_COMPLETE` — HTTP 200, ~90s
+
 ## Current confirmed executable chain
 
-The currently confirmed n8n Cloud smoke-test path (post `feature/phase-16-strategy-synthesis-runtime`) is:
+The currently confirmed n8n Cloud smoke-test path (Phase 6c — 2026-04-07) is:
 
 - `resolve-runtime-config`
 - `intake-store-input`
@@ -31,7 +57,10 @@ The currently confirmed n8n Cloud smoke-test path (post `feature/phase-16-strate
 - `build-market-intelligence`
 - `build-brand-positioning`
 - `build-competitor-clusters`
-- `build-strategy-synthesis` ← **NEW** (Phase 16, `feature/phase-16-strategy-synthesis-runtime`)
+- `build-strategy-synthesis` (Phase 16)
+- `build-offer-architecture` (Phase 6a)
+- `build-content-strategy` (Phase 6b)
+- `build-gtm-plan` ← **NEW** (Phase 6c, `feature/phase-16-strategy-synthesis-runtime`)
 
 ## Current confirmed inline outputs
 
@@ -41,7 +70,10 @@ The chain currently returns these runtime artifacts inline in cloud mode:
 - `market_intelligence`
 - `brand_positioning`
 - `competitor_clusters`
-- `strategy_synthesis` ← **NEW**
+- `strategy_synthesis`
+- `offer_architecture`
+- `content_strategy`
+- `gtm_plan` ← **NEW**
 
 ## Runtime Hardening (Phase 16)
 
@@ -161,23 +193,191 @@ This phase adds the first cross-artifact synthesis phase to the chain: `build-st
 
 All changes are additive. No existing output keys were removed or renamed. Cloud smoke-test compatibility preserved.
 
+## System Hardening & Operationalization (post-Phase 16)
+
+Branch: `feature/phase-16-strategy-synthesis-runtime`
+
+These changes harden the system for production use and establish the API-ready interface.
+
+### What was added
+
+**Webhook trigger** (`orchestrate-phase1`):
+- Webhook Trigger node added alongside Manual Trigger (both feed into same chain)
+- Webhook URL: `POST https://luwai.app.n8n.cloud/webhook/orchestrate-phase1`
+- All 8 workflows activated in n8n
+
+**Webhook auth hardening**:
+- Bearer token check in `Resolve Runtime Config` node
+- Token: `STORE_OS_API_TOKEN` (n8n env var or `smoke_test_config`)
+- Manual Trigger path: auth skipped (backward compatible)
+- Webhook path: token required if `STORE_OS_API_TOKEN` is set
+
+**Input validation** (`Validate Orchestrate Input` node):
+- Inserted between `Resolve Runtime Config` and `Run intake-store-input`
+- Validates required fields, enum values, project_id format, competitor_urls
+- Returns `VALIDATION_ERROR` with structured error list on failure
+- New enum: `brand_style` (`minimal`, `bold`, `editorial`, `playful`, `premium`, `technical`, `other`)
+
+**Input contract schema**: `schemas/runtime/orchestrate-input.schema.json`
+
+**Golden test input**: `test-data/golden-input.json`
+
+**Observability** — Phase 5 Complete now returns:
+- `execution_id` (from `$execution.id`)
+- `started_at`, `completed_at`, `duration_ms`
+- `phase_receipt` (completion status per phase)
+- `output_summary` (enriched metrics)
+
+**Deploy automation** (`scripts/deploy-workflow.js`):
+- One-command deploy: `node scripts/deploy-workflow.js <workflow-name>`
+- Substitutes all `REPLACE_WITH_*` placeholders from `workflow-ids.json`
+- Strips n8n read-only fields (`id`, `active`, `_meta`) before PUT
+- Requires: `N8N_BASE_URL`, `N8N_API_KEY` in `.env`
+
+**API CLI wrapper** (`scripts/run-orchestrator.js`):
+- Sends POST to webhook with auth header
+- Loads payload from JSON file
+- Prints clean structured summary
+- Usage: `node scripts/run-orchestrator.js --input test-data/golden-input.json`
+
+**Workflow ID manifest** (`workflows/n8n/workflow-ids.json`):
+- Maps all 9 workflow names to live n8n IDs
+- Tracks credential placeholder locations
+- Documents `build-brand-positioning` canonical ID (`eUXnAlZ0gmv6qOhL`)
+
+**Phase 6 preparation**:
+- `schemas/phase-6/offer-architecture.schema.json`
+- `schemas/phase-6/content-strategy.schema.json`
+- `schemas/phase-6/gtm-plan.schema.json`
+- `docs/phase-6-architecture.md`
+
+---
+
+## How to call the system
+
+### Via webhook (API / programmatic)
+
+```bash
+curl -X POST https://luwai.app.n8n.cloud/webhook/orchestrate-phase1 \
+  -H "Authorization: Bearer <STORE_OS_API_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d @test-data/golden-input.json
+```
+
+### Via CLI wrapper
+
+```bash
+# Set in .env: N8N_BASE_URL, STORE_OS_API_TOKEN
+node scripts/run-orchestrator.js --input test-data/golden-input.json
+
+# Dry run (validate payload locally, no request):
+node scripts/run-orchestrator.js --input test-data/golden-input.json --dry-run
+
+# Silent (output raw JSON only):
+node scripts/run-orchestrator.js --input test-data/golden-input.json --silent
+```
+
+### Via Manual Trigger (n8n UI)
+
+Open `orchestrate-phase1` in n8n, paste input JSON, Execute.
+Auth check is skipped for manual trigger runs.
+
+### Deploy a workflow from repo to n8n
+
+```bash
+node scripts/deploy-workflow.js orchestrate-phase1
+node scripts/deploy-workflow.js build-strategy-synthesis
+```
+
+---
+
+## System Architecture (text diagram)
+
+```
+INPUT LAYER
+  Webhook POST  ──→  Authorization: Bearer <STORE_OS_API_TOKEN>
+  Manual Trigger ──→ (no auth required)
+  Payload: { intake_payload: {...}, smoke_test_config: {...} }
+      │
+      ▼
+orchestrate-phase1
+  Resolve Runtime Config     ← validates env vars + auth token
+      │
+  Validate Orchestrate Input ← fast-fail schema check
+      │
+  ┌── PHASE CHAIN ────────────────────────────────────────┐
+  │  intake-store-input → import-shopify-data             │
+  │  build-store-profile          (Phase 1)               │
+  │  build-market-intelligence    (Phase 2)               │
+  │  build-brand-positioning      (Phase 3)               │
+  │  build-competitor-clusters    (Phase 4)               │
+  │  build-strategy-synthesis     (Phase 5)               │
+  │  build-offer-architecture     (Phase 6a)              │
+  │  build-content-strategy       (Phase 6b)              │
+  │  build-gtm-plan               (Phase 6c) ← TERMINAL   │
+  └───────────────────────────────────────────────────────┘
+      │
+  Phase 6c Complete → returns inline artifacts + metadata
+      │
+OUTPUT
+  status, execution_id, completed_at
+  next_phase (Phase 7 — Store Build)
+  store_profile, market_intelligence, brand_positioning,
+  competitor_clusters, strategy_synthesis,
+  offer_architecture, content_strategy, gtm_plan
+  (all inline in cloud mode)
+```
+
+---
+
+## Input contract alignment
+
+The following `intake_payload` fields are validated at two layers:
+
+| Field | Validated in orchestrator | Enforced in subworkflow |
+|---|---|---|
+| `vertical` | `Validate Orchestrate Input` (enum) | `build-store-profile` |
+| `price_positioning` | `Validate Orchestrate Input` (enum) | `build-store-profile` |
+| `brand_style` | `Validate Orchestrate Input` (enum) | `build-brand-positioning` |
+| `brand_role` | `Validate Orchestrate Input` (enum) | `build-brand-positioning` (DIRECT field) |
+| `tone_of_voice` | `Validate Orchestrate Input` (enum) | `build-brand-positioning` (DIRECT field) |
+| `trust_style` | `Validate Orchestrate Input` (enum) | `build-brand-positioning` (DIRECT field) |
+| `conversion_style` | `Validate Orchestrate Input` (enum) | `build-brand-positioning` (DIRECT field) |
+
+DIRECT fields are passed through verbatim and override any LLM-generated values.
+
 ## Confirmed next planned runtime step
 
-Current in-progress branch:
+Next feature branch: **Phase 7 — Store Build**
 
-- `feature/phase-16-strategy-synthesis-runtime` — strategy synthesis phase (this branch)
+- `build-design-system` — visual identity tokens from brand_positioning + offer_architecture
+- `build-section-plan` — homepage + PDP section structure from content_strategy + gtm_plan
+- `build-product-content` — AI-generated product descriptions
+- `build-page-content` — editorial pages (About, FAQ, Blog)
+- `build-deployment-manifest` — Shopify theme deployment manifest
 
-After merge, next likely steps (Phase 6+):
+Phase 6 is **COMPLETE** — all three Phase 6 subworkflows (`build-offer-architecture`, `build-content-strategy`, `build-gtm-plan`) are deployed, activated, and end-to-end confirmed in cloud mode.
 
-- `build-offer-architecture` — uses growth_thesis, offer_implications, moat_hypotheses
-- `build-content-strategy` — uses messaging_priorities, gtm_implications, opportunity_priorities
-- `build-gtm-plan` — uses gtm_implications, opportunity_priorities, validation_questions
+See `docs/phase-6-architecture.md` for full input/output contracts and implementation checklist.
 
-## Operational warning
+---
 
-Always distinguish between:
+## Operational notes
 
-- repo state
-- n8n UI state
+**Deploy automation:**
+```bash
+node scripts/deploy-workflow.js orchestrate-phase1
+```
+Reads `workflows/n8n/workflow-ids.json`, substitutes placeholders, calls n8n REST API.
+Requires: `N8N_BASE_URL`, `N8N_API_KEY` in `.env`.
 
-A successful merge to `main` does not update the n8n UI automatically. Imported workflows, credentials, and workflow-ID wiring must still be synchronized manually in n8n Cloud.
+**Auth token setup:**
+1. Set `STORE_OS_API_TOKEN` in n8n Settings > Variables
+2. Add `STORE_OS_API_TOKEN=<your-token>` to `.env`
+3. All webhook calls must include `Authorization: Bearer <token>`
+
+**Always distinguish:**
+- **repo** = source of truth for workflow logic and JSON
+- **n8n** = execution layer only
+
+A successful git push does NOT update n8n. Always run `deploy-workflow.js` after pushing workflow JSON changes.

@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "store-os/content-strategy",
+  "title": "Content Strategy",
+  "description": "Output of build-content-strategy. Defines the editorial content plan, messaging hierarchy, and SEO/AEO content architecture derived from strategy_synthesis and offer_architecture.",
+  "type": "object",
+  "required": ["messaging_hierarchy", "content_pillars", "page_strategy", "seo_content_plan", "editorial_voice"],
+  "additionalProperties": true,
+  "properties": {
+    "messaging_hierarchy": {
+      "type": "object",
+      "description": "Top-down messaging framework.",
+      "required": ["primary_message", "supporting_messages"],
+      "properties": {
+        "primary_message": { "type": "string", "description": "The single most important message the store must communicate." },
+        "supporting_messages": { "type": "array", "items": { "type": "string" }, "minItems": 2, "description": "3–5 secondary messages that reinforce the primary." },
+        "proof_statements": { "type": "array", "items": { "type": "string" }, "description": "Concrete claims that validate the messaging." }
+      }
+    },
+    "content_pillars": {
+      "type": "array",
+      "description": "Core topic clusters that anchor the editorial strategy.",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["pillar", "rationale", "content_types"],
+        "properties": {
+          "pillar": { "type": "string", "description": "Topic pillar name." },
+          "rationale": { "type": "string", "description": "Why this pillar is strategically important." },
+          "content_types": { "type": "array", "items": { "type": "string" }, "description": "Content formats for this pillar (e.g. guide, comparison, FAQ)." },
+          "target_keywords": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "page_strategy": {
+      "type": "object",
+      "description": "Page-level content architecture.",
+      "properties": {
+        "homepage_angle": { "type": "string", "description": "Primary message and CTA direction for the homepage." },
+        "collection_page_strategy": { "type": "string" },
+        "product_page_strategy": { "type": "string" },
+        "blog_strategy": { "type": "string" },
+        "landing_page_priorities": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "seo_content_plan": {
+      "type": "object",
+      "description": "SEO and AEO content targets.",
+      "properties": {
+        "primary_keyword_clusters": { "type": "array", "items": { "type": "string" } },
+        "long_tail_priorities": { "type": "array", "items": { "type": "string" } },
+        "featured_snippet_targets": { "type": "array", "items": { "type": "string" } },
+        "faq_topic_clusters": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "editorial_voice": {
+      "type": "object",
+      "description": "Tone and style guidelines for all content.",
+      "required": ["tone", "style_rules"],
+      "properties": {
+        "tone": { "type": "string", "description": "Tone descriptor consistent with brand positioning." },
+        "style_rules": { "type": "array", "items": { "type": "string" }, "description": "Concrete writing rules (e.g. 'use second person', 'no passive voice')." },
+        "vocabulary": { "type": "object", "properties": { "use": { "type": "array", "items": { "type": "string" } }, "avoid": { "type": "array", "items": { "type": "string" } } } }
+      }
+    },
+    "content_gaps": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Known content areas not yet addressed."
+    },
+    "validation_questions": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "_meta": { "type": "object" }
+  }
+}

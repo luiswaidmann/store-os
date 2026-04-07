@@ -1,0 +1,159 @@
+{
+  "_meta": {
+    "workflow_name": "build-content-strategy",
+    "phase": "6b",
+    "description": "Phase 6b: Synthesises content strategy (messaging hierarchy, content pillars, page strategy, SEO plan, editorial voice) from offer_architecture + strategy_synthesis + brand_positioning.",
+    "version": "1.0.0",
+    "last_updated": "2026-04-07",
+    "placeholder_ids": [
+      "REPLACE_WITH_N8N_OPENAI_CREDENTIAL_ID"
+    ]
+  },
+  "name": "build-content-strategy",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "c5d6e7f8-0006-006b-006b-000000000001",
+      "name": "Subworkflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-content-strategy \u2014 Validate Upstream Inputs\n// Checks all required upstream artifacts are present and well-formed.\n//\n// CLOUD MODE: all data arrives inline via n8n pipeline. No filesystem access.\n\nlet cloudMode = false;\ntry { require('fs'); } catch (_e) { cloudMode = true; }\n\nconst input = $input.first().json;\nconst offerArchitecture  = input.offer_architecture;\nconst strategySynthesis  = input.strategy_synthesis;\nconst brandPositioning   = input.brand_positioning;\nconst marketIntelligence = input.market_intelligence;\nconst storeProfile       = input.store_profile;\nconst intakePayload      = input.normalized_intake_payload;\nconst runtimeConfig      = input.runtime_config;\nconst projectId          = input.project_id;\n\nif (!cloudMode && runtimeConfig && runtimeConfig.cloud_mode) cloudMode = true;\n\n// Required presence checks\nif (!offerArchitecture) {\n  throw new Error('MISSING_ARTIFACT: offer_architecture is required. Run build-offer-architecture first.');\n}\nif (!offerArchitecture.core_offer || !offerArchitecture.core_offer.headline) {\n  throw new Error('MISSING_ARTIFACT: offer_architecture.core_offer.headline is required.');\n}\nif (!offerArchitecture.offer_narrative) {\n  throw new Error('MISSING_ARTIFACT: offer_architecture.offer_narrative is required.');\n}\nif (!strategySynthesis) {\n  throw new Error('MISSING_ARTIFACT: strategy_synthesis is required. Run build-strategy-synthesis first.');\n}\nif (!strategySynthesis.positioning_focus) {\n  throw new Error('MISSING_ARTIFACT: strategy_synthesis.positioning_focus is required.');\n}\nif (!brandPositioning || !brandPositioning.value_proposition) {\n  throw new Error('MISSING_ARTIFACT: brand_positioning with value_proposition is required. Run build-brand-positioning first.');\n}\nif (!intakePayload) {\n  throw new Error('MISSING_ARTIFACT: normalized_intake_payload is required. Run intake-store-input first.');\n}\nif (!runtimeConfig) {\n  throw new Error('MISSING_RUNTIME_CONFIG: runtime_config is required.');\n}\nif (!projectId) {\n  throw new Error('MISSING_INPUT: project_id is required.');\n}\n\nconsole.log('build-content-strategy: inputs validated. cloud=' + cloudMode + ' project=' + projectId);\n\nreturn [{\n  json: {\n    project_id:                projectId,\n    runtime_config:            runtimeConfig,\n    offer_architecture:        offerArchitecture,\n    strategy_synthesis:        strategySynthesis,\n    brand_positioning:         brandPositioning,\n    market_intelligence:       marketIntelligence || null,\n    store_profile:             storeProfile || null,\n    normalized_intake_payload: intakePayload,\n    cloud_mode:                cloudMode,\n  },\n}];\n"
+      },
+      "id": "c5d6e7f8-0006-006b-006b-000000000002",
+      "name": "Validate Upstream Inputs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-content-strategy \u2014 Build LLM Synthesis Prompt\n// Extracts signals from offer_architecture + strategy_synthesis + brand_positioning\n// and assembles a structured prompt for content strategy generation.\n//\n// Evidence boundary: LLM inference from internal signals only.\n// All outputs are planning hypotheses requiring human verification.\n\nconst input     = $input.first().json;\nconst oa        = input.offer_architecture;\nconst ss        = input.strategy_synthesis;\nconst bp        = input.brand_positioning;\nconst mi        = input.market_intelligence || {};\nconst sp        = input.store_profile || {};\nconst ip        = input.normalized_intake_payload;\nconst cloudMode = input.cloud_mode || false;\n\n// \u2500\u2500\u2500 Extract Offer Architecture signals \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst coreOffer        = oa.core_offer || {};\nconst offerHeadline    = coreOffer.headline || '';\nconst offerVP          = coreOffer.value_proposition || '';\nconst targetBuyer      = coreOffer.target_buyer || '';\nconst proofPoints      = (coreOffer.proof_points || []).slice(0, 4);\nconst pricingTier      = (oa.pricing_logic || {}).tier || 'unknown';\nconst anchorStrategy   = (oa.pricing_logic || {}).anchor_strategy || '';\nconst bulkPricing      = (oa.pricing_logic || {}).bulk_pricing || false;\nconst offerNarrative   = oa.offer_narrative || '';\nconst bundles          = (oa.bundle_opportunities || []).slice(0, 3).map(function(b) {\n  return b.name + (b.rationale ? ': ' + b.rationale.slice(0, 100) : '');\n});\nconst offerGaps        = (oa.offer_gaps || []).slice(0, 3);\n\n// \u2500\u2500\u2500 Extract Strategy Synthesis signals \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst positioningFocus = ss.positioning_focus || {};\nconst posAngle         = typeof positioningFocus === 'string' ? positioningFocus\n  : (positioningFocus.primary_angle || JSON.stringify(positioningFocus));\nconst opportunities    = (ss.opportunity_priorities || []).slice(0, 3).map(function(o) {\n  return typeof o === 'string' ? o : (o.opportunity || JSON.stringify(o));\n});\nconst messagingPriorities = (ss.messaging_priorities || []).slice(0, 4);\nconst validationQs     = (ss.validation_questions || []).slice(0, 3).map(function(q) {\n  return typeof q === 'string' ? q : (q.question || JSON.stringify(q));\n});\n\n// \u2500\u2500\u2500 Extract Brand Positioning signals \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst brandRole        = bp.brand_role || 'specialist';\nconst valueProposition = bp.value_proposition || '';\nconst differentiators  = (bp.differentiators || []).slice(0, 4);\nconst brandTraits      = (bp.brand_traits || []).slice(0, 4);\nconst toneStyle        = (bp.tone_of_voice && bp.tone_of_voice.style) ? bp.tone_of_voice.style : 'technical-trustworthy';\nconst messagingPillars = (bp.messaging_pillars || []).slice(0, 3).map(function(p) {\n  return typeof p === 'string' ? p : (p.pillar_name + (p.description ? ': ' + p.description.slice(0, 80) : ''));\n});\nconst emotionalBenefits   = (bp.emotional_benefits || []).slice(0, 3);\nconst functionalBenefits  = (bp.functional_benefits || []).slice(0, 3);\n\n// \u2500\u2500\u2500 Extract intake signals \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst vertical          = ip.vertical || 'unknown';\nconst pricePositioning  = ip.price_positioning || 'unknown';\nconst primaryMarket     = ip.primary_market || 'DE';\nconst primaryLanguage   = ip.primary_language || 'de';\nconst projectName       = ip.project_name || ip.project_id || 'the store';\nconst seoGoal           = ip.seo_goal || 'visibility';\nconst aeoGoal           = ip.aeo_goal || null;\nconst faqIntensity      = ip.faq_intensity || 'medium';\nconst knowledgePriority = ip.knowledge_content_priority || null;\n\n// \u2500\u2500\u2500 Extract Market Intelligence signals (optional) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst audienceSegments  = (mi.audience_segments || []).slice(0, 3).map(function(s) {\n  return typeof s === 'string' ? s : ((s.segment_name || 'segment') + (s.description ? ': ' + String(s.description).slice(0, 80) : ''));\n});\nconst coreProblems      = (mi.core_problems || []).slice(0, 4).map(function(p) {\n  return typeof p === 'string' ? p : (p.problem || JSON.stringify(p));\n});\nconst trendSignals      = (mi.trend_signals || []).slice(0, 3);\nconst trustFactors      = (mi.trust_factors || []).slice(0, 3).map(function(t) {\n  return typeof t === 'string' ? t : (t.factor || JSON.stringify(t));\n});\n\n// \u2500\u2500\u2500 Build prompt \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst faqNote = faqIntensity === 'high'\n  ? 'FAQ content is HIGH priority \u2014 include substantial FAQ coverage in content pillars and page strategy.'\n  : faqIntensity === 'none' ? 'FAQ content is NOT required for this project.'\n  : 'Include moderate FAQ coverage as relevant.';\n\nconst prompt = [\n  'You are a senior content strategist building the content strategy for a new Shopify store.',\n  'Based on the offer architecture and strategic intelligence below, generate a structured content strategy.',\n  '',\n  '## Store Context',\n  'Project: ' + projectName,\n  'Vertical: ' + vertical,\n  'Price positioning: ' + pricePositioning,\n  'Primary market: ' + primaryMarket,\n  'Primary language: ' + primaryLanguage,\n  'SEO goal: ' + seoGoal,\n  aeoGoal ? 'AEO goal: ' + aeoGoal : '',\n  knowledgePriority ? 'Knowledge content priority: ' + knowledgePriority : '',\n  faqNote,\n  '',\n  '## Offer Architecture (Phase 6a Output)',\n  '### Core Offer',\n  'Headline: ' + offerHeadline,\n  'Value proposition: ' + offerVP,\n  'Target buyer: ' + targetBuyer,\n  proofPoints.length ? 'Proof points: ' + proofPoints.join(' | ') : '',\n  'Pricing tier: ' + pricingTier + (bulkPricing ? ' (bulk pricing available)' : ''),\n  anchorStrategy ? 'Anchor strategy: ' + anchorStrategy : '',\n  bundles.length ? 'Bundles: ' + bundles.join(' / ') : '',\n  '',\n  '### Offer Narrative',\n  offerNarrative,\n  '',\n  '## Strategic Intelligence',\n  '### Positioning Focus',\n  posAngle,\n  '',\n  '### Brand Value Proposition',\n  valueProposition,\n  '',\n  '### Brand Role & Tone',\n  'Brand role: ' + brandRole,\n  'Tone of voice: ' + toneStyle,\n  brandTraits.length ? 'Brand traits: ' + (brandTraits.map(function(t) { return typeof t === 'string' ? t : JSON.stringify(t); }).join(', ')) : '',\n  messagingPillars.length ? '### Messaging Pillars\\n' + messagingPillars.map(function(p) { return '- ' + p; }).join('\\n') : '',\n  '',\n  opportunities.length ? '### Strategic Opportunities\\n' + opportunities.map(function(o, i) { return (i+1) + '. ' + o; }).join('\\n') : '',\n  coreProblems.length ? '### Customer Problems to Address\\n' + coreProblems.map(function(p) { return '- ' + p; }).join('\\n') : '',\n  audienceSegments.length ? '### Audience Segments\\n' + audienceSegments.map(function(s) { return '- ' + s; }).join('\\n') : '',\n  trustFactors.length ? '### Trust Factors\\n' + trustFactors.map(function(t) { return '- ' + t; }).join('\\n') : '',\n  emotionalBenefits.length ? '### Emotional Benefits\\n' + emotionalBenefits.map(function(b) { return '- ' + (typeof b === 'string' ? b : JSON.stringify(b)); }).join('\\n') : '',\n  differentiators.length ? '### Differentiators\\n' + differentiators.map(function(d) { return '- ' + (typeof d === 'string' ? d : JSON.stringify(d)); }).join('\\n') : '',\n  trendSignals.length ? '### Trend Signals\\n' + trendSignals.map(function(t) { return '- ' + (typeof t === 'string' ? t : JSON.stringify(t)); }).join('\\n') : '',\n  validationQs.length ? '### Open Validation Questions\\n' + validationQs.map(function(q) { return '- ' + q; }).join('\\n') : '',\n  offerGaps.length ? '### Offer Gaps to Address in Content\\n' + offerGaps.map(function(g) { return '- ' + g; }).join('\\n') : '',\n  '',\n  '## Output Requirements',\n  'Return a JSON object with exactly this structure (no markdown fences, pure JSON):',\n  '{',\n  '  \"messaging_hierarchy\": {',\n  '    \"primary_message\": \"The single most important message the store must communicate\",',\n  '    \"supporting_messages\": [\"Message 2\", \"Message 3\", \"Message 4\"],',\n  '    \"proof_statements\": [\"Concrete claim 1\", \"Concrete claim 2\"]',\n  '  },',\n  '  \"content_pillars\": [',\n  '    {',\n  '      \"pillar\": \"Pillar topic name\",',\n  '      \"rationale\": \"Why strategically important\",',\n  '      \"content_types\": [\"guide\", \"comparison\", \"FAQ\"],',\n  '      \"target_keywords\": [\"keyword 1\", \"keyword 2\"]',\n  '    }',\n  '  ],',\n  '  \"page_strategy\": {',\n  '    \"homepage_angle\": \"Primary message and CTA direction for the homepage\",',\n  '    \"collection_page_strategy\": \"How collection pages should be written and structured\",',\n  '    \"product_page_strategy\": \"Product page tone, proof point usage, and CTA approach\",',\n  '    \"blog_strategy\": \"Editorial direction for blog/knowledge content\",',\n  '    \"landing_page_priorities\": [\"Priority landing page 1\", \"Priority landing page 2\"]',\n  '  },',\n  '  \"seo_content_plan\": {',\n  '    \"primary_keyword_clusters\": [\"cluster 1\", \"cluster 2\"],',\n  '    \"long_tail_priorities\": [\"long-tail phrase 1\", \"long-tail phrase 2\"],',\n  '    \"featured_snippet_targets\": [\"question to target 1\"],',\n  '    \"faq_topic_clusters\": [\"FAQ cluster 1\", \"FAQ cluster 2\"]',\n  '  },',\n  '  \"editorial_voice\": {',\n  '    \"tone\": \"Tone descriptor consistent with brand\",',\n  '    \"style_rules\": [\"Rule 1 (e.g. use second person)\", \"Rule 2\", \"Rule 3\"],',\n  '    \"vocabulary\": {',\n  '      \"use\": [\"word/phrase to use\"],',\n  '      \"avoid\": [\"word/phrase to avoid\"]',\n  '    }',\n  '  },',\n  '  \"content_gaps\": [\"Gap or missing content area\"],',\n  '  \"validation_questions\": [\"Question needing merchant input before content creation\"]',\n  '}',\n  '',\n  'Rules:',\n  '- content_pillars: minimum 2, maximum 6',\n  '- messaging_hierarchy.supporting_messages: exactly 3\u20135 items',\n  '- messaging_hierarchy.proof_statements: at least 2 items',\n  '- editorial_voice.style_rules: at least 3 concrete rules',\n  '- All content grounded in the offer architecture and strategic intelligence above',\n  '- Primary message and editorial voice MUST be consistent with tone: ' + toneStyle,\n  '- Return pure JSON only \u2014 no markdown fences, no commentary outside the JSON',\n].filter(function(l) { return l !== null && l !== undefined; }).join('\\n');\n\nreturn [{\n  json: {\n    llm_prompt:                prompt,\n    project_id:                input.project_id,\n    runtime_config:            input.runtime_config,\n    offer_architecture:        oa,\n    strategy_synthesis:        ss,\n    brand_positioning:         bp,\n    market_intelligence:       mi,\n    store_profile:             sp,\n    normalized_intake_payload: ip,\n    cloud_mode:                cloudMode,\n    tone_style:                toneStyle,\n  },\n}];\n"
+      },
+      "id": "c5d6e7f8-0006-006b-006b-000000000003",
+      "name": "Build LLM Synthesis Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "complete",
+        "chatModel": "gpt-4o",
+        "prompt": {
+          "messages": [
+            {
+              "role": "user",
+              "content": "={{ $json.llm_prompt }}"
+            }
+          ]
+        },
+        "simplifyOutput": true,
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 3500
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_N8N_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI account"
+        }
+      },
+      "id": "c5d6e7f8-0006-006b-006b-000000000004",
+      "name": "LLM Synthesis: Content Strategy",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-content-strategy \u2014 Parse, Validate, and Write\n//\n// Steps:\n//   1. Parse LLM JSON object response\n//   2. Inline schema validation (required fields, structure checks)\n//   3. Return content_strategy inline with runtime envelope\n//\n// CLOUD MODE: fully compatible. No AJV, no filesystem write.\n\nfunction buildRunId() {\n  const ts = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);\n  const rand = Math.random().toString(36).slice(2, 6);\n  return 'run-' + ts + '-' + rand;\n}\n\nlet cloudMode = false;\ntry { require('fs'); } catch (_e) { cloudMode = true; }\n\nconst llmOutput = $input.first().json;\nconst upstream  = $node['Build LLM Synthesis Prompt'].json;\n\nif (!cloudMode && upstream.cloud_mode) cloudMode = true;\nif (!cloudMode && upstream.runtime_config && upstream.runtime_config.cloud_mode) cloudMode = true;\n\nconst projectId        = upstream.project_id;\nconst runtimeConfig    = upstream.runtime_config;\nconst offerArchitecture = upstream.offer_architecture;\nconst toneStyle         = upstream.tone_style || 'technical-trustworthy';\n\n// \u2500\u2500\u2500 Step 1: Parse LLM response \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst rawText = (llmOutput.message && llmOutput.message.content)\n  ? llmOutput.message.content\n  : (typeof llmOutput === 'string' ? llmOutput : JSON.stringify(llmOutput));\n\nlet contentStrategy;\ntry {\n  let cleaned = rawText.trim();\n  if (cleaned.startsWith('```')) {\n    cleaned = cleaned.replace(/^```(?:json)?\\s*/i, '').replace(/\\s*```$/, '').trim();\n  }\n  const parsed = JSON.parse(cleaned);\n  if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {\n    contentStrategy = parsed;\n  } else {\n    throw new Error('Expected a JSON object at root, got: ' + typeof parsed);\n  }\n} catch (err) {\n  throw new Error(\n    'LLM_PARSE_ERROR: Failed to parse LLM response as JSON object: ' + err.message +\n    '. Raw response (first 500 chars): ' + String(rawText).slice(0, 500)\n  );\n}\n\n// \u2500\u2500\u2500 Step 2: Inline schema validation \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst cloudWarnings = [];\n\n// Required top-level fields\nconst REQUIRED = ['messaging_hierarchy', 'content_pillars', 'page_strategy', 'seo_content_plan', 'editorial_voice'];\nfor (const f of REQUIRED) {\n  if (!contentStrategy[f]) {\n    throw new Error('SCHEMA_VIOLATION: content_strategy.' + f + ' is required.');\n  }\n}\n\n// messaging_hierarchy\nconst mh = contentStrategy.messaging_hierarchy;\nif (!mh.primary_message) {\n  throw new Error('SCHEMA_VIOLATION: messaging_hierarchy.primary_message is required.');\n}\nif (!Array.isArray(mh.supporting_messages) || mh.supporting_messages.length < 2) {\n  throw new Error('SCHEMA_VIOLATION: messaging_hierarchy.supporting_messages must have at least 2 items.');\n}\nif (!Array.isArray(mh.proof_statements) || mh.proof_statements.length < 2) {\n  throw new Error('SCHEMA_VIOLATION: messaging_hierarchy.proof_statements must have at least 2 items.');\n}\n\n// content_pillars\nif (!Array.isArray(contentStrategy.content_pillars) || contentStrategy.content_pillars.length < 2) {\n  throw new Error('SCHEMA_VIOLATION: content_pillars must be an array with at least 2 items.');\n}\nfor (let i = 0; i < contentStrategy.content_pillars.length; i++) {\n  const p = contentStrategy.content_pillars[i];\n  if (!p.pillar || !p.rationale) {\n    throw new Error('SCHEMA_VIOLATION: content_pillars[' + i + '] must have pillar and rationale.');\n  }\n  if (!Array.isArray(p.content_types) || p.content_types.length === 0) {\n    throw new Error('SCHEMA_VIOLATION: content_pillars[' + i + '].content_types must be a non-empty array.');\n  }\n}\n\n// page_strategy\nconst ps = contentStrategy.page_strategy;\nif (!ps.homepage_angle) {\n  throw new Error('SCHEMA_VIOLATION: page_strategy.homepage_angle is required.');\n}\n\n// editorial_voice\nconst ev = contentStrategy.editorial_voice;\nif (!ev.tone) {\n  throw new Error('SCHEMA_VIOLATION: editorial_voice.tone is required.');\n}\nif (!Array.isArray(ev.style_rules) || ev.style_rules.length < 2) {\n  throw new Error('SCHEMA_VIOLATION: editorial_voice.style_rules must have at least 2 items.');\n}\n\n// \u2500\u2500\u2500 Step 3: Build runtime envelope \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst runId       = buildRunId();\nconst executionTs = new Date().toISOString();\n\nconst outputSummary = {\n  pillar_count:           contentStrategy.content_pillars.length,\n  supporting_message_count: mh.supporting_messages.length,\n  proof_statement_count:  mh.proof_statements.length,\n  style_rule_count:       ev.style_rules.length,\n  primary_keyword_cluster_count: (contentStrategy.seo_content_plan.primary_keyword_clusters || []).length,\n  faq_cluster_count:      (contentStrategy.seo_content_plan.faq_topic_clusters || []).length,\n  content_gap_count:      (contentStrategy.content_gaps || []).length,\n  editorial_tone:         ev.tone,\n};\n\nconst envelope = {\n  run_id:     runId,\n  phase:      'content-strategy',\n  project_id: projectId,\n  timestamp:  executionTs,\n  cloud_mode: cloudMode,\n  validation: {\n    result:    'PASS',\n    errors:    [],\n    warnings:  cloudWarnings,\n  },\n  diagnostics: {\n    output_summary: outputSummary,\n  },\n  lineage: {\n    depends_on: ['build-offer-architecture', 'build-strategy-synthesis', 'build-brand-positioning'],\n    produced_by: 'build-content-strategy',\n  },\n};\n\nreturn [{\n  json: {\n    project_id:       projectId,\n    artifact_name:    'content-strategy',\n    artifact_path:    null,\n    content_strategy: contentStrategy,\n    runtime_config:   runtimeConfig,\n    status:           'SUCCESS',\n    cloud_mode:       cloudMode,\n    cloud_warnings:   cloudWarnings,\n    notes:            [],\n    envelope:         envelope,\n  },\n}];\n"
+      },
+      "id": "c5d6e7f8-0006-006b-006b-000000000005",
+      "name": "Parse Validate Write",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Subworkflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Upstream Inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Upstream Inputs": {
+      "main": [
+        [
+          {
+            "node": "Build LLM Synthesis Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build LLM Synthesis Prompt": {
+      "main": [
+        [
+          {
+            "node": "LLM Synthesis: Content Strategy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Synthesis: Content Strategy": {
+      "main": [
+        [
+          {
+            "node": "Parse Validate Write",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "any"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "store-os"
+    },
+    {
+      "name": "phase-6"
+    }
+  ],
+  "pinData": {}
+}

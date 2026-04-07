@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "store-os/offer-architecture",
+  "title": "Offer Architecture",
+  "description": "Output of build-offer-architecture. Defines the product offer structure, pricing logic, and bundling strategy derived from strategy_synthesis.",
+  "type": "object",
+  "required": ["core_offer", "pricing_logic", "bundle_opportunities", "upsell_paths", "offer_narrative"],
+  "additionalProperties": true,
+  "properties": {
+    "core_offer": {
+      "type": "object",
+      "description": "Primary product/service offer definition.",
+      "required": ["headline", "value_proposition", "target_buyer"],
+      "properties": {
+        "headline": { "type": "string", "description": "One-line offer statement." },
+        "value_proposition": { "type": "string", "description": "Why this offer wins for the target buyer." },
+        "target_buyer": { "type": "string", "description": "Specific buyer persona or segment." },
+        "proof_points": { "type": "array", "items": { "type": "string" }, "description": "Evidence or signals that back the value proposition." }
+      }
+    },
+    "pricing_logic": {
+      "type": "object",
+      "description": "Pricing architecture and positioning rules.",
+      "required": ["tier", "anchor_strategy"],
+      "properties": {
+        "tier": { "type": "string", "enum": ["budget", "mass-market", "mass-premium", "premium", "luxury"], "description": "Price tier consistent with intake_payload.price_positioning." },
+        "anchor_strategy": { "type": "string", "description": "How price anchoring is used (e.g. 'bundle discount as anchor')." },
+        "price_range_signal": { "type": "string", "description": "Indicative price range language for the category." },
+        "bulk_pricing": { "type": "boolean", "description": "Whether bulk/volume pricing is part of the offer." },
+        "subscription_model": { "type": "boolean", "description": "Whether a subscription/repeat-purchase model applies." }
+      }
+    },
+    "bundle_opportunities": {
+      "type": "array",
+      "description": "Recommended product bundle combinations.",
+      "items": {
+        "type": "object",
+        "required": ["name", "rationale"],
+        "properties": {
+          "name": { "type": "string" },
+          "rationale": { "type": "string" },
+          "components": { "type": "array", "items": { "type": "string" } },
+          "estimated_uplift": { "type": "string" }
+        }
+      }
+    },
+    "upsell_paths": {
+      "type": "array",
+      "description": "Recommended upsell and cross-sell flows.",
+      "items": {
+        "type": "object",
+        "required": ["from", "to", "trigger"],
+        "properties": {
+          "from": { "type": "string", "description": "Entry product/category." },
+          "to": { "type": "string", "description": "Upsell target." },
+          "trigger": { "type": "string", "description": "When/why this upsell is shown." }
+        }
+      }
+    },
+    "offer_narrative": {
+      "type": "string",
+      "description": "1–3 paragraph narrative synthesising the offer architecture for content and GTM use."
+    },
+    "offer_gaps": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Known gaps in the current offer that need to be addressed."
+    },
+    "validation_questions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Open questions requiring merchant validation before launch."
+    },
+    "_meta": {
+      "type": "object",
+      "description": "Runtime artifact metadata (provenance, run_id, phase)."
+    }
+  }
+}
