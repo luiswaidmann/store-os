@@ -776,6 +776,91 @@
         9500,
         300
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 \u2014 Prepare Store Blueprint Input\n// Assembles Phase 7A input from Phase 6c Complete + upstream artifact refs.\n// Subworkflows do NOT forward upstream artifacts \u2014 source them explicitly.\n\nconst phase6cOutput = $input.first().json;\nconst phase5Out     = $node['Phase 5 Complete'].json;\nconst phase6aOut    = $node['Phase 6a Complete'].json;\nconst phase6bOut    = $node['Phase 6b Complete'].json;\nconst preSynth      = $node['Prepare Strategy Synthesis Input'].json;\n\nconst output = {\n  project_id:        phase6cOutput.project_id  || preSynth.project_id,\n  runtime_config:    phase6cOutput.runtime_config || preSynth.runtime_config,\n  strategy_synthesis: phase5Out.strategy_synthesis || null,\n  offer_architecture: phase6aOut.offer_architecture || null,\n  content_strategy:   phase6bOut.content_strategy  || null,\n  gtm_plan:           phase6cOutput.gtm_plan        || null,\n};\n\nif (!output.strategy_synthesis) {\n  throw new Error('Prepare Store Blueprint Input: strategy_synthesis missing from Phase 5 Complete output.');\n}\nif (!output.offer_architecture) {\n  throw new Error('Prepare Store Blueprint Input: offer_architecture missing from Phase 6a Complete output.');\n}\nif (!output.content_strategy) {\n  throw new Error('Prepare Store Blueprint Input: content_strategy missing from Phase 6b Complete output.');\n}\nif (!output.gtm_plan) {\n  throw new Error('Prepare Store Blueprint Input: gtm_plan missing from Phase 6c Complete output.');\n}\n\nconsole.log('Prepare Store Blueprint Input: assembled for project=' + output.project_id);\nreturn [{ json: output }];\n"
+      },
+      "id": "f2a3b4c5-0007-007a-007a-000000000011",
+      "name": "Prepare Store Blueprint Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_WITH_BUILD_STORE_BLUEPRINT_WORKFLOW_ID",
+        "options": {}
+      },
+      "id": "f2a3b4c5-0007-007a-007a-000000000012",
+      "name": "Run build-store-blueprint",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        10000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "f2a3b4c5-cond-007a-007a-000000000001",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "SUCCESS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f2a3b4c5-0007-007a-007a-000000000013",
+      "name": "Store Blueprint Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        10250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "throw new Error('Phase 7A FAILED \u2014 Store Blueprint synthesis did not return a valid store_blueprint artifact. Check build-store-blueprint execution log.');"
+      },
+      "id": "f2a3b4c5-0007-007a-007a-000000000014",
+      "name": "Halt - Store Blueprint Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10250,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Phase 7A Complete \u2014 Store Blueprint\n// Returns full Phase 1-7A artifact chain inline for cloud smoke-test validation.\n\nconst sbOutput  = $input.first().json;\nconst phase5Out = $node['Phase 5 Complete'].json;\nconst phase6aOut = $node['Phase 6a Complete'].json;\nconst phase6bOut = $node['Phase 6b Complete'].json;\nconst phase6cOut = $node['Phase 6c Complete'].json;\nconst preSynth  = $node['Prepare Strategy Synthesis Input'].json;\n\nconst storeProfile       = preSynth.store_profile        || null;\nconst marketIntelligence = preSynth.market_intelligence   || null;\nconst brandPositioning   = preSynth.brand_positioning     || null;\nconst competitorClusters = preSynth.competitor_clusters   || null;\nconst strategySynthesis  = phase5Out.strategy_synthesis   || null;\nconst offerArchitecture  = phase6aOut.offer_architecture  || null;\nconst contentStrategy    = phase6bOut.content_strategy    || null;\nconst gtmPlan            = phase6cOut.gtm_plan            || null;\nconst storeBlueprint     = sbOutput.store_blueprint       || null;\n\nconst runtimeConfig = sbOutput.runtime_config || {};\nconst projectId     = sbOutput.project_id || runtimeConfig.project_id || null;\nconst cloudMode     = sbOutput.cloud_mode !== undefined ? sbOutput.cloud_mode : true;\n\nconst sb = storeBlueprint || {};\nconst summary = {\n  status:              'PHASE_7A_COMPLETE',\n  project_id:          projectId,\n  cloud_mode:          cloudMode,\n  execution_id:        $execution.id,\n  completed_at:        new Date().toISOString(),\n  next_phase:          'Phase 7B \u2014 Store Build (Shopify API deployment)',\n\n  // Full artifact chain\n  store_profile:        storeProfile,\n  market_intelligence:  marketIntelligence,\n  brand_positioning:    brandPositioning,\n  competitor_clusters:  competitorClusters,\n  strategy_synthesis:   strategySynthesis,\n  offer_architecture:   offerArchitecture,\n  content_strategy:     contentStrategy,\n  gtm_plan:             gtmPlan,\n  store_blueprint:      storeBlueprint,\n\n  // Blueprint summary for observability\n  blueprint_summary: {\n    products_count:       (sb.products       || []).length,\n    collections_count:    (sb.collections    || []).length,\n    pages_count:          (sb.pages          || []).length,\n    navigation_menus:     (sb.navigation     || []).length,\n    theme_sections_count: (sb.theme_sections || []).length,\n    assets_count:         (sb.assets         || []).length,\n  },\n\n  runtime_config:       runtimeConfig,\n};\n\nreturn [{ json: summary }];\n"
+      },
+      "id": "f2a3b4c5-0007-007a-007a-000000000015",
+      "name": "Phase 7A Complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10500,
+        300
+      ]
     }
   ],
   "connections": {
@@ -1272,6 +1357,57 @@
         [
           {
             "node": "Halt - GTM Plan Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 6c Complete": {
+      "main": [
+        [
+          {
+            "node": "Prepare Store Blueprint Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Store Blueprint Input": {
+      "main": [
+        [
+          {
+            "node": "Run build-store-blueprint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run build-store-blueprint": {
+      "main": [
+        [
+          {
+            "node": "Store Blueprint Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Blueprint Success?": {
+      "main": [
+        [
+          {
+            "node": "Phase 7A Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Halt - Store Blueprint Failed",
             "type": "main",
             "index": 0
           }

@@ -1,0 +1,139 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "store-blueprint",
+  "title": "Store Blueprint",
+  "description": "Phase 7A output — structured Shopify store plan synthesised from all upstream strategy artifacts. Pure planning artifact; no Shopify API calls.",
+  "type": "object",
+  "required": [
+    "products",
+    "collections",
+    "pages",
+    "navigation",
+    "theme_sections",
+    "assets"
+  ],
+  "properties": {
+    "products": {
+      "type": "array",
+      "description": "Planned product listings with titles, types, pricing hints, and positioning notes.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["title", "product_type"],
+        "properties": {
+          "title":          { "type": "string", "description": "Product title" },
+          "product_type":   { "type": "string", "description": "Shopify product type" },
+          "handle":         { "type": "string", "description": "URL handle (slug)" },
+          "description_hint": { "type": "string", "description": "Brief positioning note for AI copy generation" },
+          "price_range":    { "type": "string", "description": "Expected price range or tier" },
+          "tags":           { "type": "array", "items": { "type": "string" } },
+          "collections":    { "type": "array", "items": { "type": "string" }, "description": "Collection handles this product belongs to" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "collections": {
+      "type": "array",
+      "description": "Shopify collection plan — each with a handle, title, and SEO/positioning rationale.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["handle", "title"],
+        "properties": {
+          "handle":       { "type": "string" },
+          "title":        { "type": "string" },
+          "description":  { "type": "string" },
+          "seo_rationale": { "type": "string", "description": "Why this collection exists from an SEO or merchandising perspective" },
+          "sort_order":   { "type": "string", "enum": ["best-selling", "manual", "created-desc", "price-asc", "price-desc", "alpha-asc", "alpha-desc"] }
+        },
+        "additionalProperties": false
+      }
+    },
+    "pages": {
+      "type": "array",
+      "description": "Store pages (e.g. About, FAQ, Contact, Blog) with purpose and content direction.",
+      "items": {
+        "type": "object",
+        "required": ["handle", "title", "purpose"],
+        "properties": {
+          "handle":    { "type": "string" },
+          "title":     { "type": "string" },
+          "purpose":   { "type": "string", "description": "Why this page exists and what it achieves" },
+          "content_direction": { "type": "string", "description": "Key messages and tone direction for copywriting" },
+          "seo_focus": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "navigation": {
+      "type": "array",
+      "description": "Navigation menus (main, footer) with ordered link structures.",
+      "items": {
+        "type": "object",
+        "required": ["menu_handle", "title", "items"],
+        "properties": {
+          "menu_handle": { "type": "string" },
+          "title":       { "type": "string" },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["label", "link_type"],
+              "properties": {
+                "label":     { "type": "string" },
+                "link_type": { "type": "string", "enum": ["collection", "page", "product", "blog", "url", "search"] },
+                "target":    { "type": "string", "description": "Handle or URL this link points to" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "theme_sections": {
+      "type": "array",
+      "description": "Homepage and key landing page section plan — section types, order, and content direction.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["page", "section_type", "order"],
+        "properties": {
+          "page":            { "type": "string", "description": "Page this section belongs to (e.g. homepage, collection)" },
+          "section_type":    { "type": "string", "description": "Shopify theme section type (e.g. hero, featured-collection, testimonials)" },
+          "order":           { "type": "integer", "description": "Display order on the page" },
+          "heading_hint":    { "type": "string", "description": "Suggested heading or label" },
+          "content_hint":    { "type": "string", "description": "Content/copy direction for this section" },
+          "cta_label":       { "type": "string" },
+          "cta_target":      { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "assets": {
+      "type": "array",
+      "description": "Brand and visual assets required — logos, banners, images — with specifications and purpose.",
+      "items": {
+        "type": "object",
+        "required": ["asset_type", "purpose"],
+        "properties": {
+          "asset_type": { "type": "string", "enum": ["logo", "favicon", "hero-image", "collection-banner", "product-image", "icon", "background", "other"] },
+          "purpose":    { "type": "string" },
+          "dimensions": { "type": "string", "description": "Recommended pixel dimensions (e.g. 1920x600)" },
+          "notes":      { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "blueprint_narrative": {
+      "type": "string",
+      "description": "Executive summary of the store blueprint — what the store structure achieves and why."
+    },
+    "open_questions": {
+      "type": "array",
+      "description": "Unresolved decisions requiring merchant input before build.",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

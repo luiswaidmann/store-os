@@ -5,7 +5,7 @@
  * CLI wrapper for the store-os orchestration webhook.
  * Sends a POST to orchestrate-phase1, attaches the Bearer auth token,
  * and prints a clean structured summary of the run result.
- * Recognises terminal statuses: PHASE_5_COMPLETE, PHASE_6A_COMPLETE, PHASE_6B_COMPLETE, PHASE_6C_COMPLETE.
+ * Recognises terminal statuses: PHASE_5_COMPLETE, PHASE_6A_COMPLETE, PHASE_6B_COMPLETE, PHASE_6C_COMPLETE, PHASE_7A_COMPLETE.
  *
  * Usage:
  *   node scripts/run-orchestrator.js --input <json-file>
@@ -108,7 +108,7 @@ function printSummary(result, startedAt, endedAt) {
     return;
   }
 
-  const TERMINAL_STATUSES = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE', 'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE']);
+  const TERMINAL_STATUSES = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE', 'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE']);
   const isSuccess = TERMINAL_STATUSES.has(d.status) && result.status >= 200 && result.status < 300;
   const isError   = !isSuccess;
 
@@ -192,6 +192,22 @@ function printSummary(result, startedAt, endedAt) {
     console.log(`    kpis:            ${kpis.length}`);
   }
 
+  if (d.store_blueprint || d.blueprint_summary) {
+    const bs = d.blueprint_summary || {};
+    const sb = d.store_blueprint || {};
+    console.log('');
+    console.log('  STORE BLUEPRINT:');
+    const narrative = sb.blueprint_narrative
+      ? String(sb.blueprint_narrative).slice(0, 160) + (sb.blueprint_narrative.length > 160 ? '…' : '')
+      : '—';
+    console.log(`    blueprint_narrative: ${narrative}`);
+    console.log(`    products:            ${bs.products_count       ?? (sb.products       || []).length}`);
+    console.log(`    collections:         ${bs.collections_count    ?? (sb.collections    || []).length}`);
+    console.log(`    pages:               ${bs.pages_count          ?? (sb.pages          || []).length}`);
+    console.log(`    theme_sections:      ${bs.theme_sections_count ?? (sb.theme_sections || []).length}`);
+    console.log(`    assets:              ${bs.assets_count         ?? (sb.assets         || []).length}`);
+  }
+
   if (d.next_phase) {
     console.log('');
     console.log(`  NEXT PHASE:  ${d.next_phase}`);
@@ -204,7 +220,8 @@ function printSummary(result, startedAt, endedAt) {
 
   console.log('');
   if (isSuccess) {
-    const chainDesc = d.status === 'PHASE_6C_COMPLETE' ? 'Phase 1–6c chain finished.'
+    const chainDesc = d.status === 'PHASE_7A_COMPLETE' ? 'Phase 1–7A chain finished.'
+      : d.status === 'PHASE_6C_COMPLETE' ? 'Phase 1–6c chain finished.'
       : d.status === 'PHASE_6B_COMPLETE' ? 'Phase 1–6b chain finished.'
       : d.status === 'PHASE_6A_COMPLETE' ? 'Phase 1–6a chain finished.'
       : d.status === 'PHASE_6_COMPLETE' ? 'Phase 1–6 chain finished.'
@@ -283,7 +300,7 @@ async function main() {
 
   // Exit code: 0 on success, 1 on failure
   if (result.status < 200 || result.status >= 300) process.exit(1);
-  const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE', 'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE']);
+  const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE', 'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE']);
   if (typeof result.data === 'object' && result.data.status && !TERMINAL.has(result.data.status)) process.exit(1);
 }
 

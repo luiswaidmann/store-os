@@ -28,14 +28,18 @@ Recent runtime progression merges (on `main`):
 ## Last confirmed end-to-end smoke test
 
 **Date:** 2026-04-07
-**Method:** Webhook POST via `scripts/run-orchestrator.js`
+**Method:** n8n API execution verification (`GET /api/v1/executions/14306?includeData=true`)
 **Input:** `test-data/golden-input.json` (project: `suppliedtech`)
-**Result:** `PHASE_6C_COMPLETE` — HTTP 200, ~83s, cloud mode
-**Chain:** All Phase 1–6c nodes succeeded (Webhook Trigger → Phase 6c Complete)
-**Artifacts returned:** `store_profile`, `market_intelligence`, `brand_positioning`, `competitor_clusters`, `strategy_synthesis`, `offer_architecture`, `content_strategy`, `gtm_plan`
-**GTM plan highlights:**
-- GTM narrative: "SuppliedTech's GTM plan focuses on positioning the store as the trusted partner for SMEs seeking high-quality tech solutions."
-- Launch phases: 3 | Channels: 2 (Organic Search/SEO, Email Marketing) | KPIs: 3
+**Result:** `PHASE_7A_COMPLETE` — n8n status: success, finished: True — ~128s — cloud mode
+**Note:** HTTP 524 (Cloudflare 100s timeout) received by CLI; n8n execution completed successfully. Verified via API.
+**Chain:** All Phase 1–7A nodes succeeded (Webhook Trigger → Phase 7A Complete)
+**Artifacts returned:** `store_profile`, `market_intelligence`, `brand_positioning`, `competitor_clusters`, `strategy_synthesis`, `offer_architecture`, `content_strategy`, `gtm_plan`, `store_blueprint`
+**Store blueprint highlights:**
+- Blueprint narrative: "SuppliedTech aims to be the go-to specialist for SMEs seeking reliable tech accessories at mass-premium prices."
+- Products: 3 | Collections: 3 | Pages: 3 | Theme sections: 4 | Assets: 3
+
+Previous confirmed test (Phase 6c):
+**Date:** 2026-04-07 | **Result:** `PHASE_6C_COMPLETE` — HTTP 200, ~83-99s
 
 Previous confirmed test (Phase 6b):
 **Date:** 2026-04-07 | **Result:** `PHASE_6B_COMPLETE` — HTTP 200, ~81-104s
@@ -48,7 +52,7 @@ Previous confirmed test (Phase 5):
 
 ## Current confirmed executable chain
 
-The currently confirmed n8n Cloud smoke-test path (Phase 6c — 2026-04-07) is:
+The currently confirmed n8n execution path (Phase 7A — 2026-04-07) is:
 
 - `resolve-runtime-config`
 - `intake-store-input`
@@ -60,7 +64,10 @@ The currently confirmed n8n Cloud smoke-test path (Phase 6c — 2026-04-07) is:
 - `build-strategy-synthesis` (Phase 16)
 - `build-offer-architecture` (Phase 6a)
 - `build-content-strategy` (Phase 6b)
-- `build-gtm-plan` ← **NEW** (Phase 6c, `feature/phase-16-strategy-synthesis-runtime`)
+- `build-gtm-plan` (Phase 6c)
+- `build-store-blueprint` ← **NEW** (Phase 7A, `feature/phase-16-strategy-synthesis-runtime`)
+
+**Cloud timeout note:** Phase 7A chains run ~120-130s. Cloudflare's 100s webhook timeout returns HTTP 524 to the caller, but the n8n execution completes successfully. Use `GET /api/v1/executions/{id}` to verify result. See `docs/phase-7-architecture.md`.
 
 ## Current confirmed inline outputs
 
@@ -73,7 +80,8 @@ The chain currently returns these runtime artifacts inline in cloud mode:
 - `strategy_synthesis`
 - `offer_architecture`
 - `content_strategy`
-- `gtm_plan` ← **NEW**
+- `gtm_plan`
+- `store_blueprint` ← **NEW**
 
 ## Runtime Hardening (Phase 16)
 
@@ -314,18 +322,20 @@ orchestrate-phase1
   │  build-strategy-synthesis     (Phase 5)               │
   │  build-offer-architecture     (Phase 6a)              │
   │  build-content-strategy       (Phase 6b)              │
-  │  build-gtm-plan               (Phase 6c) ← TERMINAL   │
+  │  build-gtm-plan               (Phase 6c)              │
+  │  build-store-blueprint        (Phase 7A) ← TERMINAL   │
   └───────────────────────────────────────────────────────┘
       │
-  Phase 6c Complete → returns inline artifacts + metadata
+  Phase 7A Complete → returns inline artifacts + metadata
+  (Note: Cloudflare 100s timeout → HTTP 524; verify via n8n API)
       │
 OUTPUT
   status, execution_id, completed_at
-  next_phase (Phase 7 — Store Build)
+  next_phase (Phase 7B — Shopify API deployment)
   store_profile, market_intelligence, brand_positioning,
   competitor_clusters, strategy_synthesis,
-  offer_architecture, content_strategy, gtm_plan
-  (all inline in cloud mode)
+  offer_architecture, content_strategy, gtm_plan,
+  store_blueprint (all inline in cloud mode)
 ```
 
 ---
@@ -348,17 +358,19 @@ DIRECT fields are passed through verbatim and override any LLM-generated values.
 
 ## Confirmed next planned runtime step
 
-Next feature branch: **Phase 7 — Store Build**
+Next feature branch: **Phase 7B — Store Build (Shopify API)**
 
-- `build-design-system` — visual identity tokens from brand_positioning + offer_architecture
-- `build-section-plan` — homepage + PDP section structure from content_strategy + gtm_plan
-- `build-product-content` — AI-generated product descriptions
-- `build-page-content` — editorial pages (About, FAQ, Blog)
-- `build-deployment-manifest` — Shopify theme deployment manifest
+- `build-shopify-products` — create/update products and variants from store_blueprint
+- `build-shopify-collections` — create/update smart and custom collections
+- `build-shopify-pages` — publish About, FAQ, Contact pages
+- `build-shopify-navigation` — deploy menus
+- `build-shopify-theme` — configure and publish theme sections
 
-Phase 6 is **COMPLETE** — all three Phase 6 subworkflows (`build-offer-architecture`, `build-content-strategy`, `build-gtm-plan`) are deployed, activated, and end-to-end confirmed in cloud mode.
+Phase 7A is **COMPLETE** — `build-store-blueprint` is deployed, activated, and end-to-end confirmed (n8n execution status: success). Cloud timeout limitation documented.
 
-See `docs/phase-6-architecture.md` for full input/output contracts and implementation checklist.
+Phase 6 is **COMPLETE** — all three Phase 6 subworkflows (`build-offer-architecture`, `build-content-strategy`, `build-gtm-plan`) are deployed, activated, and end-to-end confirmed.
+
+See `docs/phase-7-architecture.md` for Phase 7A/7B architecture and cloud timeout mitigation plan.
 
 ---
 
