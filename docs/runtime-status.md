@@ -30,13 +30,17 @@ Recent runtime progression merges (on `main`):
 **Date:** 2026-04-07
 **Method:** Webhook POST via `scripts/run-orchestrator.js`
 **Input:** `test-data/golden-input.json` (project: `suppliedtech`)
-**Result:** `PHASE_5_COMPLETE` — HTTP 200, ~90s, cloud mode
-**Chain:** All 8 nodes succeeded (Webhook Trigger → Phase 5 Complete)
-**Artifacts returned:** `store_profile`, `market_intelligence`, `brand_positioning`, `competitor_clusters`, `strategy_synthesis`
+**Result:** `PHASE_6A_COMPLETE` — HTTP 200, ~77s, cloud mode
+**Chain:** All Phase 1–6a nodes succeeded (Webhook Trigger → Phase 6a Complete)
+**Artifacts returned:** `store_profile`, `market_intelligence`, `brand_positioning`, `competitor_clusters`, `strategy_synthesis`, `offer_architecture`
+**Offer headline:** "Your one-stop shop for reliable tech accessories tailored for SMEs" | pricing: mass-premium | bundles: 1 | upsell paths: 1
+
+Previous confirmed test (Phase 5 only):
+**Date:** 2026-04-07 | **Result:** `PHASE_5_COMPLETE` — HTTP 200, ~90s, cloud mode
 
 ## Current confirmed executable chain
 
-The currently confirmed n8n Cloud smoke-test path (post `feature/phase-16-strategy-synthesis-runtime`) is:
+The currently confirmed n8n Cloud smoke-test path (Phase 6a — 2026-04-07) is:
 
 - `resolve-runtime-config`
 - `intake-store-input`
@@ -45,7 +49,8 @@ The currently confirmed n8n Cloud smoke-test path (post `feature/phase-16-strate
 - `build-market-intelligence`
 - `build-brand-positioning`
 - `build-competitor-clusters`
-- `build-strategy-synthesis` ← **NEW** (Phase 16, `feature/phase-16-strategy-synthesis-runtime`)
+- `build-strategy-synthesis` (Phase 16)
+- `build-offer-architecture` ← **NEW** (Phase 6a, `feature/phase-16-strategy-synthesis-runtime`)
 
 ## Current confirmed inline outputs
 
@@ -55,7 +60,8 @@ The chain currently returns these runtime artifacts inline in cloud mode:
 - `market_intelligence`
 - `brand_positioning`
 - `competitor_clusters`
-- `strategy_synthesis` ← **NEW**
+- `strategy_synthesis`
+- `offer_architecture` ← **NEW**
 
 ## Runtime Hardening (Phase 16)
 

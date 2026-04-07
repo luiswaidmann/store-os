@@ -204,15 +204,28 @@ Phase 7 uses this to drive:
 
 ## Implementation Checklist
 
-- [ ] `schemas/phase-6/offer-architecture.schema.json` ✓ (created)
-- [ ] `schemas/phase-6/content-strategy.schema.json` ✓ (created)
-- [ ] `schemas/phase-6/gtm-plan.schema.json` ✓ (created)
+- [x] `schemas/phase-6/offer-architecture.schema.json` ✓
+- [x] `schemas/phase-6/content-strategy.schema.json` ✓
+- [x] `schemas/phase-6/gtm-plan.schema.json` ✓
 - [ ] `workflows/contracts/build-offer-architecture.contract.json`
 - [ ] `workflows/contracts/build-content-strategy.contract.json`
 - [ ] `workflows/contracts/build-gtm-plan.contract.json`
-- [ ] `workflows/n8n/build-offer-architecture.n8n.json`
+- [x] `workflows/n8n/build-offer-architecture.n8n.json` ✓ **EXECUTABLE** (deployed: `aEkB4Bwp8pN57JB9`, activated 2026-04-07)
 - [ ] `workflows/n8n/build-content-strategy.n8n.json`
 - [ ] `workflows/n8n/build-gtm-plan.n8n.json`
-- [ ] Extend `orchestrate-phase1` with Phase 6 nodes (+15 nodes)
-- [ ] Update `workflow-ids.json` with 3 new IDs
-- [ ] Update `docs/runtime-status.md`
+- [x] Extend `orchestrate-phase1` with Phase 6a nodes (+5 nodes; total: 40)
+- [ ] Extend `orchestrate-phase1` with Phase 6b+c nodes (+10 nodes planned)
+- [x] `workflow-ids.json`: `build-offer-architecture` ID recorded
+- [ ] `workflow-ids.json`: `build-content-strategy` + `build-gtm-plan` IDs
+- [x] `docs/runtime-status.md` updated
+
+## Phase 6a Status (2026-04-07)
+
+**EXECUTABLE.** `build-offer-architecture` is deployed, activated, and end-to-end confirmed.
+
+Smoke test: `PHASE_6A_COMPLETE` — HTTP 200 — ~77s — cloud mode
+Offer: "Your one-stop shop for reliable tech accessories tailored for SMEs" | mass-premium | 1 bundle | 1 upsell path
+
+## Architecture Note: Artifact Forwarding Gap
+
+`build-strategy-synthesis` does not forward upstream artifacts in its output — it only returns `strategy_synthesis + runtime_config`. The `Prepare Offer Architecture Input` bridge resolves this by reading from `$node['Prepare Strategy Synthesis Input'].json`. This pattern must be applied to all subsequent Phase 6 bridge nodes.
