@@ -1,0 +1,273 @@
+{
+  "name": "build-shopify-catalog",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "7b1a0001-0007-07b1-07b1-000000000001",
+      "name": "Subworkflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-shopify-catalog — Validate Catalog Input\n// Validates store_blueprint and runtime_config; extracts shop_url and api_version.\n// Safety rules: no deletes, idempotent upsert by handle, draft status for new products.\n\nconst input = $input.first().json;\n\nconst runtimeConfig  = input.runtime_config  || {};\nconst storeBlueprint = input.store_blueprint  || null;\n// project_id is top-level; runtime_config does not carry it directly\nconst projectId      = input.project_id       || runtimeConfig.project_id || null;\n\nif (!projectId) {\n  throw new Error('MISSING_RUNTIME_CONFIG: build-shopify-catalog requires project_id (top-level) or runtime_config.project_id');\n}\n\nif (!storeBlueprint) {\n  throw new Error('MISSING_ARTIFACT: store_blueprint is required but was not found in trigger input');\n}\n\nif (!Array.isArray(storeBlueprint.products) || storeBlueprint.products.length === 0) {\n  throw new Error('INVALID_BLUEPRINT: store_blueprint.products must be a non-empty array');\n}\n\n// resolve-runtime-config uses keys: shopify_shop_url, shopify_api_version\n// Also accept flat keys for direct invocation / self-hosted fallbacks\nconst shopUrl    = runtimeConfig.shopify_shop_url    || runtimeConfig.shop_url    || runtimeConfig.STORE_OS_SHOPIFY_SHOP_URL    || null;\nconst apiVersion = runtimeConfig.shopify_api_version || runtimeConfig.api_version || runtimeConfig.STORE_OS_SHOPIFY_API_VERSION || '2025-01';\n\nif (!shopUrl) {\n  throw new Error(\n    'MISSING_CONFIG: shop_url not found in runtime_config. ' +\n    'Ensure STORE_OS_SHOPIFY_SHOP_URL is set in env or passed as smoke_test_config.STORE_OS_SHOPIFY_SHOP_URL'\n  );\n}\n\n// Normalise: strip https:// if present (we add it in URL expressions)\nconst shopDomain = shopUrl.replace(/^https?:\\/\\//, '').replace(/\\/$/, '');\nconst shopifyBase = 'https://' + shopDomain + '/admin/api/' + apiVersion;\n\nconst products    = storeBlueprint.products    || [];\nconst collections = storeBlueprint.collections || [];\n\nconsole.log(\n  `build-shopify-catalog: project=${projectId}, shop=${shopDomain}, ` +\n  `products=${products.length}, collections=${collections.length}`\n);\n\nreturn [{\n  json: {\n    project_id:      projectId,\n    runtime_config:  runtimeConfig,\n    store_blueprint: storeBlueprint,\n    shop_url:        shopUrl,\n    shop_domain:     shopDomain,\n    api_version:     apiVersion,\n    shopify_base:    shopifyBase,\n    products_count:  products.length,\n    collections_count: collections.length,\n  },\n}];\n"
+      },
+      "id": "7b1a0001-0007-07b1-07b1-000000000002",
+      "name": "Validate Catalog Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.shopify_base + '/custom_collections.json?limit=250&fields=id,title,handle,body_html,sort_order' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "options": {}
+      },
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "edgLmgVntFGX6QYN",
+          "name": "Shopify SuppliedTech Admin"
+        }
+      },
+      "id": "7b1a0001-0007-07b1-07b1-000000000003",
+      "name": "Fetch Existing Collections",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 180]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.shopify_base + '/products.json?limit=250&status=active,draft&fields=id,title,handle,status,product_type' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "options": {}
+      },
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "edgLmgVntFGX6QYN",
+          "name": "Shopify SuppliedTech Admin"
+        }
+      },
+      "id": "7b1a0001-0007-07b1-07b1-000000000004",
+      "name": "Fetch Existing Products",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 420]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "7b1a0001-0007-07b1-07b1-000000000005",
+      "name": "Merge Fetch Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-shopify-catalog — Build Upsert Plan\n// Compares existing Shopify catalog against store_blueprint.\n// Produces one action item per resource: {resource, action, handle, url, body, ...}\n// Safety: no deletes, draft status for new products, continueOnFail on downstream HTTP nodes.\n\nconst items = $input.all();\n\n// Pull validated config from Validate Catalog Input node (not affected by HTTP fetch overwrite)\nconst validated    = $node['Validate Catalog Input'].json;\nconst blueprint    = validated.store_blueprint;\nconst shopifyBase  = validated.shopify_base;\nconst projectId    = validated.project_id;\n\n// Parse Merge Fetch Results — one item has custom_collections, other has products\nlet existingCollections = [];\nlet existingProducts    = [];\n\nfor (const item of items) {\n  if (item.json.custom_collections !== undefined) {\n    existingCollections = item.json.custom_collections || [];\n  }\n  if (item.json.products !== undefined) {\n    existingProducts = item.json.products || [];\n  }\n}\n\n// Index existing by handle for O(1) lookup\nconst collectionsByHandle = {};\nfor (const c of existingCollections) {\n  if (c.handle) collectionsByHandle[c.handle] = c;\n}\n\nconst productsByHandle = {};\nfor (const p of existingProducts) {\n  if (p.handle) productsByHandle[p.handle] = p;\n}\n\nconsole.log(\n  `Build Upsert Plan: existing collections=${existingCollections.length}, existing products=${existingProducts.length}`\n);\n\nconst actions = [];\n\n// ── Collections ───────────────────────────────────────────────────────────\nfor (const col of (blueprint.collections || [])) {\n  const handle = col.handle || col.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');\n\n  const collectionBody = {\n    custom_collection: {\n      title:      col.title,\n      handle:     handle,\n      body_html:  col.description || col.body_html || '',\n      sort_order: col.sort_order || 'best-selling',\n    },\n  };\n\n  if (collectionsByHandle[handle]) {\n    // UPDATE: collection with this handle already exists\n    const existingId = collectionsByHandle[handle].id;\n    actions.push({\n      resource:   'collection',\n      action:     'update',\n      handle:     handle,\n      shopify_id: existingId,\n      url:        shopifyBase + '/custom_collections/' + existingId + '.json',\n      body:       collectionBody,\n      blueprint_title: col.title,\n    });\n  } else {\n    // CREATE: new collection\n    actions.push({\n      resource:   'collection',\n      action:     'create',\n      handle:     handle,\n      shopify_id: null,\n      url:        shopifyBase + '/custom_collections.json',\n      body:       collectionBody,\n      blueprint_title: col.title,\n    });\n  }\n}\n\n// ── Products ──────────────────────────────────────────────────────────────\nfor (const prod of (blueprint.products || [])) {\n  const handle = prod.handle || prod.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');\n\n  // Derive price: use min of price_range, or fallback\n  let price = '0.00';\n  if (prod.price_range) {\n    const raw = prod.price_range.min || prod.price_range.max || 0;\n    price = parseFloat(raw).toFixed(2);\n  } else if (prod.price) {\n    price = parseFloat(prod.price).toFixed(2);\n  }\n\n  // Tags: array → comma-separated string (Shopify API format)\n  const tags = Array.isArray(prod.tags) ? prod.tags.join(', ') : (prod.tags || '');\n\n  const productBody = {\n    product: {\n      title:        prod.title,\n      handle:       handle,\n      body_html:    prod.description || prod.body_html || '',\n      product_type: prod.product_type || '',\n      tags:         tags,\n      status:       'draft', // Safety: always draft — never publish automatically\n      variants: [\n        {\n          price:              price,\n          requires_shipping:  true,\n          inventory_management: null, // no inventory tracking by default\n        },\n      ],\n    },\n  };\n\n  if (productsByHandle[handle]) {\n    // UPDATE: product with this handle already exists\n    const existingId = productsByHandle[handle].id;\n    actions.push({\n      resource:   'product',\n      action:     'update',\n      handle:     handle,\n      shopify_id: existingId,\n      url:        shopifyBase + '/products/' + existingId + '.json',\n      body:       productBody,\n      blueprint_title: prod.title,\n    });\n  } else {\n    // CREATE: new product\n    actions.push({\n      resource:   'product',\n      action:     'create',\n      handle:     handle,\n      shopify_id: null,\n      url:        shopifyBase + '/products.json',\n      body:       productBody,\n      blueprint_title: prod.title,\n    });\n  }\n}\n\nconsole.log(\n  `Build Upsert Plan: planned actions=${actions.length} ` +\n  `(creates=${actions.filter(a=>a.action==='create').length}, ` +\n  `updates=${actions.filter(a=>a.action==='update').length})`\n);\n\n// If nothing to do, return a noop sentinel so downstream nodes can still execute\nif (actions.length === 0) {\n  return [{ json: { action: 'noop', resource: 'none', handle: null, url: null, body: null, blueprint_title: null, shopify_id: null } }];\n}\n\nreturn actions.map(a => ({ json: a }));\n"
+      },
+      "id": "7b1a0001-0007-07b1-07b1-000000000006",
+      "name": "Build Upsert Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.action }}",
+              "operation": "equal",
+              "value2": "create"
+            }
+          ]
+        }
+      },
+      "id": "7b1a0001-0007-07b1-07b1-000000000007",
+      "name": "Create or Update?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1500, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "edgLmgVntFGX6QYN",
+          "name": "Shopify SuppliedTech Admin"
+        }
+      },
+      "continueOnFail": true,
+      "id": "7b1a0001-0007-07b1-07b1-000000000008",
+      "name": "Create Resource",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1750, 180]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "edgLmgVntFGX6QYN",
+          "name": "Shopify SuppliedTech Admin"
+        }
+      },
+      "continueOnFail": true,
+      "id": "7b1a0001-0007-07b1-07b1-000000000009",
+      "name": "Update Resource",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1750, 420]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "7b1a0001-0007-07b1-07b1-000000000010",
+      "name": "Merge Action Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [2000, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-shopify-catalog — Compile Deployment Summary\n// Aggregates HTTP results from Create Resource and Update Resource nodes.\n// Counts by statusCode (201=create success, 200=update success) and resource type.\n// Returns PHASE_7B1_COMPLETE with deployment summary.\n\nconst results = $input.all();\n\n// Pull validated config from upstream node\nconst validated  = $node['Validate Catalog Input'].json;\nconst projectId  = validated.project_id;\nconst shopDomain = validated.shop_domain;\nconst blueprint  = validated.store_blueprint;\n\n// Tally results\nlet productsCreated   = 0;\nlet productsUpdated   = 0;\nlet collectionsCreated = 0;\nlet collectionsUpdated = 0;\nconst errors   = [];\nconst warnings = [];\n\nfor (const item of results) {\n  const d = item.json;\n\n  // Detect noop sentinel — no real operations were planned\n  if (d.action === 'noop') {\n    warnings.push('No catalog actions were planned — store_blueprint may be empty or all resources already match');\n    continue;\n  }\n\n  // Detect HTTP error response: neverError: true means errors return as items with statusCode != 2xx\n  const statusCode = d.statusCode || (d.body && d.status) || 0;\n  const body       = d.body || d;\n\n  if (statusCode >= 400 || d.error) {\n    const errMsg = (body.errors ? JSON.stringify(body.errors) : null)\n      || d.message\n      || `HTTP ${statusCode} error`;\n    errors.push({\n      resource:  d._resource || 'unknown',\n      handle:    d._handle   || 'unknown',\n      status:    statusCode,\n      message:   errMsg,\n    });\n    continue;\n  }\n\n  // Determine resource type from response body\n  const isProduct    = !!(body.product);\n  const isCollection = !!(body.custom_collection);\n\n  if (statusCode === 201) {\n    if (isProduct)    productsCreated++;\n    if (isCollection) collectionsCreated++;\n  } else if (statusCode === 200) {\n    if (isProduct)    productsUpdated++;\n    if (isCollection) collectionsUpdated++;\n  } else {\n    // Unexpected status — treat as warning\n    warnings.push(`Unexpected HTTP ${statusCode} for ${ isProduct ? 'product' : isCollection ? 'collection' : 'resource' }`);\n  }\n}\n\nconst totalActioned  = productsCreated + productsUpdated + collectionsCreated + collectionsUpdated;\nconst totalErrors    = errors.length;\nconst terminalStatus = totalErrors > 0 && totalActioned === 0\n  ? 'PHASE_7B1_FAILED'\n  : totalErrors > 0\n    ? 'PHASE_7B1_PARTIAL'\n    : 'PHASE_7B1_COMPLETE';\n\nconsole.log(\n  `Compile Deployment Summary: status=${terminalStatus}, ` +\n  `products_created=${productsCreated}, products_updated=${productsUpdated}, ` +\n  `collections_created=${collectionsCreated}, collections_updated=${collectionsUpdated}, ` +\n  `errors=${totalErrors}`\n);\n\nreturn [{\n  json: {\n    status:               terminalStatus,\n    project_id:           projectId,\n    shop_url:             shopDomain,\n    completed_at:         new Date().toISOString(),\n\n    // Deployment counts\n    products_created:     productsCreated,\n    products_updated:     productsUpdated,\n    collections_created:  collectionsCreated,\n    collections_updated:  collectionsUpdated,\n\n    // Diagnostics\n    errors:   errors,\n    warnings: warnings,\n\n    // Blueprint summary (for observability / next phase reference)\n    blueprint_summary: {\n      products_in_blueprint:    (blueprint.products    || []).length,\n      collections_in_blueprint: (blueprint.collections || []).length,\n    },\n\n    // Safety confirmation\n    safety_notes: [\n      'No Shopify resources were deleted — only create and update operations were performed',\n      'All new products were created with status: draft',\n    ],\n  },\n}];\n"
+      },
+      "id": "7b1a0001-0007-07b1-07b1-000000000011",
+      "name": "Compile Deployment Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 300]
+    }
+  ],
+  "connections": {
+    "Subworkflow Trigger": {
+      "main": [
+        [{ "node": "Validate Catalog Input", "type": "main", "index": 0 }]
+      ]
+    },
+    "Validate Catalog Input": {
+      "main": [
+        [
+          { "node": "Fetch Existing Collections", "type": "main", "index": 0 },
+          { "node": "Fetch Existing Products", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Existing Collections": {
+      "main": [
+        [{ "node": "Merge Fetch Results", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Existing Products": {
+      "main": [
+        [{ "node": "Merge Fetch Results", "type": "main", "index": 1 }]
+      ]
+    },
+    "Merge Fetch Results": {
+      "main": [
+        [{ "node": "Build Upsert Plan", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Upsert Plan": {
+      "main": [
+        [{ "node": "Create or Update?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create or Update?": {
+      "main": [
+        [{ "node": "Create Resource", "type": "main", "index": 0 }],
+        [{ "node": "Update Resource", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Resource": {
+      "main": [
+        [{ "node": "Merge Action Results", "type": "main", "index": 0 }]
+      ]
+    },
+    "Update Resource": {
+      "main": [
+        [{ "node": "Merge Action Results", "type": "main", "index": 1 }]
+      ]
+    },
+    "Merge Action Results": {
+      "main": [
+        [{ "node": "Compile Deployment Summary", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "_meta": {
+    "storeOs": {
+      "phase": "Phase 7B.1",
+      "format": "n8n-executable",
+      "outputSchema": "schemas/phase-7b/shopify-catalog-deployment.schema.json",
+      "cloudCompatibility": "FULL — no filesystem access, no AJV. All Shopify API calls use shopifyOAuth2Api credential injected by n8n. shop_url and api_version sourced from runtime_config (resolved by resolve-runtime-config from STORE_OS_SHOPIFY_SHOP_URL / STORE_OS_SHOPIFY_API_VERSION env vars or smoke_test_config).",
+      "invocation": "Called as a subworkflow by orchestrate-phase1. Expects Subworkflow Trigger input: { project_id, runtime_config, store_blueprint }",
+      "output": "{ status: 'PHASE_7B1_COMPLETE' | 'PHASE_7B1_PARTIAL' | 'PHASE_7B1_FAILED', project_id, shop_url, products_created, products_updated, collections_created, collections_updated, errors, warnings, blueprint_summary, safety_notes }",
+      "safetyGuarantees": [
+        "No Shopify resources are ever deleted — only create (POST) and update (PUT) operations",
+        "Upsert by handle: existing handles are updated, new handles are created",
+        "All new products are created with status: draft — never auto-published",
+        "continueOnFail: true on HTTP nodes — errors are collected, not fatal",
+        "neverError: true on HTTP nodes — HTTP 4xx/5xx return as items, not exceptions"
+      ],
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "edgLmgVntFGX6QYN",
+          "name": "Shopify SuppliedTech Admin",
+          "note": "Replace id with your n8n shopifyOAuth2Api credential ID if deploying to a different instance"
+        }
+      },
+      "setupRequired": [
+        "Replace credential id 'edgLmgVntFGX6QYN' in Fetch Existing Collections, Fetch Existing Products, Create Resource, and Update Resource nodes with your n8n shopifyOAuth2Api credential ID",
+        "Ensure STORE_OS_SHOPIFY_SHOP_URL and STORE_OS_SHOPIFY_API_VERSION are set in env (self-hosted) or smoke_test_config (cloud)"
+      ],
+      "nodeCount": 11,
+      "terminalStatuses": ["PHASE_7B1_COMPLETE", "PHASE_7B1_PARTIAL", "PHASE_7B1_FAILED"]
+    }
+  }
+}
