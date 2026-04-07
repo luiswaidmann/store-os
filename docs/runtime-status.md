@@ -28,15 +28,15 @@ Recent runtime progression merges (on `main`):
 ## Last confirmed end-to-end smoke test
 
 **Date:** 2026-04-07
-**Method:** n8n API execution verification (`GET /api/v1/executions/14306?includeData=true`)
+**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async model)
 **Input:** `test-data/golden-input.json` (project: `suppliedtech`)
-**Result:** `PHASE_7A_COMPLETE` — n8n status: success, finished: True — ~128s — cloud mode
-**Note:** HTTP 524 (Cloudflare 100s timeout) received by CLI; n8n execution completed successfully. Verified via API.
-**Chain:** All Phase 1–7A nodes succeeded (Webhook Trigger → Phase 7A Complete)
+**Result:** `PHASE_7A_COMPLETE` — n8n execution 14361, status: success, ~117s — cloud mode
+**Async response:** HTTP 202 returned in ~2s with `execution_id`; CLI polled n8n API until complete
+**Chain:** All Phase 1–7A nodes succeeded (Webhook Trigger → Respond to Webhook → … → Phase 7A Complete)
 **Artifacts returned:** `store_profile`, `market_intelligence`, `brand_positioning`, `competitor_clusters`, `strategy_synthesis`, `offer_architecture`, `content_strategy`, `gtm_plan`, `store_blueprint`
 **Store blueprint highlights:**
-- Blueprint narrative: "SuppliedTech aims to be the go-to specialist for SMEs seeking reliable tech accessories at mass-premium prices."
-- Products: 3 | Collections: 3 | Pages: 3 | Theme sections: 4 | Assets: 3
+- Blueprint narrative: "SuppliedTech is a reliable specialist for SMEs seeking high-quality electronic accessories."
+- Products: 3 | Collections: 2 | Pages: 3 | Theme sections: 4 | Assets: 3
 
 Previous confirmed test (Phase 6c):
 **Date:** 2026-04-07 | **Result:** `PHASE_6C_COMPLETE` — HTTP 200, ~83-99s
@@ -67,7 +67,7 @@ The currently confirmed n8n execution path (Phase 7A — 2026-04-07) is:
 - `build-gtm-plan` (Phase 6c)
 - `build-store-blueprint` ← **NEW** (Phase 7A, `feature/phase-16-strategy-synthesis-runtime`)
 
-**Cloud timeout note:** Phase 7A chains run ~120-130s. Cloudflare's 100s webhook timeout returns HTTP 524 to the caller, but the n8n execution completes successfully. Use `GET /api/v1/executions/{id}` to verify result. See `docs/phase-7-architecture.md`.
+**Async model:** Phase 7A chains run ~117s. The webhook returns HTTP 202 within ~2s with an `execution_id`. The CLI polls `GET /api/v1/executions/{id}` until `finished: true`. Cloudflare's 100s timeout is no longer hit. See `docs/async-execution-model.md`.
 
 ## Current confirmed inline outputs
 
@@ -263,26 +263,37 @@ These changes harden the system for production use and establish the API-ready i
 
 ## How to call the system
 
-### Via webhook (API / programmatic)
+### Via CLI wrapper (async — recommended)
 
 ```bash
-curl -X POST https://luwai.app.n8n.cloud/webhook/orchestrate-phase1 \
-  -H "Authorization: Bearer <STORE_OS_API_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d @test-data/golden-input.json
-```
-
-### Via CLI wrapper
-
-```bash
-# Set in .env: N8N_BASE_URL, STORE_OS_API_TOKEN
+# Set in .env: N8N_BASE_URL, N8N_API_KEY, (optional) STORE_OS_API_TOKEN
 node scripts/run-orchestrator.js --input test-data/golden-input.json
+# → returns HTTP 202 with execution_id in ~2s, then polls until PHASE_7A_COMPLETE
+
+# Trigger only — get execution_id, do not poll:
+node scripts/run-orchestrator.js --input test-data/golden-input.json --no-poll
+
+# Poll a previously-started execution:
+node scripts/run-orchestrator.js --execution-id <id>
+# Or use the standalone poller:
+node scripts/poll-execution.js <execution_id>
 
 # Dry run (validate payload locally, no request):
 node scripts/run-orchestrator.js --input test-data/golden-input.json --dry-run
 
 # Silent (output raw JSON only):
 node scripts/run-orchestrator.js --input test-data/golden-input.json --silent
+```
+
+### Via webhook (direct)
+
+```bash
+curl -X POST https://luwai.app.n8n.cloud/webhook/orchestrate-phase1 \
+  -H "Authorization: Bearer <STORE_OS_API_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d @test-data/golden-input.json
+# Returns HTTP 202 { execution_id, status: "started", ... }
+# Poll: GET https://luwai.app.n8n.cloud/api/v1/executions/<execution_id>?includeData=true
 ```
 
 ### Via Manual Trigger (n8n UI)
@@ -311,6 +322,10 @@ INPUT LAYER
 orchestrate-phase1
   Resolve Runtime Config     ← validates env vars + auth token
       │
+  Prepare Async Response     ← assembles execution_id + tracking info
+      │
+  Respond to Webhook         ← HTTP 202 sent here (~2s) — caller unblocked
+      │                         execution continues asynchronously
   Validate Orchestrate Input ← fast-fail schema check
       │
   ┌── PHASE CHAIN ────────────────────────────────────────┐
@@ -327,9 +342,13 @@ orchestrate-phase1
   └───────────────────────────────────────────────────────┘
       │
   Phase 7A Complete → returns inline artifacts + metadata
-  (Note: Cloudflare 100s timeout → HTTP 524; verify via n8n API)
-      │
-OUTPUT
+
+CALLER FLOW (async)
+  1. POST webhook → HTTP 202 { execution_id, status: "started" }  (~2s)
+  2. Poll GET /api/v1/executions/{id}?includeData=true  (every 5s)
+  3. finished: true → extract result from Phase 7A Complete node
+
+OUTPUT (extracted from execution data)
   status, execution_id, completed_at
   next_phase (Phase 7B — Shopify API deployment)
   store_profile, market_intelligence, brand_positioning,
