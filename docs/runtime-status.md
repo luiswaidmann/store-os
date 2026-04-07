@@ -27,7 +27,21 @@ Recent runtime progression merges (on `main`):
 
 ## Last confirmed end-to-end smoke test
 
-**Phase 7B.1 smoke test: PENDING** — `build-shopify-catalog` deployed 2026-04-07, live run against `8zw111-cj.myshopify.com` not yet executed.
+**Phase 7B.1 CONFIRMED:**
+**Date:** 2026-04-07
+**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async) + `node scripts/poll-execution.js 14430 --json`
+**Input:** `test-data/golden-input.json` (project: `suppliedtech`)
+**Result:** `PHASE_7B1_COMPLETE` — n8n execution 14430, status: success, ~101s — cloud mode
+**Shopify target:** `8zw111-cj.myshopify.com`
+**Shopify side effects:**
+- products_created: 3 (tech-accessory-bundle, premium-headphones, wireless-keyboard-mouse-set)
+- products_updated: 0
+- collections_created: 2 (audio, peripherals)
+- collections_updated: 1 (bundles — pre-existing handle)
+- errors: 0 | warnings: 0
+**Safety verified:** All new products created with `status: draft`; no deletes performed; idempotent handle-based upsert confirmed
+**Artifacts returned:** full 10-artifact chain + `shopify_catalog_deployment`
+**Persisted:** `outputs/runs/14430.json`
 
 **Phase 7A confirmed:**
 **Date:** 2026-04-07

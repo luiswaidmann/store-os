@@ -5,7 +5,7 @@
 **Phase 7B.1 EXECUTABLE.** `build-shopify-catalog` is deployed, activated, and integrated into the orchestrator.
 
 Deployed: n8n workflow `oZE0Z9fb4ojnKiDd` — activated 2026-04-07
-Smoke test: pending first live run against `8zw111-cj.myshopify.com`
+Smoke test: PASSED 2026-04-07 — execution 14430, PHASE_7B1_COMPLETE, 3 products created / 0 errors
 
 ---
 
@@ -160,8 +160,8 @@ The golden-input.json `smoke_test_config` must include:
 - [x] `workflow-ids.json`: Shopify OAuth2 credential ID recorded (`edgLmgVntFGX6QYN`)
 - [x] `scripts/run-orchestrator.js` — updated terminal statuses + printSummary + buildRunRecord for Phase 7B.1
 - [x] `scripts/poll-execution.js` — updated terminal statuses
-- [ ] Live smoke test against `8zw111-cj.myshopify.com` (pending)
-- [ ] `docs/runtime-status.md` smoke test entry (pending live run)
+- [x] Live smoke test against `8zw111-cj.myshopify.com` — execution 14430, PHASE_7B1_COMPLETE (2026-04-07)
+- [x] `docs/runtime-status.md` smoke test entry (2026-04-07)
 
 ### Phase 7B.2 Planned Scope (NOT YET IMPLEMENTED)
 
