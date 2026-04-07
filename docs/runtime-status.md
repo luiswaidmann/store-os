@@ -30,12 +30,15 @@ Recent runtime progression merges (on `main`):
 **Date:** 2026-04-07
 **Method:** Webhook POST via `scripts/run-orchestrator.js`
 **Input:** `test-data/golden-input.json` (project: `suppliedtech`)
-**Result:** `PHASE_6B_COMPLETE` — HTTP 200, ~81-104s, cloud mode
-**Chain:** All Phase 1–6b nodes succeeded (Webhook Trigger → Phase 6b Complete)
-**Artifacts returned:** `store_profile`, `market_intelligence`, `brand_positioning`, `competitor_clusters`, `strategy_synthesis`, `offer_architecture`, `content_strategy`
-**Content strategy highlights:**
-- Primary message: "SuppliedTech is your trusted partner for quality tech accessories tailored for SMEs."
-- Tone: Technical-trustworthy | Pillars: 2 | Keyword clusters: 2 | FAQ clusters: 2
+**Result:** `PHASE_6C_COMPLETE` — HTTP 200, ~83s, cloud mode
+**Chain:** All Phase 1–6c nodes succeeded (Webhook Trigger → Phase 6c Complete)
+**Artifacts returned:** `store_profile`, `market_intelligence`, `brand_positioning`, `competitor_clusters`, `strategy_synthesis`, `offer_architecture`, `content_strategy`, `gtm_plan`
+**GTM plan highlights:**
+- GTM narrative: "SuppliedTech's GTM plan focuses on positioning the store as the trusted partner for SMEs seeking high-quality tech solutions."
+- Launch phases: 3 | Channels: 2 (Organic Search/SEO, Email Marketing) | KPIs: 3
+
+Previous confirmed test (Phase 6b):
+**Date:** 2026-04-07 | **Result:** `PHASE_6B_COMPLETE` — HTTP 200, ~81-104s
 
 Previous confirmed test (Phase 6a):
 **Date:** 2026-04-07 | **Result:** `PHASE_6A_COMPLETE` — HTTP 200, ~77s
@@ -45,7 +48,7 @@ Previous confirmed test (Phase 5):
 
 ## Current confirmed executable chain
 
-The currently confirmed n8n Cloud smoke-test path (Phase 6a — 2026-04-07) is:
+The currently confirmed n8n Cloud smoke-test path (Phase 6c — 2026-04-07) is:
 
 - `resolve-runtime-config`
 - `intake-store-input`
@@ -56,7 +59,8 @@ The currently confirmed n8n Cloud smoke-test path (Phase 6a — 2026-04-07) is:
 - `build-competitor-clusters`
 - `build-strategy-synthesis` (Phase 16)
 - `build-offer-architecture` (Phase 6a)
-- `build-content-strategy` ← **NEW** (Phase 6b, `feature/phase-16-strategy-synthesis-runtime`)
+- `build-content-strategy` (Phase 6b)
+- `build-gtm-plan` ← **NEW** (Phase 6c, `feature/phase-16-strategy-synthesis-runtime`)
 
 ## Current confirmed inline outputs
 
@@ -68,7 +72,8 @@ The chain currently returns these runtime artifacts inline in cloud mode:
 - `competitor_clusters`
 - `strategy_synthesis`
 - `offer_architecture`
-- `content_strategy` ← **NEW**
+- `content_strategy`
+- `gtm_plan` ← **NEW**
 
 ## Runtime Hardening (Phase 16)
 
@@ -306,18 +311,21 @@ orchestrate-phase1
   │  build-market-intelligence    (Phase 2)               │
   │  build-brand-positioning      (Phase 3)               │
   │  build-competitor-clusters    (Phase 4)               │
-  │  build-strategy-synthesis     (Phase 5) ← TERMINAL    │
+  │  build-strategy-synthesis     (Phase 5)               │
+  │  build-offer-architecture     (Phase 6a)              │
+  │  build-content-strategy       (Phase 6b)              │
+  │  build-gtm-plan               (Phase 6c) ← TERMINAL   │
   └───────────────────────────────────────────────────────┘
       │
-  Phase 5 Complete → returns inline artifacts + metadata
+  Phase 6c Complete → returns inline artifacts + metadata
       │
 OUTPUT
-  status, execution_id, started_at, completed_at, duration_ms
-  phase_receipt (per-phase status)
-  output_summary (opportunity/risk/moat counts)
-  strategy_synthesis (full artifact inline)
+  status, execution_id, completed_at
+  next_phase (Phase 7 — Store Build)
   store_profile, market_intelligence, brand_positioning,
-  competitor_clusters (all inline in cloud mode)
+  competitor_clusters, strategy_synthesis,
+  offer_architecture, content_strategy, gtm_plan
+  (all inline in cloud mode)
 ```
 
 ---
@@ -340,11 +348,15 @@ DIRECT fields are passed through verbatim and override any LLM-generated values.
 
 ## Confirmed next planned runtime step
 
-Next feature branch: **Phase 6 implementation**
+Next feature branch: **Phase 7 — Store Build**
 
-- `build-offer-architecture` — uses `growth_thesis`, `offer_implications`, `moat_hypotheses`
-- `build-content-strategy` — uses `messaging_priorities`, `positioning_focus`
-- `build-gtm-plan` — uses `gtm_implications`, `opportunity_priorities`, `validation_questions`
+- `build-design-system` — visual identity tokens from brand_positioning + offer_architecture
+- `build-section-plan` — homepage + PDP section structure from content_strategy + gtm_plan
+- `build-product-content` — AI-generated product descriptions
+- `build-page-content` — editorial pages (About, FAQ, Blog)
+- `build-deployment-manifest` — Shopify theme deployment manifest
+
+Phase 6 is **COMPLETE** — all three Phase 6 subworkflows (`build-offer-architecture`, `build-content-strategy`, `build-gtm-plan`) are deployed, activated, and end-to-end confirmed in cloud mode.
 
 See `docs/phase-6-architecture.md` for full input/output contracts and implementation checklist.
 

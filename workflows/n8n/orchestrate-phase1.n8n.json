@@ -691,6 +691,91 @@
         8500,
         300
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 \u2014 Prepare GTM Plan Input\n// Assembles Phase 6c input from Phase 6b Complete + upstream node refs.\n// Subworkflows do NOT forward upstream artifacts, so we source them explicitly.\n\nconst phase6bOutput = $input.first().json;\nconst preSynthesis  = $node['Prepare Strategy Synthesis Input'].json;\nconst phase5Output  = $node['Phase 5 Complete'].json;\nconst phase6aOutput = $node['Phase 6a Complete'].json;\n\nconst output = {\n  project_id:                phase6bOutput.project_id  || phase6aOutput.project_id  || preSynthesis.project_id,\n  runtime_config:            phase6bOutput.runtime_config || preSynthesis.runtime_config,\n  content_strategy:          phase6bOutput.content_strategy  || null,\n  offer_architecture:        phase6bOutput.offer_architecture || phase6aOutput.offer_architecture || null,\n  strategy_synthesis:        phase5Output.strategy_synthesis  || null,\n  market_intelligence:       preSynthesis.market_intelligence  || null,\n  normalized_intake_payload: preSynthesis.normalized_intake_payload || null,\n};\n\nif (!output.content_strategy) {\n  throw new Error('Prepare GTM Plan Input: content_strategy missing from Phase 6b Complete output.');\n}\nif (!output.offer_architecture) {\n  throw new Error('Prepare GTM Plan Input: offer_architecture missing \u2014 check Phase 6a Complete output.');\n}\nif (!output.strategy_synthesis) {\n  throw new Error('Prepare GTM Plan Input: strategy_synthesis missing from Phase 5 Complete output.');\n}\n\nconsole.log('Prepare GTM Plan Input: assembled for project=' + output.project_id);\nreturn [{ json: output }];\n"
+      },
+      "id": "d7e8f9a0-006c-006c-006c-000000000011",
+      "name": "Prepare GTM Plan Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_WITH_BUILD_GTM_PLAN_WORKFLOW_ID",
+        "options": {}
+      },
+      "id": "d7e8f9a0-006c-006c-006c-000000000012",
+      "name": "Run build-gtm-plan",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        9000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "d7e8f9a0-cond-006c-006c-000000000001",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "SUCCESS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d7e8f9a0-006c-006c-006c-000000000013",
+      "name": "GTM Plan Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        9250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "throw new Error('Phase 6c FAILED \u2014 GTM Plan synthesis did not return a valid gtm_plan artifact. Check build-gtm-plan execution log.');"
+      },
+      "id": "d7e8f9a0-006c-006c-006c-000000000014",
+      "name": "Halt - GTM Plan Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9250,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Phase 6c Complete \u2014 GTM Plan\n// Returns full chain artifacts inline for cloud smoke-test validation.\n\nconst gtmOutput   = $input.first().json;\nconst phase5Out   = $node['Phase 5 Complete'].json;\nconst phase6aOut  = $node['Phase 6a Complete'].json;\nconst phase6bOut  = $node['Phase 6b Complete'].json;\nconst preSynth    = $node['Prepare Strategy Synthesis Input'].json;\n\n// Gather all inline artifacts\nconst storeProfile       = preSynth.store_profile        || null;\nconst marketIntelligence = preSynth.market_intelligence   || null;\nconst brandPositioning   = preSynth.brand_positioning     || null;\nconst competitorClusters = preSynth.competitor_clusters   || null;\nconst strategySynthesis  = phase5Out.strategy_synthesis   || null;\nconst offerArchitecture  = phase6aOut.offer_architecture  || null;\nconst contentStrategy    = phase6bOut.content_strategy    || null;\nconst gtmPlan            = gtmOutput.gtm_plan             || null;\n\nconst runtimeConfig = gtmOutput.runtime_config || {};\nconst projectId     = gtmOutput.project_id || runtimeConfig.project_id || null;\nconst cloudMode     = gtmOutput.cloud_mode !== undefined ? gtmOutput.cloud_mode : true;\n\nconst summary = {\n  status:              'PHASE_6C_COMPLETE',\n  project_id:          projectId,\n  cloud_mode:          cloudMode,\n  execution_id:        $execution.id,\n  completed_at:        new Date().toISOString(),\n  next_phase:          'Phase 7 \u2014 Store Build (design-system, section-plan, deployment)',\n\n  // Full artifact chain\n  store_profile:        storeProfile,\n  market_intelligence:  marketIntelligence,\n  brand_positioning:    brandPositioning,\n  competitor_clusters:  competitorClusters,\n  strategy_synthesis:   strategySynthesis,\n  offer_architecture:   offerArchitecture,\n  content_strategy:     contentStrategy,\n  gtm_plan:             gtmPlan,\n\n  runtime_config:       runtimeConfig,\n};\n\nreturn [{ json: summary }];\n"
+      },
+      "id": "d7e8f9a0-006c-006c-006c-000000000015",
+      "name": "Phase 6c Complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9500,
+        300
+      ]
     }
   ],
   "connections": {
@@ -1136,6 +1221,57 @@
         [
           {
             "node": "Halt - Content Strategy Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 6b Complete": {
+      "main": [
+        [
+          {
+            "node": "Prepare GTM Plan Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare GTM Plan Input": {
+      "main": [
+        [
+          {
+            "node": "Run build-gtm-plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run build-gtm-plan": {
+      "main": [
+        [
+          {
+            "node": "GTM Plan Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GTM Plan Success?": {
+      "main": [
+        [
+          {
+            "node": "Phase 6c Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Halt - GTM Plan Failed",
             "type": "main",
             "index": 0
           }

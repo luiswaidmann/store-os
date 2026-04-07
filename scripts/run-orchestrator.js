@@ -5,7 +5,7 @@
  * CLI wrapper for the store-os orchestration webhook.
  * Sends a POST to orchestrate-phase1, attaches the Bearer auth token,
  * and prints a clean structured summary of the run result.
- * Recognises terminal statuses: PHASE_5_COMPLETE, PHASE_6A_COMPLETE.
+ * Recognises terminal statuses: PHASE_5_COMPLETE, PHASE_6A_COMPLETE, PHASE_6B_COMPLETE, PHASE_6C_COMPLETE.
  *
  * Usage:
  *   node scripts/run-orchestrator.js --input <json-file>
@@ -108,7 +108,7 @@ function printSummary(result, startedAt, endedAt) {
     return;
   }
 
-  const TERMINAL_STATUSES = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE', 'PHASE_6_COMPLETE']);
+  const TERMINAL_STATUSES = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE', 'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE']);
   const isSuccess = TERMINAL_STATUSES.has(d.status) && result.status >= 200 && result.status < 300;
   const isError   = !isSuccess;
 
@@ -176,6 +176,22 @@ function printSummary(result, startedAt, endedAt) {
     console.log(`    keyword_clusters: ${(seo.primary_keyword_clusters || []).length} | faq_clusters: ${(seo.faq_topic_clusters || []).length}`);
   }
 
+  if (d.gtm_plan) {
+    const gp = d.gtm_plan;
+    const ls = gp.launch_sequence || {};
+    const channels = gp.channel_strategy || [];
+    const kpis = gp.kpis || [];
+    console.log('');
+    console.log('  GTM PLAN:');
+    const narrative = typeof gp.gtm_narrative === 'string'
+      ? gp.gtm_narrative.slice(0, 160) + (gp.gtm_narrative.length > 160 ? '…' : '')
+      : '—';
+    console.log(`    gtm_narrative:   ${narrative}`);
+    console.log(`    launch_phases:   ${[ls.phase_1, ls.phase_2, ls.phase_3].filter(Boolean).length}`);
+    console.log(`    channels:        ${channels.length} (${channels.slice(0, 3).map((c) => c.channel || c).join(', ')})`);
+    console.log(`    kpis:            ${kpis.length}`);
+  }
+
   if (d.next_phase) {
     console.log('');
     console.log(`  NEXT PHASE:  ${d.next_phase}`);
@@ -188,7 +204,8 @@ function printSummary(result, startedAt, endedAt) {
 
   console.log('');
   if (isSuccess) {
-    const chainDesc = d.status === 'PHASE_6B_COMPLETE' ? 'Phase 1–6b chain finished.'
+    const chainDesc = d.status === 'PHASE_6C_COMPLETE' ? 'Phase 1–6c chain finished.'
+      : d.status === 'PHASE_6B_COMPLETE' ? 'Phase 1–6b chain finished.'
       : d.status === 'PHASE_6A_COMPLETE' ? 'Phase 1–6a chain finished.'
       : d.status === 'PHASE_6_COMPLETE' ? 'Phase 1–6 chain finished.'
       : 'Phase 1–5 chain finished.';
@@ -266,7 +283,7 @@ async function main() {
 
   // Exit code: 0 on success, 1 on failure
   if (result.status < 200 || result.status >= 300) process.exit(1);
-  const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE', 'PHASE_6_COMPLETE']);
+  const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE', 'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE']);
   if (typeof result.data === 'object' && result.data.status && !TERMINAL.has(result.data.status)) process.exit(1);
 }
 

@@ -212,13 +212,13 @@ Phase 7 uses this to drive:
 - [ ] `workflows/contracts/build-gtm-plan.contract.json`
 - [x] `workflows/n8n/build-offer-architecture.n8n.json` ✓ **EXECUTABLE** (deployed: `aEkB4Bwp8pN57JB9`, activated 2026-04-07)
 - [x] `workflows/n8n/build-content-strategy.n8n.json` ✓ **EXECUTABLE** (deployed: `O4KhaCgA0itCazMu`, activated 2026-04-07)
-- [ ] `workflows/n8n/build-gtm-plan.n8n.json`
+- [x] `workflows/n8n/build-gtm-plan.n8n.json` ✓ **EXECUTABLE** (deployed: `8aCUkx6RlfdklCBH`, activated 2026-04-07)
 - [x] Extend `orchestrate-phase1` with Phase 6a nodes (+5 nodes; total: 40)
 - [x] Extend `orchestrate-phase1` with Phase 6b nodes (+5 nodes; total: 45)
-- [ ] Extend `orchestrate-phase1` with Phase 6c nodes (+5 nodes planned)
+- [x] Extend `orchestrate-phase1` with Phase 6c nodes (+5 nodes; total: 50)
 - [x] `workflow-ids.json`: `build-offer-architecture` ID recorded
 - [x] `workflow-ids.json`: `build-content-strategy` ID recorded
-- [ ] `workflow-ids.json`: `build-gtm-plan` ID
+- [x] `workflow-ids.json`: `build-gtm-plan` ID recorded (`8aCUkx6RlfdklCBH`)
 - [x] `docs/runtime-status.md` updated
 
 ## Phase 6a Status (2026-04-07)
@@ -235,6 +235,14 @@ Offer: "Your one-stop shop for reliable tech accessories tailored for SMEs" | ma
 Smoke test: `PHASE_6B_COMPLETE` — HTTP 200 — ~81-104s — cloud mode
 Primary message: "SuppliedTech is your trusted partner for quality tech accessories tailored for SMEs."
 Tone: Technical-trustworthy | Pillars: 2 | Keyword clusters: 2 | FAQ clusters: 2
+
+## Phase 6c Status (2026-04-07)
+
+**EXECUTABLE.** `build-gtm-plan` is deployed, activated, and end-to-end confirmed.
+
+Smoke test: `PHASE_6C_COMPLETE` — HTTP 200 — ~83s — cloud mode
+GTM narrative: "SuppliedTech's GTM plan focuses on positioning the store as the trusted partner for SMEs seeking high-quality tech solutions."
+Launch phases: 3 | Channels: 2 (Organic Search/SEO, Email Marketing) | KPIs: 3
 
 ## Architecture Note: Artifact Forwarding Pattern
 
