@@ -606,6 +606,91 @@
         7500,
         300
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 \u2014 Bridge: Prepare build-content-strategy input\n// Assembles the input payload for the build-content-strategy subworkflow.\n// build-content-strategy expects: project_id, offer_architecture,\n// strategy_synthesis, brand_positioning, market_intelligence, store_profile,\n// normalized_intake_payload, runtime_config.\n//\n// offer_architecture flows from Phase 6a Complete (current $input).\n// strategy_synthesis is sourced from Phase 5 Complete (retained in context).\n// brand_positioning, market_intelligence, store_profile, normalized_intake_payload\n// are sourced from Prepare Strategy Synthesis Input (pre-subworkflow context\n// that retains all upstream artifacts before Phase 5 consumed them).\n\nconst phase6aOutput  = $input.first().json;\nconst preSynthesis   = $node['Prepare Strategy Synthesis Input'].json;\nconst phase5Complete = $node['Phase 5 Complete'].json;\n\nconst output = {\n  project_id:                phase6aOutput.project_id,\n  runtime_config:            phase6aOutput.runtime_config,\n  offer_architecture:        phase6aOutput.offer_architecture,\n  strategy_synthesis:        phase5Complete.strategy_synthesis || preSynthesis.strategy_synthesis || null,\n  brand_positioning:         preSynthesis.brand_positioning || null,\n  market_intelligence:       preSynthesis.market_intelligence || null,\n  store_profile:             preSynthesis.store_profile || null,\n  normalized_intake_payload: preSynthesis.normalized_intake_payload || null,\n};\n\nconsole.log('Prepare Content Strategy Input: project=' + phase6aOutput.project_id +\n  ' offer_architecture=' + (phase6aOutput.offer_architecture ? 'present' : 'MISSING') +\n  ' strategy_synthesis=' + (output.strategy_synthesis ? 'present' : 'MISSING') +\n  ' brand_positioning=' + (output.brand_positioning ? 'present' : 'MISSING'));\n\nreturn [{ json: output }];\n"
+      },
+      "id": "c5d6e7f8-0006-006b-006b-000000000011",
+      "name": "Prepare Content Strategy Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_WITH_BUILD_CONTENT_STRATEGY_WORKFLOW_ID",
+        "options": {}
+      },
+      "id": "c5d6e7f8-0006-006b-006b-000000000012",
+      "name": "Run build-content-strategy",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        8000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c5d6e7f8-cond-006b-006b-000000000001",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "SUCCESS",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c5d6e7f8-0006-006b-006b-000000000013",
+      "name": "Content Strategy Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        8250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 \u2014 Content Strategy HALT\nconst input    = $input.first().json;\nconst errorMsg = `CHAIN_HALT: build-content-strategy failed. Status: ${input.status}.`;\nconsole.error(errorMsg);\nthrow new Error(errorMsg);\n"
+      },
+      "id": "c5d6e7f8-0006-006b-006b-000000000014",
+      "name": "Halt - Content Strategy Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8250,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 \u2014 Phase 6b Complete\n// build-content-strategy succeeded. Forwards all artifacts inline.\n\nconst csOutput  = $input.first().json;\nconst phase6aComplete = $node['Phase 6a Complete'].json;\nconst cloudMode = csOutput.cloud_mode || false;\n\nconst summary = {\n  status:           'PHASE_6B_COMPLETE',\n  project_id:       csOutput.project_id,\n  cloud_mode:       cloudMode,\n  content_strategy: csOutput.content_strategy || null,\n  // Forward Phase 6a artifacts\n  offer_architecture: phase6aComplete.offer_architecture || null,\n  // runtime\n  runtime_config:   csOutput.runtime_config,\n  cloud_warnings:   csOutput.cloud_warnings || [],\n  envelope:         csOutput.envelope || null,\n  next_phase:       'Phase 6c \u2014 GTM Plan (build-gtm-plan)',\n};\n\nconst cs  = csOutput.content_strategy || {};\nconst mh  = cs.messaging_hierarchy || {};\nconst ev  = cs.editorial_voice || {};\nconst pillars = cs.content_pillars || [];\n\nsummary.message = `Phase 6b complete for project: ${csOutput.project_id} | primary_message: ${(mh.primary_message||'').slice(0,80)} | pillars: ${pillars.length} | tone: ${ev.tone||'unknown'}`;\n\nreturn [{ json: summary }];\n"
+      },
+      "id": "c5d6e7f8-0006-006b-006b-000000000015",
+      "name": "Phase 6b Complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        8500,
+        300
+      ]
     }
   ],
   "connections": {
@@ -1000,6 +1085,57 @@
         [
           {
             "node": "Halt - Offer Architecture Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 6a Complete": {
+      "main": [
+        [
+          {
+            "node": "Prepare Content Strategy Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Content Strategy Input": {
+      "main": [
+        [
+          {
+            "node": "Run build-content-strategy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run build-content-strategy": {
+      "main": [
+        [
+          {
+            "node": "Content Strategy Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Content Strategy Success?": {
+      "main": [
+        [
+          {
+            "node": "Phase 6b Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Halt - Content Strategy Failed",
             "type": "main",
             "index": 0
           }

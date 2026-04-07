@@ -162,6 +162,20 @@ function printSummary(result, startedAt, endedAt) {
     console.log(`    upsell_paths:   ${(oa.upsell_paths || []).length}`);
   }
 
+  if (d.content_strategy) {
+    const cs = d.content_strategy;
+    const mh = cs.messaging_hierarchy || {};
+    const ev = cs.editorial_voice || {};
+    const pillars = cs.content_pillars || [];
+    console.log('');
+    console.log('  CONTENT STRATEGY:');
+    console.log(`    primary_message: ${(mh.primary_message || '—').slice(0, 120)}`);
+    console.log(`    content_pillars: ${pillars.length} (${pillars.slice(0, 3).map((p) => p.pillar).join(', ')})`);
+    console.log(`    editorial_tone:  ${ev.tone || '—'}`);
+    const seo = cs.seo_content_plan || {};
+    console.log(`    keyword_clusters: ${(seo.primary_keyword_clusters || []).length} | faq_clusters: ${(seo.faq_topic_clusters || []).length}`);
+  }
+
   if (d.next_phase) {
     console.log('');
     console.log(`  NEXT PHASE:  ${d.next_phase}`);
@@ -174,7 +188,10 @@ function printSummary(result, startedAt, endedAt) {
 
   console.log('');
   if (isSuccess) {
-    const chainDesc = d.status === 'PHASE_6A_COMPLETE' ? 'Phase 1–6a chain finished.' : 'Phase 1–5 chain finished.';
+    const chainDesc = d.status === 'PHASE_6B_COMPLETE' ? 'Phase 1–6b chain finished.'
+      : d.status === 'PHASE_6A_COMPLETE' ? 'Phase 1–6a chain finished.'
+      : d.status === 'PHASE_6_COMPLETE' ? 'Phase 1–6 chain finished.'
+      : 'Phase 1–5 chain finished.';
     console.log(`  ✓ Run completed successfully. ${chainDesc}`);
   } else {
     console.log('  ✗ Run did not complete. Check n8n execution log for details.');
