@@ -194,7 +194,8 @@ async function main() {
       }
 
       const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
-                                 'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE']);
+                                 'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
+                                 'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL']);
       if (result && !TERMINAL.has(result.status)) process.exit(1);
       return;
     }
