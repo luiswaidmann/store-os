@@ -120,9 +120,20 @@ async function main() {
   }
   console.log(`\nSubstitutions applied: ${substitutions}`);
 
-  // Parse and inject the correct workflow ID
+  // Parse, inject the correct workflow ID, and strip non-API fields
   const workflowJson = JSON.parse(rawJson);
   workflowJson.id = targetId;
+
+  // n8n API v1 PUT /workflows/{id} rejects any unknown top-level properties.
+  // Strip store-os internal fields (_meta, etc.) before sending.
+  // id, active are read-only — managed by n8n, not sent in body
+  const API_ALLOWED_KEYS = new Set(['name', 'nodes', 'connections', 'settings', 'staticData', 'tags', 'pinData']);
+  for (const key of Object.keys(workflowJson)) {
+    if (!API_ALLOWED_KEYS.has(key)) {
+      console.log(`  Stripped non-API field: ${key}`);
+      delete workflowJson[key];
+    }
+  }
 
   // Deploy to n8n via REST API
   const baseUrl = N8N_BASE_URL.replace(/\/$/, '');
