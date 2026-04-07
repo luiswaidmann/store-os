@@ -27,6 +27,9 @@ Recent runtime progression merges (on `main`):
 
 ## Last confirmed end-to-end smoke test
 
+**Phase 7B.1 smoke test: PENDING** — `build-shopify-catalog` deployed 2026-04-07, live run against `8zw111-cj.myshopify.com` not yet executed.
+
+**Phase 7A confirmed:**
 **Date:** 2026-04-07
 **Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async model + persistence)
 **Input:** `test-data/golden-input.json` (project: `suppliedtech`)
@@ -65,9 +68,10 @@ The currently confirmed n8n execution path (Phase 7A — 2026-04-07) is:
 - `build-offer-architecture` (Phase 6a)
 - `build-content-strategy` (Phase 6b)
 - `build-gtm-plan` (Phase 6c)
-- `build-store-blueprint` ← **NEW** (Phase 7A, `feature/phase-16-strategy-synthesis-runtime`)
+- `build-store-blueprint` (Phase 7A)
+- `build-shopify-catalog` ← **NEW** (Phase 7B.1, `feature/phase-7b1-shopify-catalog`)
 
-**Async model:** Phase 7A chains run ~117s. The webhook returns HTTP 202 within ~2s with an `execution_id`. The CLI polls `GET /api/v1/executions/{id}` until `finished: true`. Cloudflare's 100s timeout is no longer hit. See `docs/async-execution-model.md`.
+**Async model:** Chains run ~117s+. The webhook returns HTTP 202 within ~2s with an `execution_id`. The CLI polls `GET /api/v1/executions/{id}` until `finished: true`. Cloudflare's 100s timeout is no longer hit. See `docs/async-execution-model.md`.
 
 ## Current confirmed inline outputs
 
@@ -81,7 +85,8 @@ The chain currently returns these runtime artifacts inline in cloud mode:
 - `offer_architecture`
 - `content_strategy`
 - `gtm_plan`
-- `store_blueprint` ← **NEW**
+- `store_blueprint`
+- `shopify_catalog_deployment` ← **NEW** (Phase 7B.1)
 
 ## Runtime Hardening (Phase 16)
 

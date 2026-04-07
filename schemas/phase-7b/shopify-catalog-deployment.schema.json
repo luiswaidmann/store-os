@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12",
+  "$id": "schemas/phase-7b/shopify-catalog-deployment.schema.json",
+  "title": "Shopify Catalog Deployment",
+  "description": "Output schema for build-shopify-catalog (Phase 7B.1). Documents the result of deploying store_blueprint products and collections to Shopify via the Admin API.",
+  "type": "object",
+  "required": [
+    "status",
+    "project_id",
+    "shop_url",
+    "completed_at",
+    "products_created",
+    "products_updated",
+    "collections_created",
+    "collections_updated",
+    "errors",
+    "warnings",
+    "blueprint_summary",
+    "safety_notes"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["PHASE_7B1_COMPLETE", "PHASE_7B1_PARTIAL", "PHASE_7B1_FAILED"],
+      "description": "Terminal status. COMPLETE = all actions succeeded. PARTIAL = some succeeded, some failed. FAILED = all actions failed or no actions succeeded."
+    },
+    "project_id": {
+      "type": "string",
+      "description": "Project identifier, matches runtime_config.project_id"
+    },
+    "shop_url": {
+      "type": "string",
+      "description": "Shopify shop domain (without https://), e.g. my-store.myshopify.com"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the deployment summary was compiled"
+    },
+    "products_created": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of new products successfully created (HTTP 201)"
+    },
+    "products_updated": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of existing products successfully updated (HTTP 200)"
+    },
+    "collections_created": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of new custom collections successfully created (HTTP 201)"
+    },
+    "collections_updated": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of existing custom collections successfully updated (HTTP 200)"
+    },
+    "errors": {
+      "type": "array",
+      "description": "List of API errors encountered during deployment. Non-fatal — partial success is possible.",
+      "items": {
+        "type": "object",
+        "required": ["resource", "handle", "status", "message"],
+        "properties": {
+          "resource": { "type": "string", "description": "'product' or 'collection'" },
+          "handle":   { "type": "string", "description": "Shopify handle of the resource" },
+          "status":   { "type": "integer", "description": "HTTP status code" },
+          "message":  { "type": "string", "description": "Error message from Shopify or n8n" }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Non-fatal warnings (e.g. noop sentinel, unexpected status codes)",
+      "items": { "type": "string" }
+    },
+    "blueprint_summary": {
+      "type": "object",
+      "description": "Input summary from store_blueprint for cross-reference",
+      "required": ["products_in_blueprint", "collections_in_blueprint"],
+      "properties": {
+        "products_in_blueprint":    { "type": "integer", "minimum": 0 },
+        "collections_in_blueprint": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "safety_notes": {
+      "type": "array",
+      "description": "Confirms safety guarantees applied during this deployment",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}

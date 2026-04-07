@@ -1,0 +1,133 @@
+{
+  "_meta": {
+    "format": "store-os-runtime-contract",
+    "version": "1.0",
+    "phase_id": "build-shopify-catalog",
+    "category": "deployment",
+    "cloud_compatibility": "FULL",
+    "description": "First live Shopify deployment stage (Phase 7B.1). Consumes store_blueprint to create or update products and collections in a Shopify store via the Admin API. Safety-first: no deletes, upsert by handle, all new products created as drafts."
+  },
+  "phase_id": "build-shopify-catalog",
+  "category": "deployment",
+  "cloud_compatibility": "FULL",
+  "upstream_dependencies": [
+    "build-store-blueprint"
+  ],
+  "required_inputs": {
+    "from_pipeline": [
+      {
+        "field": "store_blueprint",
+        "source": "build-store-blueprint",
+        "required_subfields": ["products", "collections"],
+        "constraints": ["products must be a non-empty array"]
+      },
+      {
+        "field": "runtime_config",
+        "source": "resolve-runtime-config",
+        "required_subfields": ["project_id", "shop_url"],
+        "notes": "shop_url may be under key STORE_OS_SHOPIFY_SHOP_URL in cloud mode (smoke_test_config)"
+      },
+      {
+        "field": "project_id",
+        "source": "resolve-runtime-config"
+      }
+    ],
+    "environment": [
+      {
+        "variable": "STORE_OS_SHOPIFY_SHOP_URL",
+        "description": "Shopify store domain (e.g. my-store.myshopify.com). Set in env (self-hosted) or smoke_test_config (cloud)."
+      },
+      {
+        "variable": "STORE_OS_SHOPIFY_API_VERSION",
+        "description": "Shopify Admin API version (e.g. 2025-01). Defaults to 2025-01 if not set.",
+        "optional": true
+      }
+    ],
+    "credentials": [
+      {
+        "name": "Shopify SuppliedTech Admin",
+        "type": "shopifyOAuth2Api",
+        "n8n_id_placeholder": "edgLmgVntFGX6QYN",
+        "used_by": ["Fetch Existing Collections", "Fetch Existing Products", "Create Resource", "Update Resource"]
+      }
+    ]
+  },
+  "execution_model": {
+    "pattern": "Subworkflow — called as executeWorkflow from orchestrate-phase1",
+    "trigger_node": "n8n-nodes-base.executeWorkflowTrigger",
+    "node_count": 11,
+    "shopify_api_operations": [
+      "GET /admin/api/{version}/custom_collections.json?limit=250 — fetch existing collections",
+      "GET /admin/api/{version}/products.json?limit=250 — fetch existing products",
+      "POST /admin/api/{version}/custom_collections.json — create new collection",
+      "POST /admin/api/{version}/products.json — create new product",
+      "PUT /admin/api/{version}/custom_collections/{id}.json — update existing collection",
+      "PUT /admin/api/{version}/products/{id}.json — update existing product"
+    ]
+  },
+  "output_contract": {
+    "shopify_catalog_deployment": {
+      "description": "Deployment summary. Returned inline — no filesystem writes.",
+      "schema_ref": "schemas/phase-7b/shopify-catalog-deployment.schema.json",
+      "terminal_statuses": ["PHASE_7B1_COMPLETE", "PHASE_7B1_PARTIAL", "PHASE_7B1_FAILED"],
+      "required_fields": [
+        "status",
+        "project_id",
+        "shop_url",
+        "completed_at",
+        "products_created",
+        "products_updated",
+        "collections_created",
+        "collections_updated",
+        "errors",
+        "warnings",
+        "blueprint_summary",
+        "safety_notes"
+      ]
+    }
+  },
+  "safety_guarantees": [
+    "No Shopify resources are ever deleted — only POST (create) and PUT (update) operations are performed",
+    "Upsert by handle: existing handles are updated, new handles are created",
+    "All new products are created with status: 'draft' — never auto-published",
+    "continueOnFail: true on all HTTP nodes — individual API errors are collected, not fatal",
+    "neverError: true on HTTP nodes — HTTP 4xx/5xx return as items, not exceptions"
+  ],
+  "upsert_logic": {
+    "collections": "GET existing custom_collections → index by handle → if handle exists: PUT (update), else POST (create)",
+    "products": "GET existing products (status=active,draft) → index by handle → if handle exists: PUT (update), else POST (create)",
+    "handle_derivation": "store_blueprint handle field used directly if present; otherwise derived from title: lowercase, non-alphanumeric replaced with hyphens"
+  },
+  "validation_errors": [
+    {
+      "code": "MISSING_RUNTIME_CONFIG",
+      "severity": "fatal",
+      "description": "runtime_config or runtime_config.project_id is absent."
+    },
+    {
+      "code": "MISSING_ARTIFACT",
+      "severity": "fatal",
+      "description": "store_blueprint is absent from trigger input."
+    },
+    {
+      "code": "INVALID_BLUEPRINT",
+      "severity": "fatal",
+      "description": "store_blueprint.products is not a non-empty array."
+    },
+    {
+      "code": "MISSING_CONFIG",
+      "severity": "fatal",
+      "description": "shop_url not found in runtime_config. STORE_OS_SHOPIFY_SHOP_URL must be configured."
+    }
+  ],
+  "cloud_behavior": {
+    "skipped": [],
+    "notes": "Fully cloud-compatible. All Shopify API calls use shopifyOAuth2Api credential injected by n8n. No filesystem access or AJV validation required."
+  },
+  "downstream_consumers": {
+    "primary": [
+      "orchestrate-phase1 — Phase 7B.1 bridge node reads shopify_catalog_deployment.status to gate continuation",
+      "Phase 7B.2 (planned) — build-shopify-pages: deploys About, FAQ, Contact pages"
+    ]
+  }
+}

@@ -864,7 +864,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// orchestrate-phase1 — Prepare Async Response\n// Assembles the immediate HTTP 202 body and passes the original runtime config\n// through to downstream nodes. 'Respond to Webhook' uses _async_response as body;\n// all nodes after it receive the original runtime_config + intake_payload intact.\n\nconst input = $input.first().json;\nconst projectId = (input.runtime_config || {}).project_id\n  || (input.intake_payload || {}).project_id\n  || 'unknown';\nconst executionId = $execution.id;\n\nreturn [{\n  json: {\n    // passthrough — downstream nodes (Validate Orchestrate Input etc.) use this\n    ...input,\n    // async response — used only by Respond to Webhook node\n    _async_response: {\n      execution_id:  executionId,\n      status:        'started',\n      project_id:    projectId,\n      started_at:    new Date().toISOString(),\n      message:       'Run started asynchronously. Poll /api/v1/executions/' + executionId + ' for status and results.',\n      tracking: {\n        poll_interval_seconds:  5,\n        terminal_statuses:      ['PHASE_7A_COMPLETE', 'PHASE_6C_COMPLETE', 'PHASE_6B_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_5_COMPLETE'],\n        api_endpoint:           'GET /api/v1/executions/' + executionId + '?includeData=true',\n        result_field:           'data.resultData.runData[lastNodeExecuted][0].data.main[0][0].json',\n      },\n    },\n  },\n}];"
+        "jsCode": "// orchestrate-phase1 — Prepare Async Response\n// Assembles the immediate HTTP 202 body and passes the original runtime config\n// through to downstream nodes. 'Respond to Webhook' uses _async_response as body;\n// all nodes after it receive the original runtime_config + intake_payload intact.\n\nconst input = $input.first().json;\nconst projectId = (input.runtime_config || {}).project_id\n  || (input.intake_payload || {}).project_id\n  || 'unknown';\nconst executionId = $execution.id;\n\nreturn [{\n  json: {\n    // passthrough — downstream nodes (Validate Orchestrate Input etc.) use this\n    ...input,\n    // async response — used only by Respond to Webhook node\n    _async_response: {\n      execution_id:  executionId,\n      status:        'started',\n      project_id:    projectId,\n      started_at:    new Date().toISOString(),\n      message:       'Run started asynchronously. Poll /api/v1/executions/' + executionId + ' for status and results.',\n      tracking: {\n        poll_interval_seconds:  5,\n        terminal_statuses:      ['PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL', 'PHASE_7A_COMPLETE', 'PHASE_6C_COMPLETE', 'PHASE_6B_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_5_COMPLETE'],\n        api_endpoint:           'GET /api/v1/executions/' + executionId + '?includeData=true',\n        result_field:           'data.resultData.runData[lastNodeExecuted][0].data.main[0][0].json',\n      },\n    },\n  },\n}];"
       },
       "id": "a0b1c2d3-0000-0000-0000-000000000001",
       "name": "Prepare Async Response",
@@ -890,6 +890,91 @@
       "position": [
         800,
         600
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Prepare Shopify Catalog Input\n// Assembles Phase 7B.1 input from Phase 7A Complete output.\n// Passes store_blueprint + runtime_config to build-shopify-catalog subworkflow.\n\nconst phase7aOut = $input.first().json;\n\nconst output = {\n  project_id:      phase7aOut.project_id,\n  runtime_config:  phase7aOut.runtime_config,\n  store_blueprint: phase7aOut.store_blueprint,\n};\n\nif (!output.store_blueprint) {\n  throw new Error('Prepare Shopify Catalog Input: store_blueprint missing from Phase 7A Complete output.');\n}\nif (!output.runtime_config) {\n  throw new Error('Prepare Shopify Catalog Input: runtime_config missing from Phase 7A Complete output.');\n}\n\nconsole.log('Prepare Shopify Catalog Input: assembled for project=' + output.project_id);\nreturn [{ json: output }];\n"
+      },
+      "id": "7b1aorch-0007-07b1-07b1-000000000001",
+      "name": "Prepare Shopify Catalog Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        10750,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_WITH_BUILD_SHOPIFY_CATALOG_WORKFLOW_ID",
+        "options": {}
+      },
+      "id": "7b1aorch-0007-07b1-07b1-000000000002",
+      "name": "Run build-shopify-catalog",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        11000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "7b1aorch-cond-07b1-07b1-000000000001",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "PHASE_7B1_FAILED",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7b1aorch-0007-07b1-07b1-000000000003",
+      "name": "Shopify Catalog Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        11250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Phase 7B.1 Complete — Shopify Catalog Deployment\n// Returns full Phase 1-7B.1 artifact chain inline.\n// Forwards shopify_catalog_deployment as the new terminal artifact.\n\nconst catalogOut  = $input.first().json;\nconst phase7aOut  = $node['Phase 7A Complete'].json;\n\nconst summary = {\n  status:               catalogOut.status || 'PHASE_7B1_COMPLETE',\n  project_id:           catalogOut.project_id || phase7aOut.project_id,\n  cloud_mode:           phase7aOut.cloud_mode,\n  execution_id:         $execution.id,\n  completed_at:         new Date().toISOString(),\n  next_phase:           'Phase 7B.2 — Store Build (pages, navigation, theme)',\n\n  // Full artifact chain (Phase 1-7A forwarded)\n  store_profile:        phase7aOut.store_profile,\n  market_intelligence:  phase7aOut.market_intelligence,\n  brand_positioning:    phase7aOut.brand_positioning,\n  competitor_clusters:  phase7aOut.competitor_clusters,\n  strategy_synthesis:   phase7aOut.strategy_synthesis,\n  offer_architecture:   phase7aOut.offer_architecture,\n  content_strategy:     phase7aOut.content_strategy,\n  gtm_plan:             phase7aOut.gtm_plan,\n  store_blueprint:      phase7aOut.store_blueprint,\n\n  // Phase 7B.1 deployment result\n  shopify_catalog_deployment: {\n    status:               catalogOut.status,\n    products_created:     catalogOut.products_created,\n    products_updated:     catalogOut.products_updated,\n    collections_created:  catalogOut.collections_created,\n    collections_updated:  catalogOut.collections_updated,\n    errors:               catalogOut.errors,\n    warnings:             catalogOut.warnings,\n    shop_url:             catalogOut.shop_url,\n    blueprint_summary:    catalogOut.blueprint_summary,\n    safety_notes:         catalogOut.safety_notes,\n  },\n\n  runtime_config: phase7aOut.runtime_config,\n};\n\nreturn [{ json: summary }];\n"
+      },
+      "id": "7b1aorch-0007-07b1-07b1-000000000004",
+      "name": "Phase 7B.1 Complete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11500,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "throw new Error('Phase 7B.1 FAILED — Shopify catalog deployment failed. Check build-shopify-catalog execution log for errors. Status: ' + ($input.first().json.status || 'UNKNOWN'));"
+      },
+      "id": "7b1aorch-0007-07b1-07b1-000000000005",
+      "name": "Halt - Shopify Catalog Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        11500,
+        420
       ]
     }
   ],
@@ -1465,6 +1550,57 @@
           }
         ]
       ]
+    },
+    "Phase 7A Complete": {
+      "main": [
+        [
+          {
+            "node": "Prepare Shopify Catalog Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Shopify Catalog Input": {
+      "main": [
+        [
+          {
+            "node": "Run build-shopify-catalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run build-shopify-catalog": {
+      "main": [
+        [
+          {
+            "node": "Shopify Catalog Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shopify Catalog Success?": {
+      "main": [
+        [
+          {
+            "node": "Phase 7B.1 Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Halt - Shopify Catalog Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -1473,7 +1609,7 @@
   },
   "_meta": {
     "storeOs": {
-      "phase": "Phase 12/13/14/15/16",
+      "phase": "Phase 12/13/14/15/16/7A/7B.1",
       "format": "n8n-executable",
       "sourceSpec": "workflows/runtime/n8n-implementation-map.md",
       "cloudCompatibility": "PARTIAL — the full chain runs in both modes. In cloud mode: no artifact persistence, no schema validation, no checkpoint/log writes. shopify_import, store_profile, market_intelligence, brand_positioning, competitor_clusters, and strategy_synthesis flow inline through bridge nodes. Config is supplied via smoke_test_config in the trigger input (no process.env access).",
@@ -1504,7 +1640,7 @@
           "STORE_OS_SHOPIFY_API_VERSION": "2024-01"
         }
       },
-      "chainCoverage": "resolve-runtime-config → intake-store-input → import-shopify-data → build-store-profile → build-market-intelligence → build-brand-positioning → build-competitor-clusters → build-strategy-synthesis",
+      "chainCoverage": "resolve-runtime-config → intake-store-input → import-shopify-data → build-store-profile → build-market-intelligence → build-brand-positioning → build-competitor-clusters → build-strategy-synthesis → build-offer-architecture → build-content-strategy → build-gtm-plan → build-store-blueprint → build-shopify-catalog",
       "setupRequired": [
         "Replace REPLACE_WITH_INTAKE_STORE_INPUT_WORKFLOW_ID with the n8n workflow ID of intake-store-input",
         "Replace REPLACE_WITH_IMPORT_SHOPIFY_DATA_WORKFLOW_ID with the n8n workflow ID of import-shopify-data",
@@ -1518,9 +1654,11 @@
         "Replace REPLACE_WITH_N8N_OPENAI_CREDENTIAL_ID in build-competitor-clusters with your OpenAI credential ID",
         "Replace REPLACE_WITH_N8N_OPENAI_CREDENTIAL_ID in build-strategy-synthesis with your OpenAI credential ID",
         "Self-hosted: set all STORE_OS_* environment variables. n8n Cloud: pass values as smoke_test_config in trigger input.",
-        "Configure Shopify API credential in n8n and update import-shopify-data with its credential ID"
+        "Configure Shopify API credential in n8n and update import-shopify-data with its credential ID",
+        "Replace REPLACE_WITH_BUILD_SHOPIFY_CATALOG_WORKFLOW_ID with the n8n workflow ID of build-shopify-catalog after deployment",
+        "Ensure STORE_OS_SHOPIFY_SHOP_URL is set in env (self-hosted) or smoke_test_config (cloud) for Phase 7B.1"
       ],
-      "notYetImplemented": "build-offer-architecture, build-content-strategy, build-gtm-plan, build-pattern-manifest and all subsequent workflows (Phase 6+)"
+      "notYetImplemented": "Phase 7B.2 (pages, navigation, theme), build-pattern-manifest and all subsequent SEO/content phases"
     }
   }
 }

@@ -121,7 +121,7 @@ function extractResultFromExecution(exData) {
 
   // Try known terminal nodes in priority order
   const terminalNodes = [
-    'Phase 7A Complete', 'Phase 6c Complete', 'Phase 6b Complete',
+    'Phase 7B.1 Complete', 'Phase 7A Complete', 'Phase 6c Complete', 'Phase 6b Complete',
     'Phase 6a Complete', 'Phase 5 Complete',
   ];
 
@@ -201,7 +201,8 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
   }
 
   const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
-                             'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE']);
+                             'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
+                             'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL']);
   const isSuccess = TERMINAL.has(d.status);
 
   console.log('');
@@ -300,6 +301,24 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
     console.log(`    assets:              ${bs.assets_count         ?? (sb.assets         || []).length}`);
   }
 
+  if (d.shopify_catalog_deployment) {
+    const cd = d.shopify_catalog_deployment;
+    console.log('');
+    console.log('  SHOPIFY CATALOG DEPLOYMENT:');
+    console.log(`    status:              ${cd.status || '—'}`);
+    console.log(`    shop:                ${cd.shop_url || '—'}`);
+    console.log(`    products_created:    ${cd.products_created ?? '—'}`);
+    console.log(`    products_updated:    ${cd.products_updated ?? '—'}`);
+    console.log(`    collections_created: ${cd.collections_created ?? '—'}`);
+    console.log(`    collections_updated: ${cd.collections_updated ?? '—'}`);
+    if (cd.errors && cd.errors.length > 0) {
+      console.log(`    errors:              ${cd.errors.length} (${cd.errors.map((e) => e.handle).join(', ')})`);
+    }
+    if (cd.warnings && cd.warnings.length > 0) {
+      console.log(`    warnings:            ${cd.warnings.length}`);
+    }
+  }
+
   if (d.next_phase) {
     console.log('');
     console.log(`  NEXT PHASE:  ${d.next_phase}`);
@@ -312,7 +331,9 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
 
   console.log('');
   if (isSuccess) {
-    const chainDesc = d.status === 'PHASE_7A_COMPLETE' ? 'Phase 1–7A chain finished.'
+    const chainDesc = d.status === 'PHASE_7B1_COMPLETE' ? 'Phase 1–7B.1 chain finished (Shopify catalog deployed).'
+      : d.status === 'PHASE_7B1_PARTIAL' ? 'Phase 1–7B.1 finished with partial deployment (some errors).'
+      : d.status === 'PHASE_7A_COMPLETE' ? 'Phase 1–7A chain finished.'
       : d.status === 'PHASE_6C_COMPLETE' ? 'Phase 1–6c chain finished.'
       : d.status === 'PHASE_6B_COMPLETE' ? 'Phase 1–6b chain finished.'
       : d.status === 'PHASE_6A_COMPLETE' ? 'Phase 1–6a chain finished.'
@@ -395,6 +416,20 @@ function buildRunRecord(result, executionId, startedAt, finishedAt, error) {
         assets_count:        (sb.assets         || []).length,
       },
     };
+
+    if (result.shopify_catalog_deployment) {
+      const cd = result.shopify_catalog_deployment;
+      record.artifacts.shopify_catalog_deployment = {
+        status:               cd.status || null,
+        shop_url:             cd.shop_url || null,
+        products_created:     cd.products_created ?? 0,
+        products_updated:     cd.products_updated ?? 0,
+        collections_created:  cd.collections_created ?? 0,
+        collections_updated:  cd.collections_updated ?? 0,
+        errors_count:         (cd.errors || []).length,
+        warnings_count:       (cd.warnings || []).length,
+      };
+    }
   }
 
   return record;
@@ -483,7 +518,8 @@ async function main() {
         printSummary(finalResult, 200, durationMs, pollStartedAt);
       }
       const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
-                                 'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE']);
+                                 'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
+                                 'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL']);
       if (!TERMINAL.has(finalResult.status)) process.exit(1);
     } else {
       console.error('ERROR: Could not extract result from execution data.');
@@ -550,7 +586,8 @@ async function main() {
 
   // Detect async response vs legacy synchronous response
   const TERMINAL_STATUSES = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
-                                      'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE']);
+                                      'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
+                                      'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL']);
   const isLegacySync = startData.status && TERMINAL_STATUSES.has(startData.status);
 
   if (isLegacySync) {
