@@ -110,19 +110,23 @@
         },
         "brand_role": {
           "type": "string",
-          "description": "Optional: The role the brand plays for the customer (e.g. 'expert', 'companion', 'enabler')."
+          "enum": ["specialist", "curator", "problem-solver", "premium-innovator", "editorial-guide", "value-leader"],
+          "description": "Optional: The role the brand plays for the customer. Must match the enum enforced by build-brand-positioning."
         },
         "tone_of_voice": {
           "type": "string",
-          "description": "Optional: Directional tone descriptor (e.g. 'confident', 'warm', 'authoritative')."
+          "enum": ["clear-direct", "premium-confident", "warm-helpful", "editorial-smart", "playful-bold", "technical-trustworthy"],
+          "description": "Optional: Tone of voice style. Must match the enum enforced by build-brand-positioning (tone_of_voice.style)."
         },
         "trust_style": {
           "type": "string",
-          "description": "Optional: How trust is signaled (e.g. 'reviews', 'certifications', 'transparency')."
+          "enum": ["evidence-led", "social-proof-led", "authority-led", "guarantee-led", "mixed"],
+          "description": "Optional: Trust proof mode. Must match the enum enforced by build-brand-positioning (trust_style.proof_mode)."
         },
         "conversion_style": {
           "type": "string",
-          "description": "Optional: Conversion approach (e.g. 'urgency', 'education', 'social-proof')."
+          "enum": ["subtle", "balanced", "assertive"],
+          "description": "Optional: CTA style. Must match the enum enforced by build-brand-positioning (conversion_style.cta_style)."
         },
         "must_feel_like": {
           "type": "string",

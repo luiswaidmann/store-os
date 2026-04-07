@@ -28,10 +28,10 @@
       "https://www.otto.de/office",
       "https://staples.de"
     ],
-    "brand_role": "expert",
-    "tone_of_voice": "confident",
-    "trust_style": "certifications",
-    "conversion_style": "education",
+    "brand_role": "specialist",
+    "tone_of_voice": "technical-trustworthy",
+    "trust_style": "evidence-led",
+    "conversion_style": "balanced",
     "must_feel_like": "professional, reliable, efficient",
     "must_not_feel_like": "cheap, generic, consumer-oriented",
     "special_notes": "Focus on SME customers. Emphasize fast delivery, bulk pricing, and account management."
