@@ -2,29 +2,38 @@
 /**
  * run-orchestrator.js
  *
- * CLI wrapper for the store-os orchestration webhook.
- * Sends a POST to orchestrate-phase1, attaches the Bearer auth token,
- * and prints a clean structured summary of the run result.
- * Recognises terminal statuses: PHASE_5_COMPLETE, PHASE_6A_COMPLETE, PHASE_6B_COMPLETE, PHASE_6C_COMPLETE, PHASE_7A_COMPLETE.
+ * CLI wrapper for the store-os orchestration webhook — async execution model.
+ *
+ * ASYNC MODEL (default):
+ *   1. POST to webhook → receives 202 { execution_id, status: "started" } quickly
+ *   2. Polls GET /api/v1/executions/{id} until finished
+ *   3. Extracts and displays final result
+ *   This eliminates the Cloudflare 100s webhook timeout for long chains.
  *
  * Usage:
  *   node scripts/run-orchestrator.js --input <json-file>
  *   node scripts/run-orchestrator.js --input test-data/golden-input.json
+ *   node scripts/run-orchestrator.js --execution-id <id>   # poll only
  *
- * Required env vars (in .env or shell):
- *   N8N_BASE_URL         — e.g. https://luwai.app.n8n.cloud
- *   STORE_OS_API_TOKEN   — Bearer token for webhook auth (set in n8n vars)
+ * Required env vars (in .env):
+ *   N8N_BASE_URL    — e.g. https://luwai.app.n8n.cloud
+ *   N8N_API_KEY     — n8n API key for polling /api/v1/executions
  *
  * Optional:
- *   --dry-run            — validate payload locally, do not call webhook
- *   --timeout <ms>       — request timeout in ms (default: 300000 / 5 min)
- *   --silent             — suppress progress output, print only final JSON
+ *   STORE_OS_API_TOKEN  — Bearer token for webhook auth (if set in n8n vars)
+ *
+ * Flags:
+ *   --dry-run            — validate payload locally, do not send
+ *   --timeout <ms>       — total run timeout in ms (default: 600000 / 10 min)
+ *   --poll-interval <ms> — polling interval in ms (default: 5000)
+ *   --silent             — suppress progress output
+ *   --no-poll            — trigger only; print execution_id and exit
  */
 
 'use strict';
 
-const fs   = require('fs');
-const path = require('path');
+const fs    = require('fs');
+const path  = require('path');
 const https = require('https');
 const http  = require('http');
 
@@ -51,31 +60,37 @@ function loadEnv() {
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const result = { input: null, dryRun: false, timeout: 300000, silent: false };
+  const result = {
+    input: null, executionId: null,
+    dryRun: false, noPoll: false, silent: false,
+    timeout: 600000, pollInterval: 5000,
+  };
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--input' && args[i + 1])    { result.input   = args[++i]; continue; }
-    if (args[i] === '--timeout' && args[i + 1])  { result.timeout = parseInt(args[++i], 10); continue; }
+    if (args[i] === '--input' && args[i + 1])         { result.input        = args[++i]; continue; }
+    if (args[i] === '--execution-id' && args[i + 1])  { result.executionId  = args[++i]; continue; }
+    if (args[i] === '--timeout' && args[i + 1])       { result.timeout      = parseInt(args[++i], 10); continue; }
+    if (args[i] === '--poll-interval' && args[i + 1]) { result.pollInterval = parseInt(args[++i], 10); continue; }
     if (args[i] === '--dry-run')  { result.dryRun  = true; continue; }
+    if (args[i] === '--no-poll')  { result.noPoll  = true; continue; }
     if (args[i] === '--silent')   { result.silent  = true; continue; }
   }
   return result;
 }
 
-// ── HTTP helper ───────────────────────────────────────────────────────────
+// ── HTTP helpers ──────────────────────────────────────────────────────────
 
-function postJson(url, body, headers, timeoutMs) {
+function httpRequest(method, url, body, headers, timeoutMs) {
   return new Promise((resolve, reject) => {
     const parsed  = new URL(url);
     const lib     = parsed.protocol === 'https:' ? https : http;
-    const bodyBuf = Buffer.from(JSON.stringify(body));
+    const bodyBuf = body ? Buffer.from(JSON.stringify(body)) : null;
     const options = {
       hostname: parsed.hostname,
       port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
       path: parsed.pathname + parsed.search,
-      method: 'POST',
+      method,
       headers: {
-        'Content-Type':   'application/json',
-        'Content-Length': bodyBuf.length,
+        ...(bodyBuf ? { 'Content-Type': 'application/json', 'Content-Length': bodyBuf.length } : {}),
         ...headers,
       },
     };
@@ -92,25 +107,102 @@ function postJson(url, body, headers, timeoutMs) {
 
     req.setTimeout(timeoutMs, () => { req.destroy(); reject(new Error(`Request timed out after ${timeoutMs}ms`)); });
     req.on('error', reject);
-    req.write(bodyBuf);
+    if (bodyBuf) req.write(bodyBuf);
     req.end();
   });
 }
 
+// ── Extract final result from execution data ──────────────────────────────
+
+function extractResultFromExecution(exData) {
+  const resultData = (exData.data || {}).resultData || {};
+  const runData    = resultData.runData || {};
+  const lastNode   = resultData.lastNodeExecuted;
+
+  // Try known terminal nodes in priority order
+  const terminalNodes = [
+    'Phase 7A Complete', 'Phase 6c Complete', 'Phase 6b Complete',
+    'Phase 6a Complete', 'Phase 5 Complete',
+  ];
+
+  for (const nodeName of terminalNodes) {
+    const nodeRuns = runData[nodeName];
+    if (nodeRuns && nodeRuns[0]) {
+      const mainOut = ((nodeRuns[0].data || {}).main || [[]])[0] || [];
+      if (mainOut[0]) return mainOut[0].json;
+    }
+  }
+
+  // Fallback: use lastNodeExecuted
+  if (lastNode && runData[lastNode]) {
+    const mainOut = ((runData[lastNode][0].data || {}).main || [[]])[0] || [];
+    if (mainOut[0]) return mainOut[0].json;
+  }
+
+  return null;
+}
+
+// ── Poll execution until finished ─────────────────────────────────────────
+
+async function pollExecution(executionId, apiKey, baseUrl, timeoutMs, pollInterval, silent) {
+  const apiUrl = `${baseUrl}/api/v1/executions/${executionId}?includeData=true`;
+  const pollHeaders = { 'X-N8N-API-KEY': apiKey };
+  const start = Date.now();
+  let dotCount = 0;
+
+  if (!silent) {
+    process.stdout.write(`  Polling execution ${executionId}`);
+  }
+
+  while (Date.now() - start < timeoutMs) {
+    await new Promise((resolve) => setTimeout(resolve, pollInterval));
+
+    let result;
+    try {
+      result = await httpRequest('GET', apiUrl, null, pollHeaders, 30000);
+    } catch (e) {
+      if (!silent) process.stdout.write('?');
+      continue;
+    }
+
+    if (result.status !== 200) {
+      if (!silent) process.stdout.write('!');
+      continue;
+    }
+
+    const ex = result.data;
+
+    if (ex.status === 'error') {
+      if (!silent) console.log(' ERROR');
+      throw new Error(`n8n execution ${executionId} finished with status: error`);
+    }
+
+    if (ex.status === 'success' && ex.finished) {
+      if (!silent) console.log(` done (${Math.round((Date.now() - start) / 1000)}s)`);
+      return ex;
+    }
+
+    if (!silent) {
+      process.stdout.write('.');
+      dotCount++;
+      if (dotCount % 60 === 0) process.stdout.write('\n  ');
+    }
+  }
+
+  throw new Error(`Polling timed out after ${timeoutMs}ms. Check n8n execution ${executionId} manually.`);
+}
+
 // ── Output formatter ──────────────────────────────────────────────────────
 
-function printSummary(result, startedAt, endedAt) {
-  const durationMs = endedAt - startedAt;
-  const d = result.data;
-
+function printSummary(d, httpStatus, durationMs, startedAt) {
   if (typeof d !== 'object' || d === null) {
     console.log('RAW RESPONSE:', d);
     return;
   }
 
-  const TERMINAL_STATUSES = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE', 'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE']);
-  const isSuccess = TERMINAL_STATUSES.has(d.status) && result.status >= 200 && result.status < 300;
-  const isError   = !isSuccess;
+  const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
+                             'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE']);
+  const isSuccess = TERMINAL.has(d.status);
 
   console.log('');
   console.log('╔══════════════════════════════════════════════════════════╗');
@@ -121,7 +213,7 @@ function printSummary(result, startedAt, endedAt) {
   console.log(`  PROJECT:     ${d.project_id || '—'}`);
   console.log(`  CLOUD MODE:  ${d.cloud_mode !== undefined ? d.cloud_mode : '—'}`);
   console.log(`  DURATION:    ${durationMs}ms`);
-  console.log(`  HTTP:        ${result.status}`);
+  if (d.execution_id) console.log(`  EXEC ID:     ${d.execution_id}`);
 
   if (d.output_summary) {
     const s = d.output_summary;
@@ -213,7 +305,7 @@ function printSummary(result, startedAt, endedAt) {
     console.log(`  NEXT PHASE:  ${d.next_phase}`);
   }
 
-  if (isError && d.message) {
+  if (!isSuccess && d.message) {
     console.log('');
     console.log(`  ERROR: ${d.message}`);
   }
@@ -240,27 +332,55 @@ async function main() {
   const args = parseArgs();
 
   const N8N_BASE_URL = process.env.N8N_BASE_URL;
+  const N8N_API_KEY  = process.env.N8N_API_KEY;
   const API_TOKEN    = process.env.STORE_OS_API_TOKEN;
 
   if (!N8N_BASE_URL) {
     console.error('ERROR: N8N_BASE_URL must be set in .env');
     process.exit(1);
   }
+
+  // ── Poll-only mode ──────────────────────────────────────────────────────
+  if (args.executionId) {
+    if (!N8N_API_KEY) {
+      console.error('ERROR: N8N_API_KEY must be set in .env for polling.');
+      process.exit(1);
+    }
+    if (!args.silent) console.log(`\nPolling execution ${args.executionId}...`);
+    const startedAt = Date.now();
+    const ex = await pollExecution(args.executionId, N8N_API_KEY, N8N_BASE_URL, args.timeout, args.pollInterval, args.silent);
+    const finalResult = extractResultFromExecution(ex);
+    const durationMs = Date.now() - startedAt;
+    if (finalResult) {
+      if (args.silent) {
+        console.log(JSON.stringify(finalResult, null, 2));
+      } else {
+        printSummary(finalResult, 200, durationMs, startedAt);
+      }
+      const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
+                                 'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE']);
+      if (!TERMINAL.has(finalResult.status)) process.exit(1);
+    } else {
+      console.error('ERROR: Could not extract result from execution data.');
+      process.exit(1);
+    }
+    return;
+  }
+
+  // ── Trigger mode ────────────────────────────────────────────────────────
   if (!args.input) {
-    console.error('Usage: node scripts/run-orchestrator.js --input <json-file>');
-    console.error('Example: node scripts/run-orchestrator.js --input test-data/golden-input.json');
+    console.error('Usage:');
+    console.error('  node scripts/run-orchestrator.js --input <json-file>');
+    console.error('  node scripts/run-orchestrator.js --execution-id <id>   # poll only');
     process.exit(1);
   }
 
-  // Load input file
   const inputPath = path.resolve(ROOT, args.input);
   if (!fs.existsSync(inputPath)) {
     console.error(`ERROR: Input file not found: ${inputPath}`);
     process.exit(1);
   }
   const payload = JSON.parse(fs.readFileSync(inputPath, 'utf8'));
-
-  // Strip _meta from payload (store-os internal field)
   const sendPayload = { ...payload };
   delete sendPayload._meta;
 
@@ -268,12 +388,13 @@ async function main() {
     console.log(`\nstore-os run-orchestrator`);
     console.log(`  input:   ${inputPath}`);
     console.log(`  target:  ${N8N_BASE_URL}/webhook/orchestrate-phase1`);
+    console.log(`  mode:    async (webhook → execution_id → poll n8n API)`);
     console.log(`  auth:    ${API_TOKEN ? 'Bearer token configured' : 'no token (STORE_OS_API_TOKEN not set)'}`);
+    console.log(`  api_key: ${N8N_API_KEY ? 'configured' : 'NOT SET (will trigger only, no polling)'}`);
+
     if (args.dryRun) {
       console.log('\n[DRY RUN] Payload validated locally. Not sending request.');
       console.log('  project_id:', sendPayload.intake_payload?.project_id);
-      console.log('  vertical:  ', sendPayload.intake_payload?.vertical);
-      console.log('  market:    ', sendPayload.intake_payload?.primary_market);
       process.exit(0);
     }
     console.log('\nSending request...\n');
@@ -284,24 +405,99 @@ async function main() {
   if (API_TOKEN) headers['Authorization'] = `Bearer ${API_TOKEN}`;
 
   const startedAt = Date.now();
-  const result = await postJson(webhookUrl, sendPayload, headers, args.timeout);
-  const endedAt = Date.now();
 
-  if (args.silent) {
-    // Silent: output only the raw JSON response
-    console.log(JSON.stringify({
-      http_status: result.status,
-      duration_ms: endedAt - startedAt,
-      ...( typeof result.data === 'object' ? result.data : { raw: result.data }),
-    }, null, 2));
-  } else {
-    printSummary(result, startedAt, endedAt);
+  // Step 1: Trigger webhook — expect quick 202 with execution_id
+  let startResponse;
+  try {
+    startResponse = await httpRequest('POST', webhookUrl, sendPayload, headers, 30000);
+  } catch (e) {
+    console.error('FATAL: Failed to start run:', e.message);
+    process.exit(1);
   }
 
-  // Exit code: 0 on success, 1 on failure
-  if (result.status < 200 || result.status >= 300) process.exit(1);
-  const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE', 'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE']);
-  if (typeof result.data === 'object' && result.data.status && !TERMINAL.has(result.data.status)) process.exit(1);
+  if (startResponse.status < 200 || startResponse.status >= 300) {
+    console.error(`FATAL: Webhook returned HTTP ${startResponse.status}`);
+    if (startResponse.data) console.error('  Response:', typeof startResponse.data === 'string' ? startResponse.data.slice(0, 200) : JSON.stringify(startResponse.data).slice(0, 200));
+    process.exit(1);
+  }
+
+  const startData = typeof startResponse.data === 'object' ? startResponse.data : {};
+
+  // Detect async response vs legacy synchronous response
+  const TERMINAL_STATUSES = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
+                                      'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE']);
+  const isLegacySync = startData.status && TERMINAL_STATUSES.has(startData.status);
+
+  if (isLegacySync) {
+    // Old-style synchronous response — display directly
+    if (!args.silent) console.log('[legacy] Synchronous response received.');
+    const durationMs = Date.now() - startedAt;
+    if (args.silent) {
+      console.log(JSON.stringify({ http_status: startResponse.status, duration_ms: durationMs, ...startData }, null, 2));
+    } else {
+      printSummary(startData, startResponse.status, durationMs, startedAt);
+    }
+    if (!TERMINAL_STATUSES.has(startData.status)) process.exit(1);
+    return;
+  }
+
+  const executionId = startData.execution_id;
+  if (!executionId) {
+    console.error('ERROR: No execution_id in webhook response. Cannot poll.');
+    console.error('  Response:', JSON.stringify(startData).slice(0, 300));
+    process.exit(1);
+  }
+
+  if (!args.silent) {
+    console.log(`  execution_id: ${executionId}`);
+    console.log(`  project_id:   ${startData.project_id || '—'}`);
+    console.log(`  started_at:   ${startData.started_at || new Date().toISOString()}`);
+  }
+
+  // Step 2: --no-poll mode — just print id and exit
+  if (args.noPoll) {
+    console.log(`\nExecution started: ${executionId}`);
+    console.log(`Poll with: node scripts/run-orchestrator.js --execution-id ${executionId}`);
+    return;
+  }
+
+  // Step 3: Poll for result
+  if (!N8N_API_KEY) {
+    console.log(`\n⚠  N8N_API_KEY not set — cannot poll automatically.`);
+    console.log(`   Execution started: ${executionId}`);
+    console.log(`   Add N8N_API_KEY to .env, then poll with:`);
+    console.log(`   node scripts/run-orchestrator.js --execution-id ${executionId}`);
+    return;
+  }
+
+  if (!args.silent) {
+    console.log(`\n  Waiting for chain to complete (polling every ${args.pollInterval / 1000}s)...`);
+  }
+
+  let executionData;
+  try {
+    executionData = await pollExecution(executionId, N8N_API_KEY, N8N_BASE_URL, args.timeout, args.pollInterval, args.silent);
+  } catch (e) {
+    console.error('\nFATAL:', e.message);
+    process.exit(1);
+  }
+
+  const finalResult = extractResultFromExecution(executionData);
+  const durationMs  = Date.now() - startedAt;
+
+  if (!finalResult) {
+    console.error('\nERROR: Could not extract final result from completed execution.');
+    console.error('  Execution ID:', executionId, '| Last node:', (executionData.data?.resultData?.lastNodeExecuted || 'unknown'));
+    process.exit(1);
+  }
+
+  if (args.silent) {
+    console.log(JSON.stringify({ http_status: startResponse.status, duration_ms: durationMs, ...finalResult }, null, 2));
+  } else {
+    printSummary(finalResult, startResponse.status, durationMs, startedAt);
+  }
+
+  if (!TERMINAL_STATUSES.has(finalResult.status)) process.exit(1);
 }
 
 main().catch((err) => {

@@ -4,8 +4,8 @@
 
 **EXECUTABLE.** `build-store-blueprint` is deployed, activated, and end-to-end confirmed.
 
-Smoke test: `PHASE_7A_COMPLETE` — n8n execution status: success — ~128s — cloud mode
-Note: Cloudflare webhook 100s timeout is hit for Phase 7A chains. The execution completes successfully in n8n (confirmed via API: `finished: True`). See Cloud Timeout Constraint below.
+Smoke test: `PHASE_7A_COMPLETE` — n8n execution 14361 — status: success — ~117s — cloud mode — async model
+Async response: HTTP 202 in ~2s → CLI polled to completion. Cloudflare 100s timeout resolved.
 
 ---
 
@@ -100,15 +100,37 @@ Phase 6c Complete
 
 ---
 
-## Cloud Timeout Constraint
+## Async Execution Model
 
-**Issue:** The full Phase 1–7A chain runs for ~120-130s. Cloudflare (n8n Cloud's CDN) enforces a 100s timeout on webhook HTTP responses, returning HTTP 524 before the response arrives.
+**Previous issue:** The full Phase 1–7A chain runs for ~117s. Cloudflare enforces a 100s timeout on webhook HTTP responses, returning HTTP 524 before the response arrived.
 
-**Impact:** The webhook caller receives a 524 error. The n8n execution itself **completes successfully** (`finished: True`, `status: success`).
+**Resolution (feature/async-execution-model):** The orchestrator uses `responseMode: "responseNode"`. The execution path is:
 
-**Current mitigation:** Verified via n8n API (`GET /api/v1/executions/{id}`) — `PHASE_7A_COMPLETE` confirmed in `lastNodeExecuted` and `Phase 7A Complete` output data.
+```
+Webhook Trigger → Resolve Runtime Config → Prepare Async Response
+    → Respond to Webhook  ← HTTP 202 sent here (~2s)
+    → Validate Orchestrate Input → … → Phase 7A Complete
+```
 
-**Future remedy:** Use n8n's "Respond to Webhook" node immediately after Phase 5/6 and continue Phase 7A in a background execution, or adopt a polling/callback model for Phase 7+.
+The caller receives HTTP 202 with `{ execution_id, status: "started" }` within ~2 seconds. The full chain continues asynchronously. Results are retrieved by polling:
+
+```
+GET /api/v1/executions/{execution_id}?includeData=true
+```
+
+**CLI support:**
+```bash
+# Full run (trigger + poll until complete):
+node scripts/run-orchestrator.js --input test-data/golden-input.json
+
+# Trigger only:
+node scripts/run-orchestrator.js --input test-data/golden-input.json --no-poll
+
+# Poll a running execution:
+node scripts/poll-execution.js <execution_id>
+```
+
+See `docs/async-execution-model.md` for full lifecycle documentation.
 
 ---
 
@@ -120,7 +142,10 @@ Phase 6c Complete
 - [x] Extend `orchestrate-phase1` with Phase 7A nodes (+5 nodes; total: 55)
 - [x] `workflow-ids.json`: `build-store-blueprint` ID recorded (`j1JVNqqyidlKUIHX`)
 - [x] `docs/runtime-status.md` updated
-- [ ] Cloud timeout resolved (Respond-to-Webhook pattern or polling model)
+- [x] Cloud timeout resolved — async model deployed (`feature/async-execution-model`)
+- [x] `scripts/run-orchestrator.js` updated — async trigger + poll
+- [x] `scripts/poll-execution.js` added — standalone poller
+- [x] `docs/async-execution-model.md` created
 
 ---
 
