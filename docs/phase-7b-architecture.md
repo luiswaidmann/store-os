@@ -2,13 +2,13 @@
 
 ## Status
 
-**Phase 7B.2 EXECUTABLE.** `build-shopify-pages-navigation` is deployed, activated, and integrated into the orchestrator.
+**Phase 7B.3 EXECUTABLE.** `build-shopify-theme` is deployed, activated, and integrated into the orchestrator. Full chain through theme deployment confirmed.
 
 | Phase | Status | n8n ID | Smoke Test |
 |---|---|---|---|
 | 7B.1 | EXECUTABLE | `oZE0Z9fb4ojnKiDd` | PASSED 2026-04-07 (exec 14430) |
-| 7B.2 | EXECUTABLE | `LADq8PuMRuswIxJa` | PASSED 2026-04-07 (exec 14457 — pending result) |
-| 7B.3 | SCAFFOLD (dry-run only) | not deployed | N/A |
+| 7B.2 | EXECUTABLE | `LADq8PuMRuswIxJa` | PASSED 2026-04-08 (exec 14604) |
+| 7B.3 | EXECUTABLE | `QG5ezHb3qKjKcvvn` | PASSED 2026-04-08 (exec 14728) |
 | 7B.4 | PLANNED | — | — |
 
 ---
@@ -22,8 +22,8 @@ store_blueprint (Phase 7A output)
                 │
                 └──→ Phase 7B.2: build-shopify-pages-navigation → shopify_pages_navigation_deployment
                          │
-                         └──→ Phase 7B.3: build-shopify-theme (SCAFFOLD — dry-run only)
-                                  └──→ Phase 7B.4: (PLANNED)
+                         └──→ Phase 7B.3: build-shopify-theme       → shopify_theme_deployment
+                                  └──→ Phase 7B.4: (PLANNED — theme publish)
 ```
 
 ---
@@ -173,9 +173,9 @@ Deployed: LADq8PuMRuswIxJa (activated 2026-04-07)
 
 ---
 
-## Orchestrator Extension (Phase 7B.1 + 7B.2)
+## Orchestrator Extension (Phase 7B.1 + 7B.2 + 7B.3)
 
-`orchestrate-phase1` total nodes: **67** (62 after 7B.1 + 5 for 7B.2)
+`orchestrate-phase1` total nodes: **72** (62 after 7B.1 + 5 for 7B.2 + 5 for 7B.3)
 
 ```
 Phase 7A Complete
@@ -189,73 +189,121 @@ Phase 7A Complete
                 │                   └── Run build-shopify-pages-navigation
                 │                       └── Shopify Pages/Nav Success? (IF: status !== 'PHASE_7B2_FAILED')
                 │                           ├── [true]  Phase 7B.2 Complete
+                │                           │               │
+                │                           │               └── Prepare Theme Input
+                │                           │                   └── Run build-shopify-theme
+                │                           │                       └── Shopify Theme Success? (IF: status !== 'PHASE_7B3_FAILED')
+                │                           │                           ├── [true]  Phase 7B.3 Complete
+                │                           │                           └── [false] Halt - Shopify Theme Failed
                 │                           └── [false] Halt - Shopify Pages/Nav Failed
                 └── [false] Halt - Shopify Catalog Failed
 ```
 
-**`Phase 7B.2 Complete`** returns the full 11-artifact chain inline:
+**`Phase 7B.3 Complete`** returns the full 12-artifact chain inline:
 `store_profile`, `market_intelligence`, `brand_positioning`, `competitor_clusters`,
 `strategy_synthesis`, `offer_architecture`, `content_strategy`, `gtm_plan`,
-`store_blueprint`, `shopify_catalog_deployment`, `shopify_pages_navigation_deployment`
+`store_blueprint`, `shopify_catalog_deployment`, `shopify_pages_navigation_deployment`,
+`shopify_theme_deployment`
 
 **Terminal statuses** (orchestrator polling — all scripts):
-- `PHASE_7B2_COMPLETE` — all pages + navigation operations succeeded
-- `PHASE_7B2_PARTIAL` — some operations succeeded, some failed (execution continues)
-- `PHASE_7B2_FAILED` → triggers `Halt - Shopify Pages/Nav Failed` (fatal)
-- `PHASE_7B1_COMPLETE` — catalog only (backward compatible)
+- `PHASE_7B3_COMPLETE` — all theme sections + assets written
+- `PHASE_7B3_PARTIAL` — some writes succeeded, some failed (execution continues)
+- `PHASE_7B3_DRY_RUN` — dry run completed (allow_theme_writes not set)
+- `PHASE_7B3_BLOCKED` — no safe theme target found
+- `PHASE_7B3_FAILED` → triggers `Halt - Shopify Theme Failed` (fatal)
+- `PHASE_7B2_COMPLETE` / `PHASE_7B1_COMPLETE` — backward compatible
 
 ---
 
-## Phase 7B.3: build-shopify-theme (SCAFFOLD — NOT YET DEPLOYED)
+## Phase 7B.3: build-shopify-theme
 
-### What it will do
+### What it does
 
-Consume `store_blueprint.theme_sections` and `store_blueprint.assets` and write theme section JSON files and assets to a specified Shopify theme via the Assets API.
+Consumes `store_blueprint.theme_sections` and `store_blueprint.assets` and deploys Shopify OS 2.0 section files and SVG placeholder assets to a target theme via the Theme Assets API.
 
 **Blueprint inputs:**
 - `theme_sections`: 4 sections (hero, featured-collection, value-prop, trust/social-proof)
-- `assets`: 3 assets (logo 200×50, favicon 32×32, hero-image 1920×1080)
+- `assets`: 3 assets (logo 200×50, favicon 32×32, hero-image 1920×800)
 
-### Safety Model
+**Safety guarantees:**
+- No writes unless `runtime_config.allow_theme_writes: true` is explicitly set (default: dry-run)
+- Auto-selects unpublished theme; blocks if only active theme exists (no accidental live deploys)
+- Explicit `shopify_theme_id` overrides auto-selection (can target active theme by choice)
+- All section keys prefixed `store-os-` to avoid overwriting existing Dawn sections
+- Does NOT modify `templates/*.json` or `config/settings_data.json`
+- No existing theme files are deleted
+- `continueOnFail: true` + `neverError: true` on HTTP nodes — individual 4xx errors are collected
+- PUT `/themes/{id}/assets.json` is inherently idempotent by key
 
-| Rule | Detail |
+### Theme Targeting Logic
+
+1. If `runtime_config.shopify_theme_id` is set → use that theme (warns if role: main)
+2. Else if unpublished themes exist → auto-select most recently updated unpublished theme
+3. Else → `PHASE_7B3_BLOCKED` (refuses to auto-target active theme)
+
+### Input Dependencies
+
+| Input field | Source | Required |
+|---|---|---|
+| `store_blueprint.theme_sections` | Phase 7A (`build-store-blueprint`) | ✓ |
+| `store_blueprint.assets` | Phase 7A (`build-store-blueprint`) | ✓ |
+| `runtime_config.shopify_shop_url` | `resolve-runtime-config` | ✓ |
+| `runtime_config.shopify_api_version` | `resolve-runtime-config` | optional (default: 2026-01) |
+| `runtime_config.allow_theme_writes` | `resolve-runtime-config` → `STORE_OS_ALLOW_THEME_WRITES` | ✓ for live writes |
+| `runtime_config.shopify_theme_id` | `resolve-runtime-config` → `STORE_OS_SHOPIFY_THEME_ID` | optional (auto-select) |
+
+### Expected Output: shopify_theme_deployment
+
+Schema: `schemas/phase-7b/shopify-theme-deployment.schema.json`
+
+| Field | Description |
 |---|---|
-| Opt-in required | `runtime_config.allow_theme_writes: true` must be set for any writes |
-| Default behavior | Returns `PHASE_7B3_DRY_RUN` with planned write operations — no API calls |
-| Target theme | Must specify `runtime_config.shopify_theme_id` pointing to a dev/preview theme |
-| No template overwrites | Does NOT modify `templates/*.json` or `config/settings_data.json` |
-| No deletes | No existing theme files are deleted |
-| No publish | Does not change which theme is active |
+| `status` | `PHASE_7B3_COMPLETE` \| `PHASE_7B3_PARTIAL` \| `PHASE_7B3_FAILED` \| `PHASE_7B3_DRY_RUN` \| `PHASE_7B3_BLOCKED` |
+| `theme_id` | Target theme numeric ID |
+| `theme_name` | Target theme display name |
+| `sections_written` | Count of section .liquid files written |
+| `assets_written` | Count of SVG placeholder assets written |
+| `dry_run` | `true` if no writes were performed |
+| `errors` | Array of per-asset errors (key, status, message) |
+| `warnings` | Non-fatal warnings |
+| `safety_notes` | Confirms theme targeting, no-delete, no-template-modify guarantees |
 
-### Dry Run Output
+### Node Contract
 
-When `allow_theme_writes` is not set (default), returns `PHASE_7B3_DRY_RUN` with:
-- `dry_run: true`
-- `dry_run_plan[]`: planned write operations (key, section_type, reason)
-- `sections_written: 0`, `assets_written: 0`
+```
+Pattern: 7-node (Trigger → Validate → Fetch Themes → Build Plan → IF write → Write Asset → Summary)
+Trigger: n8n-nodes-base.executeWorkflowTrigger
+Input:   store_blueprint + runtime_config + content_strategy (optional)
+Output:  shopify_theme_deployment (inline)
+Auth:    shopifyOAuth2Api (credential: CO1JGlTR5RJ9Cs6x "Shopify SuppliedTech Admin")
+Cloud:   fully compatible (no filesystem, no AJV)
+Deployed: QG5ezHb3qKjKcvvn (activated 2026-04-08)
+```
 
-### Scaffold Status
-
-- Workflow file: `workflows/n8n/build-shopify-theme.n8n.json` (scaffold — 6 nodes)
-- Schema: `schemas/phase-7b/shopify-theme-deployment.schema.json`
-- Contract: `workflows/contracts/build-shopify-theme.contract.json`
-- **NOT deployed to n8n** — scaffold only; live path not implemented
-- **NOT integrated into orchestrator** — will add 5 bridge nodes after Phase 7B.2 Complete when ready
-
-### Planned Shopify API Operations (when live path implemented)
+### Shopify API Operations
 
 | Operation | Endpoint | Purpose |
 |---|---|---|
-| GET | `/themes.json` | Find active/target theme ID |
-| GET | `/themes/{id}/assets.json` | List existing assets for diff |
-| PUT | `/themes/{id}/assets.json` | Create or update section/asset file (idempotent by key) |
+| GET | `/themes.json` | Fetch all themes for target selection |
+| PUT | `/themes/{id}/assets.json` | Write section .liquid or SVG asset (idempotent by key) |
+
+### Generated Section Types
+
+| Section | File Key | Schema Name | Features |
+|---|---|---|---|
+| Hero | `sections/store-os-hero.liquid` | `store-os: {heading}` | heading, content, CTA |
+| Featured Collection | `sections/store-os-featured-collection.liquid` | `store-os: {heading}` | collection picker, product grid |
+| Value Prop | `sections/store-os-value-prop.liquid` | `store-os: {heading}` | column blocks (max 6) |
+| Trust/Social Proof | `sections/store-os-trust-social-proof.liquid` | `store-os: {heading}` | trust item blocks (max 6) |
+
+Schema names are truncated to 25 characters (Shopify limit). All sections include presets for theme editor discovery.
 
 ---
 
 ## CLI Support
 
 ```bash
-# Full run (trigger + poll until PHASE_7B2_COMPLETE or PHASE_7B2_PARTIAL):
+# Full run (trigger + poll until PHASE_7B3_COMPLETE or similar):
 node scripts/run-orchestrator.js --input test-data/golden-input.json
 
 # Poll a running execution:
@@ -266,9 +314,13 @@ The `golden-input.json` `smoke_test_config` must include:
 ```json
 {
   "STORE_OS_SHOPIFY_SHOP_URL": "8zw111-cj.myshopify.com",
-  "STORE_OS_SHOPIFY_API_VERSION": "2026-01"
+  "STORE_OS_SHOPIFY_API_VERSION": "2026-01",
+  "STORE_OS_ALLOW_THEME_WRITES": "true",
+  "STORE_OS_SHOPIFY_THEME_ID": "193655701844"
 }
 ```
+
+Omit `STORE_OS_ALLOW_THEME_WRITES` to get a dry-run (PHASE_7B3_DRY_RUN). Omit `STORE_OS_SHOPIFY_THEME_ID` to auto-select an unpublished theme.
 
 ---
 
@@ -295,15 +347,18 @@ The `golden-input.json` `smoke_test_config` must include:
 - [x] Live smoke test — execution 14457, PHASE_7B2_PARTIAL (2026-04-07): 1 page created, 2 updated; navigation 406 (missing write_online_store_navigation OAuth scope — non-fatal)
 - [x] `docs/runtime-status.md` smoke test entry (2026-04-07)
 
-### Phase 7B.3 — SCAFFOLDED
+### Phase 7B.3 ✓ COMPLETE
 
 - [x] `schemas/phase-7b/shopify-theme-deployment.schema.json`
 - [x] `workflows/contracts/build-shopify-theme.contract.json`
-- [x] `workflows/n8n/build-shopify-theme.n8n.json` — scaffold (dry-run only; not deployed)
-- [ ] Live path implementation (requires `allow_theme_writes` opt-in model)
-- [ ] Deploy to n8n
-- [ ] Orchestrator integration (5 bridge nodes after Phase 7B.2 Complete)
-- [ ] Live smoke test
+- [x] `workflows/n8n/build-shopify-theme.n8n.json` — EXECUTABLE (deployed: `QG5ezHb3qKjKcvvn`)
+- [x] `orchestrate-phase1` extended with 7B.3 bridge nodes (+5; total: 72)
+- [x] `workflow-ids.json`: ID + placeholder recorded
+- [x] `resolve-runtime-config`: added `allow_theme_writes` + `shopify_theme_id` fields
+- [x] `orchestrate-phase1` Resolve Runtime Config: added same fields to inline config assembly
+- [x] `test-data/golden-input.json`: added `STORE_OS_ALLOW_THEME_WRITES` + `STORE_OS_SHOPIFY_THEME_ID`
+- [x] `scripts/run-orchestrator.js` + `scripts/poll-execution.js`: added PHASE_7B3_* statuses
+- [x] Live smoke test — execution 14728, PHASE_7B3_COMPLETE (2026-04-08): 4 sections + 3 assets, 0 errors
 
 ### Phase 7B.4 — PLANNED
 
@@ -320,7 +375,7 @@ All Phase 7B workflows use `shopifyOAuth2Api` credential type:
 | Credential type | `shopifyOAuth2Api` |
 | Credential ID | `CO1JGlTR5RJ9Cs6x` |
 | Credential name | Shopify SuppliedTech Admin |
-| Used in | `build-shopify-catalog.n8n.json`, `build-shopify-pages-navigation.n8n.json` |
+| Used in | `build-shopify-catalog.n8n.json`, `build-shopify-pages-navigation.n8n.json`, `build-shopify-theme.n8n.json` |
 
 **Required OAuth scopes by phase:**
 - Phase 7B.1 (catalog): `read_products`, `write_products`

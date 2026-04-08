@@ -21,7 +21,8 @@
     "build-gtm-plan":            "8aCUkx6RlfdklCBH",
     "build-store-blueprint":     "j1JVNqqyidlKUIHX",
     "build-shopify-catalog":          "oZE0Z9fb4ojnKiDd",
-    "build-shopify-pages-navigation": "LADq8PuMRuswIxJa"
+    "build-shopify-pages-navigation": "LADq8PuMRuswIxJa",
+    "build-shopify-theme":            "QG5ezHb3qKjKcvvn"
   },
   "placeholder_map": {
     "REPLACE_WITH_INTAKE_STORE_INPUT_WORKFLOW_ID":           "intake-store-input",
@@ -36,7 +37,8 @@
     "REPLACE_WITH_BUILD_GTM_PLAN_WORKFLOW_ID":               "build-gtm-plan",
     "REPLACE_WITH_BUILD_STORE_BLUEPRINT_WORKFLOW_ID":        "build-store-blueprint",
     "REPLACE_WITH_BUILD_SHOPIFY_CATALOG_WORKFLOW_ID":             "build-shopify-catalog",
-    "REPLACE_WITH_BUILD_SHOPIFY_PAGES_NAVIGATION_WORKFLOW_ID":    "build-shopify-pages-navigation"
+    "REPLACE_WITH_BUILD_SHOPIFY_PAGES_NAVIGATION_WORKFLOW_ID":    "build-shopify-pages-navigation",
+    "REPLACE_WITH_BUILD_SHOPIFY_THEME_WORKFLOW_ID":              "build-shopify-theme"
   },
   "credential_placeholders": {
     "_note": "Credential IDs are instance-specific and must be set manually in n8n. These placeholders appear in subworkflow JSON files and require the numeric credential ID from n8n Settings > Credentials (visible in the URL when editing a credential).",

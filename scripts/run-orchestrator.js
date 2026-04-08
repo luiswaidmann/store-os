@@ -121,7 +121,7 @@ function extractResultFromExecution(exData) {
 
   // Try known terminal nodes in priority order
   const terminalNodes = [
-    'Phase 7B.2 Complete', 'Phase 7B.1 Complete', 'Phase 7A Complete', 'Phase 6c Complete',
+    'Phase 7B.3 Complete', 'Phase 7B.2 Complete', 'Phase 7B.1 Complete', 'Phase 7A Complete', 'Phase 6c Complete',
     'Phase 6b Complete', 'Phase 6a Complete', 'Phase 5 Complete',
   ];
 
@@ -203,7 +203,8 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
   const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                              'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
                              'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
-                             'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL']);
+                             'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
+                             'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED']);
   const isSuccess = TERMINAL.has(d.status);
 
   console.log('');
@@ -338,6 +339,28 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
     }
   }
 
+  if (d.shopify_theme_deployment) {
+    const td = d.shopify_theme_deployment;
+    console.log('');
+    console.log('  SHOPIFY THEME DEPLOYMENT:');
+    console.log(`    status:              ${td.status || '—'}`);
+    console.log(`    theme:               ${td.theme_name || '—'} (id: ${td.theme_id || '—'})`);
+    console.log(`    dry_run:             ${td.dry_run}`);
+    console.log(`    sections_written:    ${td.sections_written ?? '—'}`);
+    console.log(`    assets_written:      ${td.assets_written ?? '—'}`);
+    if (td.dry_run && td.dry_run_plan) {
+      console.log(`    dry_run_plan:        ${td.dry_run_plan.length} operations planned`);
+    }
+    if (td.errors && td.errors.length > 0) {
+      console.log(`    errors:              ${td.errors.length}`);
+    }
+    if (td.safety_notes && td.safety_notes.length > 0) {
+      for (const note of td.safety_notes) {
+        console.log(`    safety:              ${note}`);
+      }
+    }
+  }
+
   if (d.next_phase) {
     console.log('');
     console.log(`  NEXT PHASE:  ${d.next_phase}`);
@@ -350,7 +373,11 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
 
   console.log('');
   if (isSuccess) {
-    const chainDesc = d.status === 'PHASE_7B2_COMPLETE' ? 'Phase 1–7B.2 chain finished (catalog + pages + navigation deployed).'
+    const chainDesc = d.status === 'PHASE_7B3_COMPLETE' ? 'Phase 1–7B.3 chain finished (catalog + pages + navigation + theme deployed).'
+      : d.status === 'PHASE_7B3_PARTIAL' ? 'Phase 1–7B.3 finished with partial theme deployment.'
+      : d.status === 'PHASE_7B3_DRY_RUN' ? 'Phase 1–7B.3 finished (theme: dry run only — no writes performed).'
+      : d.status === 'PHASE_7B3_BLOCKED' ? 'Phase 1–7B.3 finished (theme: BLOCKED — no safe target theme found).'
+      : d.status === 'PHASE_7B2_COMPLETE' ? 'Phase 1–7B.2 chain finished (catalog + pages + navigation deployed).'
       : d.status === 'PHASE_7B2_PARTIAL' ? 'Phase 1–7B.2 finished with partial deployment (some errors).'
       : d.status === 'PHASE_7B1_COMPLETE' ? 'Phase 1–7B.1 chain finished (Shopify catalog deployed).'
       : d.status === 'PHASE_7B1_PARTIAL' ? 'Phase 1–7B.1 finished with partial deployment (some errors).'
@@ -465,6 +492,20 @@ function buildRunRecord(result, executionId, startedAt, finishedAt, error) {
         warnings_count:     (pn.warnings || []).length,
       };
     }
+
+    if (result.shopify_theme_deployment) {
+      const td = result.shopify_theme_deployment;
+      record.artifacts.shopify_theme_deployment = {
+        status:           td.status || null,
+        theme_id:         td.theme_id || null,
+        theme_name:       td.theme_name || null,
+        dry_run:          td.dry_run ?? true,
+        sections_written: td.sections_written ?? 0,
+        assets_written:   td.assets_written ?? 0,
+        errors_count:     (td.errors || []).length,
+        warnings_count:   (td.warnings || []).length,
+      };
+    }
   }
 
   return record;
@@ -554,7 +595,9 @@ async function main() {
       }
       const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                                  'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
-                                 'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL']);
+                                 'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
+                                 'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
+                                 'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED']);
       if (!TERMINAL.has(finalResult.status)) process.exit(1);
     } else {
       console.error('ERROR: Could not extract result from execution data.');
@@ -622,7 +665,9 @@ async function main() {
   // Detect async response vs legacy synchronous response
   const TERMINAL_STATUSES = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                                       'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
-                                      'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL']);
+                                      'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
+                                      'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
+                                      'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED']);
   const isLegacySync = startData.status && TERMINAL_STATUSES.has(startData.status);
 
   if (isLegacySync) {
