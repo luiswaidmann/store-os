@@ -78,7 +78,7 @@
 
   "credentials": {
     "type": "shopifyOAuth2Api",
-    "id": "edgLmgVntFGX6QYN",
+    "id": "CO1JGlTR5RJ9Cs6x",
     "name": "Shopify SuppliedTech Admin",
     "note": "Same credential as Phase 7B.1 and 7B.2. Replace credential id if deploying to a different n8n instance."
   },

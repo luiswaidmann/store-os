@@ -73,7 +73,7 @@ Pattern: 11-node (Subworkflow Trigger → Validate → Fetch×2 → Merge → Bu
 Trigger: n8n-nodes-base.executeWorkflowTrigger
 Input:   store_blueprint + runtime_config
 Output:  shopify_catalog_deployment (inline)
-Auth:    shopifyOAuth2Api (credential: edgLmgVntFGX6QYN "Shopify SuppliedTech Admin")
+Auth:    shopifyOAuth2Api (credential: CO1JGlTR5RJ9Cs6x "Shopify SuppliedTech Admin")
 Cloud:   fully compatible (no filesystem, no AJV)
 Deployed: oZE0Z9fb4ojnKiDd (activated 2026-04-07)
 ```
@@ -143,7 +143,7 @@ Pattern: 11-node (Subworkflow Trigger → Validate → Fetch×2 → Merge → Bu
 Trigger: n8n-nodes-base.executeWorkflowTrigger
 Input:   store_blueprint + runtime_config + content_strategy (optional)
 Output:  shopify_pages_navigation_deployment (inline)
-Auth:    shopifyOAuth2Api (credential: edgLmgVntFGX6QYN "Shopify SuppliedTech Admin")
+Auth:    shopifyOAuth2Api (credential: CO1JGlTR5RJ9Cs6x "Shopify SuppliedTech Admin")
 Cloud:   fully compatible
 Deployed: LADq8PuMRuswIxJa (activated 2026-04-07)
 ```
@@ -316,7 +316,7 @@ All Phase 7B workflows use `shopifyOAuth2Api` credential type:
 | Field | Value |
 |---|---|
 | Credential type | `shopifyOAuth2Api` |
-| Credential ID | `edgLmgVntFGX6QYN` |
+| Credential ID | `CO1JGlTR5RJ9Cs6x` |
 | Credential name | Shopify SuppliedTech Admin |
 | Used in | `build-shopify-catalog.n8n.json`, `build-shopify-pages-navigation.n8n.json` |
 
@@ -326,4 +326,4 @@ All Phase 7B workflows use `shopifyOAuth2Api` credential type:
   - Without `read_content`: fetch nodes fail gracefully, all resources treated as new creates
 - Phase 7B.3 (theme): additionally needs `read_themes`, `write_themes`
 
-To deploy to a different n8n instance, replace credential ID `edgLmgVntFGX6QYN` in all Phase 7B workflow JSON files.
+To deploy to a different n8n instance, replace credential ID `CO1JGlTR5RJ9Cs6x` in all Phase 7B workflow JSON files.

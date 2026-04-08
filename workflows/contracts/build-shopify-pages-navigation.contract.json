@@ -60,7 +60,7 @@
   ],
   "credentials": {
     "type": "shopifyOAuth2Api",
-    "id": "edgLmgVntFGX6QYN",
+    "id": "CO1JGlTR5RJ9Cs6x",
     "name": "Shopify SuppliedTech Admin",
     "note": "Replace credential id if deploying to a different n8n instance"
   },

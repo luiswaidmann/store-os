@@ -29,7 +29,7 @@
       },
       "credentials": {
         "shopifyOAuth2Api": {
-          "id": "edgLmgVntFGX6QYN",
+          "id": "CO1JGlTR5RJ9Cs6x",
           "name": "Shopify SuppliedTech Admin"
         }
       },
@@ -49,7 +49,7 @@
       },
       "credentials": {
         "shopifyOAuth2Api": {
-          "id": "edgLmgVntFGX6QYN",
+          "id": "CO1JGlTR5RJ9Cs6x",
           "name": "Shopify SuppliedTech Admin"
         }
       },
@@ -117,7 +117,7 @@
       },
       "credentials": {
         "shopifyOAuth2Api": {
-          "id": "edgLmgVntFGX6QYN",
+          "id": "CO1JGlTR5RJ9Cs6x",
           "name": "Shopify SuppliedTech Admin"
         }
       },
@@ -148,7 +148,7 @@
       },
       "credentials": {
         "shopifyOAuth2Api": {
-          "id": "edgLmgVntFGX6QYN",
+          "id": "CO1JGlTR5RJ9Cs6x",
           "name": "Shopify SuppliedTech Admin"
         }
       },
@@ -257,13 +257,13 @@
       ],
       "credentials": {
         "shopifyOAuth2Api": {
-          "id": "edgLmgVntFGX6QYN",
+          "id": "CO1JGlTR5RJ9Cs6x",
           "name": "Shopify SuppliedTech Admin",
           "note": "Replace id with your n8n shopifyOAuth2Api credential ID if deploying to a different instance"
         }
       },
       "setupRequired": [
-        "Replace credential id 'edgLmgVntFGX6QYN' in Fetch Existing Collections, Fetch Existing Products, Create Resource, and Update Resource nodes with your n8n shopifyOAuth2Api credential ID",
+        "Replace credential id 'CO1JGlTR5RJ9Cs6x' in Fetch Existing Collections, Fetch Existing Products, Create Resource, and Update Resource nodes with your n8n shopifyOAuth2Api credential ID",
         "Ensure STORE_OS_SHOPIFY_SHOP_URL and STORE_OS_SHOPIFY_API_VERSION are set in env (self-hosted) or smoke_test_config (cloud)"
       ],
       "nodeCount": 11,

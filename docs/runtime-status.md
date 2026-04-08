@@ -27,24 +27,21 @@ Recent runtime progression merges (on `main`):
 
 ## Last confirmed end-to-end smoke test
 
-**Phase 7B.2 CONFIRMED (PARTIAL):**
-**Date:** 2026-04-07
-**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async) + `node scripts/poll-execution.js 14457 --json`
+**Phase 7B.2 CONFIRMED (COMPLETE):**
+**Date:** 2026-04-08
+**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async)
 **Input:** `test-data/golden-input.json` (project: `suppliedtech`)
-**Result:** `PHASE_7B2_PARTIAL` — n8n execution 14457, status: success, ~117s — cloud mode
+**Result:** `PHASE_7B2_COMPLETE` — n8n execution 14587, status: success, ~127s — cloud mode
 **Shopify target:** `8zw111-cj.myshopify.com`
 **Pages side effects:**
-- pages_created: 1 (about — new)
-- pages_updated: 2 (faq, contact — pre-existing handles updated)
+- pages_created: 0 | pages_updated: 3
 - Safety verified: all pages created with `published: false`
 **Navigation side effects:**
-- navigation_created: 0 | navigation_updated: 0
-- errors: 2 × HTTP 406 on link_lists POST
-- Root cause: OAuth credential `edgLmgVntFGX6QYN` lacks `write_online_store_navigation` scope
-- Impact: pages fully deployed; navigation requires scope grant (non-fatal, no incorrect writes)
+- navigation_created: 1 | navigation_updated: 1 | errors: 0
+- Deployed via Shopify GraphQL Menu API (`menuCreate` / `menuUpdate` mutations)
+**Fix applied:** Migrated navigation from deprecated REST `link_lists` endpoint (removed in Shopify API 2025-04) to GraphQL Menu API. Also updated Shopify OAuth2 credential from `edgLmgVntFGX6QYN` to `CO1JGlTR5RJ9Cs6x` (recreated with navigation scopes).
 **Artifacts returned:** full 11-artifact chain + `shopify_pages_navigation_deployment`
-**Persisted:** `outputs/runs/14457.json`
-**PARTIAL verdict:** Pages deployment: PASS. Navigation deployment: BLOCKED (scope). PHASE_7B2_PARTIAL is correct terminal status.
+**Persisted:** `outputs/runs/14587.json`
 
 **Phase 7B.1 CONFIRMED:**
 **Date:** 2026-04-07
@@ -102,7 +99,8 @@ The currently confirmed n8n execution path (Phase 7A — 2026-04-07) is:
 - `build-content-strategy` (Phase 6b)
 - `build-gtm-plan` (Phase 6c)
 - `build-store-blueprint` (Phase 7A)
-- `build-shopify-catalog` ← **NEW** (Phase 7B.1, `feature/phase-7b1-shopify-catalog`)
+- `build-shopify-catalog` (Phase 7B.1)
+- `build-shopify-pages-navigation` ← **NEW** (Phase 7B.2 — pages REST + navigation GraphQL)
 
 **Async model:** Chains run ~117s+. The webhook returns HTTP 202 within ~2s with an `execution_id`. The CLI polls `GET /api/v1/executions/{id}` until `finished: true`. Cloudflare's 100s timeout is no longer hit. See `docs/async-execution-model.md`.
 
@@ -119,7 +117,8 @@ The chain currently returns these runtime artifacts inline in cloud mode:
 - `content_strategy`
 - `gtm_plan`
 - `store_blueprint`
-- `shopify_catalog_deployment` ← **NEW** (Phase 7B.1)
+- `shopify_catalog_deployment` (Phase 7B.1)
+- `shopify_pages_navigation_deployment` ← **NEW** (Phase 7B.2)
 
 ## Runtime Hardening (Phase 16)
 
