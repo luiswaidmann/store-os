@@ -205,7 +205,8 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
                              'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
                              'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
                              'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED',
-                             'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED']);
+                             'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED',
+                             'PHASE_10_COMPLETE', 'PHASE_10_FAILED']);
   const isSuccess = TERMINAL.has(d.status);
 
   console.log('');
@@ -603,7 +604,8 @@ async function main() {
                                  'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
                                  'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
                                  'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED',
-                                 'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED']);
+                                 'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED',
+                             'PHASE_10_COMPLETE', 'PHASE_10_FAILED']);
       if (!TERMINAL.has(finalResult.status)) process.exit(1);
     } else {
       console.error('ERROR: Could not extract result from execution data.');
@@ -674,7 +676,8 @@ async function main() {
                                       'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
                                       'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
                                       'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED',
-                                      'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED']);
+                                      'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED',
+                             'PHASE_10_COMPLETE', 'PHASE_10_FAILED']);
   const isLegacySync = startData.status && TERMINAL_STATUSES.has(startData.status);
 
   if (isLegacySync) {

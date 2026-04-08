@@ -1,0 +1,347 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://store-os.dev/schemas/phase-10/theme-rules.schema.json",
+  "title": "Theme Rules Artifact",
+  "description": "Deterministic theme decision layer produced by build-theme-rules. Defines store pattern, section stack, layout model, trust model, and conversion model. Consumed by build-shopify-theme to drive section generation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "project_id",
+    "completed_at",
+    "store_pattern",
+    "pattern_rationale",
+    "homepage_layout",
+    "section_system",
+    "trust_model",
+    "conversion_model",
+    "merchandising_model",
+    "visual_system",
+    "page_template_rules",
+    "media_placement_rules",
+    "derived_from"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["PHASE_10_COMPLETE", "PHASE_10_FAILED"],
+      "description": "Terminal status of the theme rules phase."
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "store_pattern": {
+      "type": "string",
+      "enum": [
+        "technical-b2b-specialist",
+        "premium-minimalist",
+        "lifestyle-emotional-dr",
+        "value-led-general",
+        "catalog-first-specialist",
+        "editorial-curator",
+        "single-product-focused"
+      ],
+      "description": "The winning store pattern selected by the classification engine. Deterministic output of brand_role + tone_of_voice + price_positioning + catalog_type."
+    },
+    "pattern_rationale": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable explanation of why this pattern was selected, citing specific input field values."
+    },
+    "homepage_layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section_stack", "visual_density", "whitespace_level"],
+      "properties": {
+        "section_stack": {
+          "type": "array",
+          "description": "Ordered list of homepage sections. Determines which sections are generated and in what order.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["section_type", "order", "enabled"],
+            "properties": {
+              "section_type": {
+                "type": "string",
+                "enum": ["hero", "featured-collection", "value-prop", "trust-social-proof"]
+              },
+              "order": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "1-based display order on the page."
+              },
+              "enabled": {
+                "type": "boolean",
+                "description": "Whether this section is generated. Disabled sections are excluded from the deployment plan."
+              },
+              "variant": {
+                "type": "string",
+                "description": "Section style variant (e.g. standard, fullscreen, compact, editorial)."
+              },
+              "heading_hint": {
+                "type": ["string", "null"],
+                "description": "Suggested heading — populated from content_strategy or store_blueprint."
+              },
+              "content_hint": {
+                "type": ["string", "null"],
+                "description": "Suggested body content — populated from brand_traits or blueprint content hints."
+              },
+              "cta_label": {
+                "type": ["string", "null"],
+                "description": "Call-to-action button text."
+              },
+              "cta_target": {
+                "type": ["string", "null"],
+                "description": "Call-to-action link target."
+              }
+            }
+          }
+        },
+        "visual_density": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "Overall content density of the homepage. low = editorial/luxury, high = value/catalog."
+        },
+        "whitespace_level": {
+          "type": "string",
+          "enum": ["generous", "balanced", "tight"],
+          "description": "Amount of whitespace between elements. Inversely related to visual_density."
+        }
+      }
+    },
+    "section_system": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Per-section configuration rules applied during Liquid generation.",
+      "properties": {
+        "hero": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "variant": {
+              "type": "string",
+              "enum": ["standard", "fullscreen", "compact", "lifestyle", "promotional", "editorial", "fullscreen-product"],
+              "description": "Hero layout variant."
+            },
+            "cta_prominence": {
+              "type": "string",
+              "enum": ["subtle", "balanced", "prominent", "assertive"],
+              "description": "CTA button visual weight."
+            },
+            "copy_density": {
+              "type": "string",
+              "enum": ["low", "medium", "high"],
+              "description": "Amount of copy in the hero section."
+            },
+            "media_type": {
+              "type": "string",
+              "enum": ["image", "video", "color-block", "split-image"],
+              "description": "Recommended media format for the hero."
+            }
+          }
+        },
+        "featured_collection": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "grid_columns": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 6,
+              "description": "Product grid column count."
+            },
+            "products_to_show": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 12,
+              "description": "Number of products to show."
+            },
+            "show_vendor": {
+              "type": "boolean",
+              "description": "Whether to display the product vendor/brand name."
+            }
+          }
+        },
+        "value_prop": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "column_count": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 4,
+              "description": "Number of value proposition columns."
+            },
+            "style": {
+              "type": "string",
+              "enum": ["icon-led", "text-led", "benefit-led", "editorial-text"],
+              "description": "Visual emphasis of the value prop blocks."
+            }
+          }
+        },
+        "trust_social_proof": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "proof_mode": {
+              "type": "string",
+              "enum": ["evidence-led", "social-proof-led", "authority-led", "guarantee-led", "mixed"],
+              "description": "Primary type of social proof signals to emphasize."
+            },
+            "block_count": {
+              "type": "integer",
+              "minimum": 2,
+              "maximum": 6,
+              "description": "Number of trust signal blocks."
+            },
+            "placement": {
+              "type": "string",
+              "enum": ["after-hero", "before-collection", "end-of-page"],
+              "description": "Where in the section stack this section is anchored."
+            }
+          }
+        }
+      }
+    },
+    "trust_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary_proof", "prominence", "placement"],
+      "properties": {
+        "primary_proof": {
+          "type": "string",
+          "description": "Primary trust proof type (e.g. evidence, social-proof, guarantee, brand-authority, taste-curation)."
+        },
+        "prominence": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "How prominently trust signals are displayed."
+        },
+        "placement": {
+          "type": "string",
+          "description": "Where trust signals are primarily placed."
+        }
+      }
+    },
+    "conversion_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cta_style", "urgency_level", "bundle_promo"],
+      "properties": {
+        "cta_style": {
+          "type": "string",
+          "enum": ["subtle", "balanced", "assertive"]
+        },
+        "urgency_level": {
+          "type": "string",
+          "enum": ["none", "low", "medium", "high"]
+        },
+        "bundle_promo": {
+          "type": "boolean",
+          "description": "Whether bundle/upsell promotions should be featured."
+        }
+      }
+    },
+    "merchandising_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary_pattern", "grid_columns", "collection_prominence"],
+      "properties": {
+        "primary_pattern": {
+          "type": "string",
+          "description": "Primary merchandising pattern (e.g. featured-collection, product-grid, editorial-grid, featured-accessories)."
+        },
+        "grid_columns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "collection_prominence": {
+          "type": "string",
+          "enum": ["primary", "secondary", "minimal"],
+          "description": "How prominently collections are featured relative to individual products."
+        }
+      }
+    },
+    "visual_system": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["density", "whitespace", "contrast"],
+      "properties": {
+        "density": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "whitespace": {
+          "type": "string",
+          "enum": ["generous", "balanced", "tight"]
+        },
+        "contrast": {
+          "type": "string",
+          "description": "Contrast profile (e.g. high-clarity, soft-editorial, punchy-commercial)."
+        }
+      }
+    },
+    "page_template_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "product_page": {
+          "type": "string",
+          "description": "Product page template variant recommendation."
+        },
+        "collection_page": {
+          "type": "string",
+          "description": "Collection page template variant recommendation."
+        },
+        "about_page": {
+          "type": "string",
+          "description": "About page template variant recommendation."
+        }
+      }
+    },
+    "media_placement_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hero_media_type": {
+          "type": "string",
+          "description": "Recommended media format for the hero section."
+        },
+        "product_image_priority": {
+          "type": "string",
+          "enum": ["packshot", "lifestyle", "mixed"],
+          "description": "Which type of product image to prioritize."
+        },
+        "lifestyle_image_prominence": {
+          "type": "string",
+          "enum": ["primary", "secondary", "minimal"],
+          "description": "How prominently lifestyle images are used across the store."
+        }
+      }
+    },
+    "derived_from": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The upstream artifact fields that drove the pattern classification and rule selection.",
+      "properties": {
+        "brand_role": { "type": ["string", "null"] },
+        "tone_of_voice": { "type": ["string", "null"] },
+        "price_positioning": { "type": ["string", "null"] },
+        "store_type": { "type": ["string", "null"] },
+        "catalog_type": { "type": ["string", "null"] },
+        "trust_style": { "type": ["string", "null"] },
+        "conversion_style": { "type": ["string", "null"] },
+        "primary_message": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

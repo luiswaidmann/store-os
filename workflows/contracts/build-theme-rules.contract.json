@@ -1,0 +1,104 @@
+{
+  "_meta": {
+    "format": "store-os-runtime-contract",
+    "version": "1.0",
+    "phase_id": "phase-10",
+    "category": "theme-rules-engine",
+    "cloud_compatibility": "FULL",
+    "description": "Contract for build-theme-rules: deterministic pattern classification and layout rule mapping from upstream strategic artifacts."
+  },
+  "phase_id": "phase-10",
+  "category": "theme-rules-engine",
+  "cloud_compatibility": "FULL",
+  "upstream_dependencies": [
+    "build-store-profile",
+    "build-brand-positioning",
+    "build-market-intelligence",
+    "build-competitor-clusters",
+    "build-strategy-synthesis",
+    "build-offer-architecture",
+    "build-content-strategy",
+    "build-store-blueprint"
+  ],
+  "required_inputs": {
+    "from_pipeline": [
+      {
+        "field": "store_profile",
+        "source": "build-store-profile",
+        "required_subfields": ["price_positioning", "store_type", "catalog_type"]
+      },
+      {
+        "field": "brand_positioning",
+        "source": "build-brand-positioning",
+        "required_subfields": ["brand_role", "tone_of_voice", "trust_style", "conversion_style"]
+      }
+    ]
+  },
+  "optional_inputs": [
+    { "field": "market_intelligence",  "source": "build-market-intelligence",  "purpose": "Competitive signal enrichment" },
+    { "field": "competitor_clusters",  "source": "build-competitor-clusters",   "purpose": "Layout pattern extraction from competitor patterns" },
+    { "field": "strategy_synthesis",   "source": "build-strategy-synthesis",    "purpose": "Strategic positioning cross-check" },
+    { "field": "offer_architecture",   "source": "build-offer-architecture",    "purpose": "Bundle/upsell conversion model" },
+    { "field": "content_strategy",     "source": "build-content-strategy",      "purpose": "Primary message → hero heading, content pillar → value-prop hints" },
+    { "field": "store_blueprint",      "source": "build-store-blueprint",       "purpose": "Section heading/CTA hints from theme_sections[], assets" }
+  ],
+  "output_contract": {
+    "theme_rules": {
+      "description": "Complete theme decision artifact: store_pattern classification + section stack + rule set.",
+      "schema_ref": "schemas/phase-10/theme-rules.schema.json",
+      "required_fields": [
+        "status",
+        "project_id",
+        "completed_at",
+        "store_pattern",
+        "pattern_rationale",
+        "homepage_layout",
+        "section_system",
+        "trust_model",
+        "conversion_model",
+        "merchandising_model",
+        "visual_system",
+        "page_template_rules",
+        "media_placement_rules",
+        "derived_from"
+      ]
+    }
+  },
+  "terminal_statuses": {
+    "PHASE_10_COMPLETE": "Theme rules artifact generated — pattern classified, rules mapped, content enriched",
+    "PHASE_10_FAILED":   "Rules engine failed — classification or rule mapping error"
+  },
+  "pattern_model": {
+    "patterns": [
+      "technical-b2b-specialist",
+      "premium-minimalist",
+      "lifestyle-emotional-dr",
+      "value-led-general",
+      "catalog-first-specialist",
+      "editorial-curator",
+      "single-product-focused"
+    ],
+    "classification_inputs": [
+      "store_profile.price_positioning",
+      "store_profile.catalog_type",
+      "store_profile.assortment_shape",
+      "store_profile.store_type",
+      "brand_positioning.brand_role",
+      "brand_positioning.tone_of_voice.style",
+      "brand_positioning.tone_of_voice.emotional_intensity"
+    ],
+    "classification_algorithm": "Priority-ordered rule matching. First matching priority rule wins. See workflows/n8n/build-theme-rules.n8n.json Classify Store Pattern node."
+  },
+  "determinism_guarantees": {
+    "pattern_classification": "Pure function of (brand_positioning, store_profile). Same inputs → same pattern.",
+    "rule_mapping": "Fixed lookup table keyed by pattern. Same pattern → same rules.",
+    "content_enrichment": "Deterministic merge of content_strategy.messaging_hierarchy and store_blueprint.theme_sections hints.",
+    "section_stack": "Fixed per pattern. Same pattern → same section order. Enabled/disabled flags never random."
+  },
+  "downstream_consumers": {
+    "build-shopify-theme": {
+      "reads": ["theme_rules.homepage_layout.section_stack", "theme_rules.section_system", "theme_rules.trust_model"],
+      "fallback": "If theme_rules absent, build-shopify-theme falls back to store_blueprint.theme_sections directly."
+    }
+  }
+}

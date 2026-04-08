@@ -27,6 +27,19 @@ Recent runtime progression merges (on `main`):
 
 ## Last confirmed end-to-end smoke test
 
+**Phase 10 CONFIRMED (COMPLETE) — Theme Rules Engine:**
+**Date:** 2026-04-08
+**Method:** Full orchestrator chain (execution 14747) — `build-theme-rules` runs between Phase 7B.2 Complete and `build-shopify-theme`
+**Input:** `test-data/golden-input.json` (project: suppliedtech)
+**Phase 10 result:** `PHASE_10_COMPLETE` — pattern classified, rules mapped, theme_rules passed to build-shopify-theme
+**Chain result:** `PHASE_7B3_COMPLETE` — no regressions, sections_written: 4, assets_written: 3
+**Pattern classified:** `technical-b2b-specialist` (brand_role=specialist + tone=technical-trustworthy)
+**Section stack decided:** hero(1) → value-prop(2) → featured-collection(3) → trust-social-proof(4)
+**Rules applied:** grid_columns=3, value_prop.column_count=4, trust.proof_mode=evidence-led, trust.block_count=4
+**New workflows:** build-theme-rules (ID: KzFBogj7kusXQqlp)
+**New nodes in orchestrator:** Prepare Theme Rules Input + Run build-theme-rules (continueOnFail)
+**Execution time for theme rules:** ~180ms (no LLM calls, no external APIs)
+
 **Phase 9 CONFIRMED (PROMPTS_ONLY) — Media Generation:**
 **Date:** 2026-04-08
 **Method:** Standalone sub-workflow test via webhook wrapper → `build-media-assets` (ID: krR10um8F1pT0miQ)
@@ -478,7 +491,9 @@ DIRECT fields are passed through verbatim and override any LLM-generated values.
 
 ## Confirmed next planned runtime step
 
-Next: **Orchestrator integration** — integrate `build-media-assets` into the orchestrator chain after Phase 7B.3.
+Next: **Extend theme section types** — add `testimonial-carousel`, `announcement-bar`, `comparison-table` to the rules engine section model; integrate `reason_to_believe[]` into trust section block content; connect `media_placement_rules` to Phase 9 media generation.
+
+Phase 10 is **COMPLETE** — `build-theme-rules` deployed (ID: KzFBogj7kusXQqlp), integrated into orchestrator chain, validated in execution 14747.
 
 Phase 9 is **CONFIRMED (standalone)** — `build-media-assets` deployed (ID: krR10um8F1pT0miQ), prompts_only mode validated. Not yet integrated into orchestrator chain.
 

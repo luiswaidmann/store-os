@@ -177,7 +177,8 @@ async function main() {
                                    'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
                                    'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
                                    'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED',
-                                   'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED']);
+                                   'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED',
+                                   'PHASE_10_COMPLETE', 'PHASE_10_FAILED']);
         console.log(`  STATUS:   ${result.status || 'UNKNOWN'}`);
         console.log(`  PROJECT:  ${result.project_id || '—'}`);
         if (result.store_blueprint) {
@@ -201,7 +202,8 @@ async function main() {
                                  'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
                                  'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
                                    'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED',
-                                   'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED']);
+                                   'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED',
+                                   'PHASE_10_COMPLETE', 'PHASE_10_FAILED']);
       if (result && !TERMINAL.has(result.status)) process.exit(1);
       return;
     }

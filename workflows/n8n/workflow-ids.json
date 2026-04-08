@@ -22,6 +22,7 @@
     "build-store-blueprint":     "j1JVNqqyidlKUIHX",
     "build-shopify-catalog":          "oZE0Z9fb4ojnKiDd",
     "build-shopify-pages-navigation": "LADq8PuMRuswIxJa",
+    "build-theme-rules":              "KzFBogj7kusXQqlp",
     "build-shopify-theme":            "QG5ezHb3qKjKcvvn",
     "build-media-assets":             "krR10um8F1pT0miQ"
   },
@@ -39,6 +40,7 @@
     "REPLACE_WITH_BUILD_STORE_BLUEPRINT_WORKFLOW_ID":        "build-store-blueprint",
     "REPLACE_WITH_BUILD_SHOPIFY_CATALOG_WORKFLOW_ID":             "build-shopify-catalog",
     "REPLACE_WITH_BUILD_SHOPIFY_PAGES_NAVIGATION_WORKFLOW_ID":    "build-shopify-pages-navigation",
+    "REPLACE_WITH_BUILD_THEME_RULES_WORKFLOW_ID":                "build-theme-rules",
     "REPLACE_WITH_BUILD_SHOPIFY_THEME_WORKFLOW_ID":              "build-shopify-theme",
     "REPLACE_WITH_BUILD_MEDIA_ASSETS_WORKFLOW_ID":               "build-media-assets"
   },
