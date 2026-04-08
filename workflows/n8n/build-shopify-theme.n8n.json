@@ -11,13 +11,52 @@
     },
     {
       "parameters": {
-        "jsCode": "// build-shopify-theme — Validate Theme Input\n// Validates store_blueprint (theme_sections + assets) and runtime_config.\n// SAFETY: Checks for allow_theme_writes opt-in. Defaults to dry_run mode.\n//\n// PHASE 7B.3 STATUS: SCAFFOLD — live writes require allow_theme_writes: true in runtime_config.\n// Without opt-in, this workflow returns PHASE_7B3_DRY_RUN with a plan of what would be written.\n\nconst input = $input.first().json;\n\nconst runtimeConfig   = input.runtime_config   || {};\nconst storeBlueprint  = input.store_blueprint   || null;\nconst contentStrategy = input.content_strategy  || {};\nconst projectId       = input.project_id        || runtimeConfig.project_id || null;\n\nif (!projectId) {\n  throw new Error('MISSING_RUNTIME_CONFIG: build-shopify-theme requires project_id (top-level) or runtime_config.project_id');\n}\n\nif (!storeBlueprint) {\n  throw new Error('MISSING_ARTIFACT: store_blueprint is required but was not found in trigger input');\n}\n\nconst themeSections = storeBlueprint.theme_sections || [];\nconst assets        = storeBlueprint.assets         || [];\n\nif (themeSections.length === 0 && assets.length === 0) {\n  throw new Error('INVALID_BLUEPRINT: store_blueprint.theme_sections and store_blueprint.assets are both empty — nothing to deploy');\n}\n\n// ── Shopify config ────────────────────────────────────────────────────────\nconst shopUrl    = runtimeConfig.shopify_shop_url    || runtimeConfig.shop_url    || runtimeConfig.STORE_OS_SHOPIFY_SHOP_URL    || null;\nconst apiVersion = runtimeConfig.shopify_api_version || runtimeConfig.api_version || runtimeConfig.STORE_OS_SHOPIFY_API_VERSION || '2025-01';\n\nif (!shopUrl) {\n  throw new Error('MISSING_CONFIG: shop_url not found in runtime_config.');\n}\n\nconst shopDomain  = shopUrl.replace(/^https?:\\/\\//, '').replace(/\\/$/, '');\nconst shopifyBase = 'https://' + shopDomain + '/admin/api/' + apiVersion;\n\n// ── Safety opt-in check ───────────────────────────────────────────────────\n// allow_theme_writes must be explicitly set to true to perform any writes.\n// This prevents accidental theme modifications during automated/unattended runs.\nconst allowThemeWrites = runtimeConfig.allow_theme_writes === true\n  || runtimeConfig.allow_theme_writes === 'true';\n\n// Target theme: specified theme ID or will use active theme (requires confirmation)\nconst targetThemeId = runtimeConfig.shopify_theme_id || null;\n\nconsole.log(\n  `build-shopify-theme: project=${projectId}, shop=${shopDomain}, ` +\n  `sections=${themeSections.length}, assets=${assets.length}, ` +\n  `allow_theme_writes=${allowThemeWrites}, target_theme_id=${targetThemeId || 'auto-detect'}`\n);\n\nreturn [{\n  json: {\n    project_id:        projectId,\n    runtime_config:    runtimeConfig,\n    store_blueprint:   storeBlueprint,\n    content_strategy:  contentStrategy,\n    shop_url:          shopUrl,\n    shop_domain:       shopDomain,\n    api_version:       apiVersion,\n    shopify_base:      shopifyBase,\n    allow_theme_writes: allowThemeWrites,\n    target_theme_id:   targetThemeId,\n    theme_sections:    themeSections,\n    assets:            assets,\n    sections_count:    themeSections.length,\n    assets_count:      assets.length,\n  },\n}];\n"
+        "jsCode": "// build-shopify-theme — Validate Theme Input\n// Validates store_blueprint (theme_sections + assets) and runtime_config.\n// Resolves Shopify config and opt-in flags.\n\nconst input = $input.first().json;\n\nconst runtimeConfig   = input.runtime_config   || {};\nconst storeBlueprint  = input.store_blueprint   || null;\nconst contentStrategy = input.content_strategy  || {};\nconst projectId       = input.project_id        || runtimeConfig.project_id || null;\n\nif (!projectId) {\n  throw new Error('MISSING_RUNTIME_CONFIG: build-shopify-theme requires project_id');\n}\n\nif (!storeBlueprint) {\n  throw new Error('MISSING_ARTIFACT: store_blueprint is required');\n}\n\nconst themeSections = storeBlueprint.theme_sections || [];\nconst assets        = storeBlueprint.assets         || [];\n\nif (themeSections.length === 0 && assets.length === 0) {\n  throw new Error('INVALID_BLUEPRINT: store_blueprint.theme_sections and store_blueprint.assets are both empty');\n}\n\nconst shopUrl    = runtimeConfig.shopify_shop_url || null;\nconst apiVersion = runtimeConfig.shopify_api_version || '2026-01';\n\nif (!shopUrl) {\n  throw new Error('MISSING_CONFIG: shopify_shop_url not found in runtime_config');\n}\n\nconst shopDomain  = shopUrl.replace(/^https?:\\/\\//, '').replace(/\\/$/, '');\nconst shopifyBase = 'https://' + shopDomain + '/admin/api/' + apiVersion;\n\nconst allowThemeWrites = runtimeConfig.allow_theme_writes === true || runtimeConfig.allow_theme_writes === 'true';\nconst targetThemeId    = runtimeConfig.shopify_theme_id || null;\n\nreturn [{\n  json: {\n    project_id:         projectId,\n    runtime_config:     runtimeConfig,\n    store_blueprint:    storeBlueprint,\n    content_strategy:   contentStrategy,\n    shop_domain:        shopDomain,\n    api_version:        apiVersion,\n    shopify_base:       shopifyBase,\n    allow_theme_writes: allowThemeWrites,\n    target_theme_id:    targetThemeId,\n    theme_sections:     themeSections,\n    assets:             assets,\n  },\n}];\n"
       },
       "id": "7b3a0001-0007-07b3-07b3-000000000002",
       "name": "Validate Theme Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.shopify_base + '/themes.json' }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json",
+              "neverError": true,
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "CO1JGlTR5RJ9Cs6x",
+          "name": "Shopify SuppliedTech Admin"
+        }
+      },
+      "id": "7b3a0001-0007-07b3-07b3-000000000003",
+      "name": "Fetch Themes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [750, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-shopify-theme — Resolve Target Theme + Build Deployment Plan\n// Selects safe target theme, generates section .liquid content, and outputs write actions.\n//\n// SAFETY RULES:\n// 1. NEVER target the active (role: main) theme unless explicitly overridden by shopify_theme_id\n// 2. Prefer unpublished/development themes\n// 3. If no safe target exists and no explicit theme_id → PHASE_7B3_BLOCKED\n// 4. If allow_theme_writes is false → return dry-run plan (no writes)\n\nconst validated = $('Validate Theme Input').first().json;\nconst themesResponse = $input.first().json;\n\nconst projectId        = validated.project_id;\nconst shopDomain       = validated.shop_domain;\nconst shopifyBase      = validated.shopify_base;\nconst allowWrites      = validated.allow_theme_writes;\nconst requestedThemeId = validated.target_theme_id;\nconst themeSections    = validated.theme_sections;\nconst assets           = validated.assets;\nconst contentStrategy  = validated.content_strategy || {};\n\n// ── Parse themes response ─────────────────────────────────────────────────\nconst body = themesResponse.body || themesResponse;\nconst themes = (body.themes || body.data?.themes || []);\n\nif (themes.length === 0) {\n  return [{\n    json: {\n      _action: 'terminal',\n      status: 'PHASE_7B3_BLOCKED',\n      project_id: projectId,\n      shop_url: shopDomain,\n      theme_id: null,\n      theme_name: null,\n      completed_at: new Date().toISOString(),\n      sections_written: 0,\n      assets_written: 0,\n      dry_run: true,\n      dry_run_plan: [],\n      errors: [{ key: 'themes', status: themesResponse.statusCode || 0, message: 'Failed to fetch themes or no themes found' }],\n      warnings: [],\n      blueprint_summary: { theme_sections_in_blueprint: themeSections.length, assets_in_blueprint: assets.length },\n      safety_notes: ['BLOCKED: Could not retrieve themes from Shopify'],\n    },\n  }];\n}\n\n// ── Select target theme ───────────────────────────────────────────────────\nconst activeTheme = themes.find(t => t.role === 'main');\nconst unpublishedThemes = themes.filter(t => t.role === 'unpublished' || t.role === 'demo');\nlet targetTheme = null;\nlet safetyNote = '';\n\nif (requestedThemeId) {\n  // Explicit theme ID requested — find it\n  targetTheme = themes.find(t => String(t.id) === String(requestedThemeId));\n  if (!targetTheme) {\n    return [{\n      json: {\n        _action: 'terminal',\n        status: 'PHASE_7B3_BLOCKED',\n        project_id: projectId,\n        shop_url: shopDomain,\n        theme_id: null,\n        theme_name: null,\n        completed_at: new Date().toISOString(),\n        sections_written: 0,\n        assets_written: 0,\n        dry_run: true,\n        dry_run_plan: [],\n        errors: [{ key: 'theme_id', status: 404, message: 'Requested theme ID ' + requestedThemeId + ' not found. Available: ' + themes.map(t => t.id + ' (' + t.role + ')').join(', ') }],\n        warnings: [],\n        blueprint_summary: { theme_sections_in_blueprint: themeSections.length, assets_in_blueprint: assets.length },\n        safety_notes: ['BLOCKED: Requested shopify_theme_id not found'],\n      },\n    }];\n  }\n  if (targetTheme.role === 'main') {\n    safetyNote = 'WARNING: Targeting active (main) theme by explicit shopify_theme_id override. This is the live production theme.';\n  } else {\n    safetyNote = 'Targeting explicitly requested theme: ' + targetTheme.name + ' (role: ' + targetTheme.role + ')';\n  }\n} else if (unpublishedThemes.length > 0) {\n  // Auto-select: pick the most recently updated unpublished theme\n  targetTheme = unpublishedThemes.sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))[0];\n  safetyNote = 'Auto-selected unpublished theme: ' + targetTheme.name + ' (id: ' + targetTheme.id + '). Active theme ' + (activeTheme ? activeTheme.name : 'unknown') + ' is NOT affected.';\n} else {\n  // No unpublished theme and no explicit ID → BLOCKED\n  return [{\n    json: {\n      _action: 'terminal',\n      status: 'PHASE_7B3_BLOCKED',\n      project_id: projectId,\n      shop_url: shopDomain,\n      theme_id: null,\n      theme_name: null,\n      completed_at: new Date().toISOString(),\n      sections_written: 0,\n      assets_written: 0,\n      dry_run: true,\n      dry_run_plan: [],\n      errors: [],\n      warnings: ['No unpublished/development theme found and no shopify_theme_id specified. Will not auto-target the active theme.'],\n      blueprint_summary: { theme_sections_in_blueprint: themeSections.length, assets_in_blueprint: assets.length },\n      safety_notes: ['BLOCKED: No safe theme target. Create an unpublished theme in Shopify or specify runtime_config.shopify_theme_id.'],\n    },\n  }];\n}\n\nconst themeId = targetTheme.id;\nconst themeName = targetTheme.name;\nconst assetsUrl = shopifyBase + '/themes/' + themeId + '/assets.json';\n\n// ── Generate section .liquid content ──────────────────────────────────────\n// Each section is a standalone Shopify OS 2.0 section file with:\n// - Basic HTML template using section.settings\n// - Schema block with configurable settings pre-populated from blueprint hints\n// - Preset for theme editor discovery\n// Keys are prefixed 'store-os-' to avoid overwriting existing Dawn sections.\n\nfunction generateSectionLiquid(section) {\n  const sType = (section.section_type || 'unknown').toLowerCase().replace(/[\\/\\s]+/g, '-').replace(/[^a-z0-9-]/g, '');\n  const heading = section.heading_hint || section.section_type || 'Section';\n  const content = section.content_hint || '';\n  const ctaLabel = section.cta_label || '';\n  const ctaTarget = section.cta_target || '';\n  const page = section.page || 'homepage';\n  const rawName = heading.replace(/[^a-zA-Z0-9 ]/g, '').trim();\n  const schemeName = rawName.length > 15 ? rawName.slice(0, 15).trim() : rawName;\n\n  let template = '';\n  let settings = [];\n\n  // Common settings for all section types\n  settings.push('    {\\n      \"type\": \"text\",\\n      \"id\": \"heading\",\\n      \"label\": \"Heading\",\\n      \"default\": ' + JSON.stringify(heading) + '\\n    }');\n  settings.push('    {\\n      \"type\": \"richtext\",\\n      \"id\": \"content\",\\n      \"label\": \"Content\",\\n      \"default\": ' + JSON.stringify('<p>' + (content || 'Add your content here.') + '</p>') + '\\n    }');\n\n  if (ctaLabel) {\n    settings.push('    {\\n      \"type\": \"text\",\\n      \"id\": \"cta_label\",\\n      \"label\": \"Button text\",\\n      \"default\": ' + JSON.stringify(ctaLabel) + '\\n    }');\n    settings.push('    {\\n      \"type\": \"text\",\\n      \"id\": \"cta_link\",\\n      \"label\": \"Button link\",\\n      \"default\": ' + JSON.stringify(ctaTarget || '/') + '\\n    }');\n  }\n\n  // Section-type specific settings\n  if (sType === 'featured-collection') {\n    settings.push('    {\\n      \"type\": \"collection\",\\n      \"id\": \"collection\",\\n      \"label\": \"Collection\"\\n    }');\n    settings.push('    {\\n      \"type\": \"range\",\\n      \"id\": \"products_to_show\",\\n      \"label\": \"Products to show\",\\n      \"min\": 2,\\n      \"max\": 12,\\n      \"step\": 1,\\n      \"default\": 4\\n    }');\n  }\n\n  if (sType === 'value-prop') {\n    settings.push('    {\\n      \"type\": \"range\",\\n      \"id\": \"columns\",\\n      \"label\": \"Columns\",\\n      \"min\": 2,\\n      \"max\": 4,\\n      \"step\": 1,\\n      \"default\": 3\\n    }');\n  }\n\n  // Build template\n  template += '<section class=\"store-os-section store-os-' + sType + '\" style=\"padding: 40px 20px; max-width: 1200px; margin: 0 auto;\">\\n';\n  template += '  <h2>{{ section.settings.heading }}</h2>\\n';\n  template += '  <div class=\"store-os-content\">{{ section.settings.content }}</div>\\n';\n\n  if (sType === 'featured-collection') {\n    template += '  {% if section.settings.collection %}\\n';\n    template += '    <div class=\"store-os-grid\" style=\"display: grid; grid-template-columns: repeat({{ section.settings.products_to_show | at_most: 4 }}, 1fr); gap: 20px; margin-top: 20px;\">\\n';\n    template += '      {% for product in section.settings.collection.products limit: section.settings.products_to_show %}\\n';\n    template += '        <div class=\"store-os-product-card\">\\n';\n    template += '          {% if product.featured_image %}\\n';\n    template += '            <img src=\"{{ product.featured_image | image_url: width: 400 }}\" alt=\"{{ product.featured_image.alt | escape }}\" loading=\"lazy\" width=\"400\">\\n';\n    template += '          {% endif %}\\n';\n    template += '          <h3><a href=\"{{ product.url }}\">{{ product.title }}</a></h3>\\n';\n    template += '          <p>{{ product.price | money }}</p>\\n';\n    template += '        </div>\\n';\n    template += '      {% endfor %}\\n';\n    template += '    </div>\\n';\n    template += '  {% endif %}\\n';\n  }\n\n  if (sType === 'value-prop') {\n    template += '  {%- comment -%}Value proposition columns — configure blocks in theme editor{%- endcomment -%}\\n';\n    template += '  <div class=\"store-os-columns\" style=\"display: grid; grid-template-columns: repeat({{ section.settings.columns }}, 1fr); gap: 30px; margin-top: 20px;\">\\n';\n    template += '    {% for block in section.blocks %}\\n';\n    template += '      <div class=\"store-os-column\" {{ block.shopify_attributes }}>\\n';\n    template += '        <h3>{{ block.settings.title }}</h3>\\n';\n    template += '        <p>{{ block.settings.description }}</p>\\n';\n    template += '      </div>\\n';\n    template += '    {% endfor %}\\n';\n    template += '  </div>\\n';\n  }\n\n  if (sType === 'trust' || sType === 'social-proof' || sType === 'trust-social-proof') {\n    template += '  {%- comment -%}Trust signals — configure blocks in theme editor{%- endcomment -%}\\n';\n    template += '  <div class=\"store-os-trust-items\" style=\"display: flex; gap: 30px; justify-content: center; flex-wrap: wrap; margin-top: 20px;\">\\n';\n    template += '    {% for block in section.blocks %}\\n';\n    template += '      <div class=\"store-os-trust-item\" {{ block.shopify_attributes }} style=\"text-align: center; max-width: 200px;\">\\n';\n    template += '        <strong>{{ block.settings.title }}</strong>\\n';\n    template += '        <p>{{ block.settings.description }}</p>\\n';\n    template += '      </div>\\n';\n    template += '    {% endfor %}\\n';\n    template += '  </div>\\n';\n  }\n\n  if (ctaLabel) {\n    template += '  {% if section.settings.cta_label != blank %}\\n';\n    template += '    <div style=\"margin-top: 20px;\"><a href=\"{{ section.settings.cta_link }}\" class=\"button store-os-cta\">{{ section.settings.cta_label }}</a></div>\\n';\n    template += '  {% endif %}\\n';\n  }\n\n  template += '</section>\\n';\n\n  // Build blocks for column/trust sections\n  let blocks = '';\n  if (sType === 'value-prop' || sType === 'trust' || sType === 'social-proof' || sType === 'trust-social-proof') {\n    blocks = ',\\n    \"blocks\": [\\n      {\\n        \"type\": \"column\",\\n        \"name\": \"Column\",\\n        \"settings\": [\\n          { \"type\": \"text\", \"id\": \"title\", \"label\": \"Title\", \"default\": \"Feature\" },\\n          { \"type\": \"text\", \"id\": \"description\", \"label\": \"Description\", \"default\": \"Describe this feature.\" }\\n        ]\\n      }\\n    ],\\n    \"max_blocks\": 6';\n  }\n\n  // Build schema\n  const schema = '{\\n  \"name\": ' + JSON.stringify('store-os: ' + schemeName) + ',\\n  \"tag\": \"section\",\\n  \"class\": \"store-os-section\",\\n  \"settings\": [\\n' + settings.join(',\\n') + '\\n  ]' + blocks + ',\\n  \"presets\": [\\n    { \"name\": ' + JSON.stringify('store-os: ' + schemeName) + ' }\\n  ]\\n}';\n\n  return template + '\\n{% schema %}\\n' + schema + '\\n{% endschema %}\\n';\n}\n\n// ── Generate SVG placeholder assets ───────────────────────────────────────\nfunction generatePlaceholderSvg(asset) {\n  const dims = asset.dimensions || '200x200';\n  const parts = dims.split('x').map(Number);\n  const w = parts[0] || 200;\n  const h = parts[1] || 200;\n  const purpose = asset.purpose || asset.asset_type || 'placeholder';\n  const label = purpose.length > 30 ? purpose.slice(0, 30) + '...' : purpose;\n\n  return '<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"' + w + '\" height=\"' + h + '\" viewBox=\"0 0 ' + w + ' ' + h + '\">'\n    + '<rect width=\"' + w + '\" height=\"' + h + '\" fill=\"#e8e8e8\" stroke=\"#ccc\" stroke-width=\"2\"/>'\n    + '<text x=\"50%\" y=\"40%\" text-anchor=\"middle\" font-family=\"system-ui,sans-serif\" font-size=\"14\" fill=\"#666\">' + dims + '</text>'\n    + '<text x=\"50%\" y=\"55%\" text-anchor=\"middle\" font-family=\"system-ui,sans-serif\" font-size=\"12\" fill=\"#999\">' + label.replace(/&/g,'&amp;').replace(/</g,'&lt;') + '</text>'\n    + '<text x=\"50%\" y=\"70%\" text-anchor=\"middle\" font-family=\"system-ui,sans-serif\" font-size=\"10\" fill=\"#bbb\">store-os placeholder</text>'\n    + '</svg>';\n}\n\n// ── Build write actions ───────────────────────────────────────────────────\nconst writeActions = [];\n\nfor (const section of themeSections) {\n  const sType = (section.section_type || 'unknown').toLowerCase().replace(/[\\/\\s]+/g, '-').replace(/[^a-z0-9-]/g, '');\n  const key = 'sections/store-os-' + sType + '.liquid';\n  const liquidContent = generateSectionLiquid(section);\n\n  writeActions.push({\n    operation: 'write_section',\n    key: key,\n    asset_key: key,\n    section_type: sType,\n    page: section.page || 'homepage',\n    order: section.order || null,\n    url: assetsUrl,\n    body: { asset: { key: key, value: liquidContent } },\n    reason: 'Blueprint section: ' + sType + ' on ' + (section.page || 'homepage'),\n  });\n}\n\nconst assetKeyMap = {\n  'logo': 'assets/store-os-logo-placeholder.svg',\n  'favicon': 'assets/store-os-favicon-placeholder.svg',\n  'hero-image': 'assets/store-os-hero-placeholder.svg',\n};\n\nfor (const asset of assets) {\n  const assetType = (asset.asset_type || 'unknown').toLowerCase();\n  const key = assetKeyMap[assetType] || 'assets/store-os-' + assetType + '-placeholder.svg';\n  const svgContent = generatePlaceholderSvg(asset);\n\n  writeActions.push({\n    operation: 'write_asset',\n    key: key,\n    asset_key: key,\n    asset_type: assetType,\n    purpose: asset.purpose || null,\n    dimensions: asset.dimensions || null,\n    url: assetsUrl,\n    body: { asset: { key: key, value: svgContent } },\n    reason: 'Blueprint asset: ' + assetType + ' (' + (asset.dimensions || 'no dimensions') + ')',\n  });\n}\n\n// ── Decide: dry run or live ───────────────────────────────────────────────\nif (!allowWrites) {\n  // DRY RUN — return plan without writing\n  const dryPlan = writeActions.map(a => ({\n    operation: a.operation,\n    key: a.key,\n    section_type: a.section_type || undefined,\n    asset_type: a.asset_type || undefined,\n    reason: a.reason,\n  }));\n\n  return [{\n    json: {\n      _action: 'terminal',\n      status: 'PHASE_7B3_DRY_RUN',\n      project_id: projectId,\n      shop_url: shopDomain,\n      theme_id: themeId,\n      theme_name: themeName,\n      completed_at: new Date().toISOString(),\n      sections_written: 0,\n      assets_written: 0,\n      dry_run: true,\n      dry_run_plan: dryPlan,\n      errors: [],\n      warnings: ['DRY RUN: allow_theme_writes not set. No writes performed. Set runtime_config.allow_theme_writes: true to deploy.'],\n      blueprint_summary: { theme_sections_in_blueprint: themeSections.length, assets_in_blueprint: assets.length },\n      safety_notes: [\n        safetyNote,\n        'DRY RUN: ' + writeActions.length + ' write operations planned but not executed',\n        'Target theme: ' + themeName + ' (id: ' + themeId + ', role: ' + targetTheme.role + ')',\n      ],\n    },\n  }];\n}\n\n// LIVE — output one item per write action for the HTTP node to process\nconst items = writeActions.map(a => ({\n  json: {\n    _action: 'write',\n    _theme_id: themeId,\n    _theme_name: themeName,\n    _theme_role: targetTheme.role,\n    _safety_note: safetyNote,\n    _total_actions: writeActions.length,\n    _sections_count: themeSections.length,\n    _assets_count: assets.length,\n    _project_id: projectId,\n    _shop_domain: shopDomain,\n    operation: a.operation,\n    key: a.key,\n    url: a.url,\n    body: a.body,\n    reason: a.reason,\n  },\n}));\n\nreturn items;\n"
+      },
+      "id": "7b3a0001-0007-07b3-07b3-000000000004",
+      "name": "Build Deployment Plan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 300]
     },
     {
       "parameters": {
@@ -29,12 +68,12 @@
           },
           "conditions": [
             {
-              "id": "7b3a0001-cond-07b3-07b3-000000000001",
-              "leftValue": "={{ $json.allow_theme_writes }}",
-              "rightValue": true,
+              "id": "7b3a-cond-0001",
+              "leftValue": "={{ $json._action }}",
+              "rightValue": "write",
               "operator": {
-                "type": "boolean",
-                "operation": "equal"
+                "type": "string",
+                "operation": "equals"
               }
             }
           ],
@@ -42,41 +81,52 @@
         },
         "options": {}
       },
-      "id": "7b3a0001-0007-07b3-07b3-000000000003",
-      "name": "Live Writes Enabled?",
+      "id": "7b3a0001-0007-07b3-07b3-000000000005",
+      "name": "Has Write Actions?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [750, 300]
+      "position": [1250, 300]
     },
     {
       "parameters": {
-        "jsCode": "// build-shopify-theme — Dry Run Plan\n// allow_theme_writes is not set (or false). Return a plan of what would be written without performing any writes.\n// Returns PHASE_7B3_DRY_RUN with the full planned write operations.\n\nconst validated     = $input.first().json;\nconst projectId     = validated.project_id;\nconst shopDomain    = validated.shop_domain;\nconst blueprint     = validated.store_blueprint;\nconst themeSections = validated.theme_sections;\nconst assets        = validated.assets;\n\n// ── Plan section writes ────────────────────────────────────────────────────\nconst dryRunPlan = [];\n\nfor (const section of themeSections) {\n  // Shopify Dawn/OS 2.0 section file key pattern: sections/{type}.json\n  const sectionType = (section.section_type || 'unknown').toLowerCase().replace(/[^a-z0-9-]/g, '-');\n  const key = 'sections/' + sectionType + '.json';\n\n  dryRunPlan.push({\n    operation:    'write_section',\n    key:          key,\n    section_type: sectionType,\n    page:         section.page || 'homepage',\n    order:        section.order || null,\n    heading_hint: section.heading_hint || null,\n    reason:       `Blueprint requests ${sectionType} section on ${section.page || 'homepage'} (order ${section.order || '?'})`,\n  });\n}\n\nfor (const asset of assets) {\n  const assetType = (asset.asset_type || 'unknown').toLowerCase();\n  let key;\n  if (assetType === 'logo')       key = 'assets/logo.png';\n  else if (assetType === 'favicon') key = 'assets/favicon.ico';\n  else if (assetType === 'hero-image') key = 'assets/hero.jpg';\n  else key = 'assets/' + assetType + '.png';\n\n  dryRunPlan.push({\n    operation: 'write_asset',\n    key:       key,\n    asset_type: assetType,\n    purpose:   asset.purpose || null,\n    dimensions: asset.dimensions || null,\n    reason:    `Blueprint requests ${assetType} asset: ${asset.purpose || key} (${asset.dimensions || 'dimensions not specified'})`,\n  });\n}\n\nconsole.log(\n  `Dry Run Plan: planned ${dryRunPlan.filter(p=>p.operation==='write_section').length} section writes, ` +\n  `${dryRunPlan.filter(p=>p.operation==='write_asset').length} asset writes. No live writes performed.`\n);\n\nreturn [{\n  json: {\n    status:          'PHASE_7B3_DRY_RUN',\n    project_id:      projectId,\n    shop_url:        shopDomain,\n    theme_id:        null,\n    theme_name:      null,\n    completed_at:    new Date().toISOString(),\n\n    sections_written: 0,\n    assets_written:   0,\n    dry_run:          true,\n    dry_run_plan:     dryRunPlan,\n\n    errors:   [],\n    warnings: [\n      'allow_theme_writes not set — no writes performed. Set runtime_config.allow_theme_writes: true to enable live theme deployment.',\n    ],\n\n    blueprint_summary: {\n      theme_sections_in_blueprint: themeSections.length,\n      assets_in_blueprint:         assets.length,\n    },\n\n    safety_notes: [\n      'DRY RUN ONLY — no Shopify theme assets were written',\n      'To enable live writes: set runtime_config.allow_theme_writes: true and runtime_config.shopify_theme_id to a development theme ID',\n      'NEVER target the active production theme without manual review of the dry run plan',\n    ],\n  },\n}];\n"
+        "method": "PUT",
+        "url": "={{ $json.url }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "shopifyOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
       },
-      "id": "7b3a0001-0007-07b3-07b3-000000000004",
-      "name": "Return Dry Run Plan",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1000, 420]
-    },
-    {
-      "parameters": {
-        "jsCode": "// build-shopify-theme — Live Deployment Placeholder\n// allow_theme_writes: true was detected. This node is a PLACEHOLDER for the live deployment path.\n// When Phase 7B.3 is fully implemented, this will be replaced by:\n//   Fetch Theme ID → Fetch Existing Assets → Build Write Plan → Write Section Assets → Write Other Assets → Compile Summary\n//\n// For now: return the dry run plan as PHASE_7B3_DRY_RUN with a note that live writes are not yet implemented.\n// This prevents accidental partial execution while the implementation is completed.\n\nconst validated     = $input.first().json;\nconst projectId     = validated.project_id;\nconst shopDomain    = validated.shop_domain;\nconst themeSections = validated.theme_sections;\nconst assets        = validated.assets;\n\nconst dryRunPlan = [];\n\nfor (const section of themeSections) {\n  const sectionType = (section.section_type || 'unknown').toLowerCase().replace(/[^a-z0-9-]/g, '-');\n  dryRunPlan.push({\n    operation:    'write_section',\n    key:          'sections/' + sectionType + '.json',\n    section_type: sectionType,\n    page:         section.page || 'homepage',\n    order:        section.order || null,\n    heading_hint: section.heading_hint || null,\n    reason:       `Blueprint requests ${sectionType} section (live write pending Phase 7B.3 full implementation)`,\n  });\n}\n\nfor (const asset of assets) {\n  const assetType = (asset.asset_type || 'unknown').toLowerCase();\n  const keyMap = { logo: 'assets/logo.png', favicon: 'assets/favicon.ico', 'hero-image': 'assets/hero.jpg' };\n  dryRunPlan.push({\n    operation: 'write_asset',\n    key:       keyMap[assetType] || 'assets/' + assetType + '.png',\n    asset_type: assetType,\n    purpose:   asset.purpose || null,\n    dimensions: asset.dimensions || null,\n    reason:    `Blueprint requests ${assetType} asset (live write pending Phase 7B.3 full implementation)`,\n  });\n}\n\nconsole.log('Phase 7B.3 live path: NOT YET IMPLEMENTED. Returning dry run plan.');\n\nreturn [{\n  json: {\n    status:          'PHASE_7B3_DRY_RUN',\n    project_id:      projectId,\n    shop_url:        shopDomain,\n    theme_id:        validated.target_theme_id || null,\n    theme_name:      null,\n    completed_at:    new Date().toISOString(),\n\n    sections_written: 0,\n    assets_written:   0,\n    dry_run:          true,\n    dry_run_plan:     dryRunPlan,\n\n    errors:   [],\n    warnings: [\n      'Phase 7B.3 live deployment is not yet implemented. allow_theme_writes: true was detected but live writes were not performed.',\n      'Implement the live path: Fetch Theme ID → Fetch Existing Assets → Build Write Plan → Write Section Assets → Write Assets → Compile Summary',\n    ],\n\n    blueprint_summary: {\n      theme_sections_in_blueprint: themeSections.length,\n      assets_in_blueprint:         assets.length,\n    },\n\n    safety_notes: [\n      'SCAFFOLD ONLY — live theme asset writes are not yet implemented in this workflow',\n      'When implemented: target only development/preview themes; validate dry run plan before enabling live writes',\n    ],\n  },\n}];\n"
-      },
-      "id": "7b3a0001-0007-07b3-07b3-000000000005",
-      "name": "Live Deployment (Scaffold)",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1000, 180]
-    },
-    {
-      "parameters": {
-        "mode": "append"
+      "credentials": {
+        "shopifyOAuth2Api": {
+          "id": "CO1JGlTR5RJ9Cs6x",
+          "name": "Shopify SuppliedTech Admin"
+        }
       },
       "id": "7b3a0001-0007-07b3-07b3-000000000006",
-      "name": "Merge Deployment Result",
-      "type": "n8n-nodes-base.merge",
+      "name": "Write Theme Asset",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1500, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-shopify-theme — Compile Deployment Summary\n// Aggregates results from the write path or passes through terminal items (dry-run/blocked).\n\nconst allItems = $input.all();\n\n// Check if this is a terminal item (dry-run or blocked) — pass through directly\nif (allItems.length === 1 && allItems[0].json._action === 'terminal') {\n  const t = allItems[0].json;\n  delete t._action;\n  return [{ json: t }];\n}\n\n// Otherwise, aggregate write results.\n// The HTTP node replaces input JSON with response, so recover original metadata\n// from the Build Deployment Plan node via paired item index.\nconst planItems = $('Build Deployment Plan').all();\nconst first = planItems[0]?.json || {};\nconst projectId  = first._project_id;\nconst shopDomain = first._shop_domain;\nconst themeId    = first._theme_id;\nconst themeName  = first._theme_name;\nconst themeRole  = first._theme_role;\nconst safetyNote = first._safety_note;\nconst totalActions   = first._total_actions;\nconst sectionsCount  = first._sections_count;\nconst assetsCount    = first._assets_count;\n\nlet sectionsWritten = 0;\nlet assetsWritten   = 0;\nconst errors   = [];\nconst warnings = [];\n\nfor (let i = 0; i < allItems.length; i++) {\n  const d = allItems[i].json;\n  const plan = planItems[i]?.json || {};\n  const key = plan.key || d.key || 'unknown';\n  const op  = plan.operation || d.operation || 'unknown';\n\n  // The HTTP response is in body (from fullResponse: true)\n  const statusCode = d.statusCode || d.body?.statusCode || 0;\n  const respBody   = d.body || {};\n\n  // Check for Shopify errors\n  const shopifyErrors = respBody.body?.errors || respBody.errors;\n  if (shopifyErrors) {\n    errors.push({ key: key, status: statusCode, message: typeof shopifyErrors === 'string' ? shopifyErrors : JSON.stringify(shopifyErrors) });\n    continue;\n  }\n\n  if (statusCode >= 400) {\n    errors.push({ key: key, status: statusCode, message: 'HTTP ' + statusCode + ' on PUT' });\n    continue;\n  }\n\n  // Success\n  if (op === 'write_section') {\n    sectionsWritten++;\n  } else if (op === 'write_asset') {\n    assetsWritten++;\n  }\n}\n\nconst totalWritten = sectionsWritten + assetsWritten;\nlet status;\nif (errors.length === 0 && totalWritten === totalActions) {\n  status = 'PHASE_7B3_COMPLETE';\n} else if (totalWritten > 0) {\n  status = 'PHASE_7B3_PARTIAL';\n} else {\n  status = 'PHASE_7B3_FAILED';\n}\n\nreturn [{\n  json: {\n    status:           status,\n    project_id:       projectId,\n    shop_url:         shopDomain,\n    theme_id:         themeId,\n    theme_name:       themeName,\n    completed_at:     new Date().toISOString(),\n    sections_written: sectionsWritten,\n    assets_written:   assetsWritten,\n    dry_run:          false,\n    errors:           errors,\n    warnings:         warnings,\n    blueprint_summary: {\n      theme_sections_in_blueprint: sectionsCount,\n      assets_in_blueprint:         assetsCount,\n    },\n    safety_notes: [\n      safetyNote,\n      'Target theme: ' + themeName + ' (id: ' + themeId + ', role: ' + themeRole + ')',\n      'Active production theme was NOT modified',\n      'No templates or settings_data.json were modified',\n      'No theme files were deleted',\n    ],\n  },\n}];\n"
+      },
+      "id": "7b3a0001-0007-07b3-07b3-000000000007",
+      "name": "Compile Deployment Summary",
+      "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1250, 300]
+      "position": [1750, 300]
     }
   ],
   "connections": {
@@ -87,23 +137,28 @@
     },
     "Validate Theme Input": {
       "main": [
-        [{ "node": "Live Writes Enabled?", "type": "main", "index": 0 }]
+        [{ "node": "Fetch Themes", "type": "main", "index": 0 }]
       ]
     },
-    "Live Writes Enabled?": {
+    "Fetch Themes": {
       "main": [
-        [{ "node": "Live Deployment (Scaffold)", "type": "main", "index": 0 }],
-        [{ "node": "Return Dry Run Plan",        "type": "main", "index": 0 }]
+        [{ "node": "Build Deployment Plan", "type": "main", "index": 0 }]
       ]
     },
-    "Live Deployment (Scaffold)": {
+    "Build Deployment Plan": {
       "main": [
-        [{ "node": "Merge Deployment Result", "type": "main", "index": 0 }]
+        [{ "node": "Has Write Actions?", "type": "main", "index": 0 }]
       ]
     },
-    "Return Dry Run Plan": {
+    "Has Write Actions?": {
       "main": [
-        [{ "node": "Merge Deployment Result", "type": "main", "index": 1 }]
+        [{ "node": "Write Theme Asset", "type": "main", "index": 0 }],
+        [{ "node": "Compile Deployment Summary", "type": "main", "index": 0 }]
+      ]
+    },
+    "Write Theme Asset": {
+      "main": [
+        [{ "node": "Compile Deployment Summary", "type": "main", "index": 0 }]
       ]
     }
   },
@@ -115,25 +170,21 @@
   "_meta": {
     "storeOs": {
       "phase": "Phase 7B.3",
-      "status": "SCAFFOLD — NOT YET DEPLOYED",
-      "format": "n8n-scaffold",
+      "status": "EXECUTABLE",
+      "format": "n8n-executable",
       "outputSchema": "schemas/phase-7b/shopify-theme-deployment.schema.json",
-      "cloudCompatibility": "FULL — no filesystem access, no AJV.",
-      "invocation": "Called as a subworkflow by orchestrate-phase1 (when integrated). Expects Subworkflow Trigger input: { project_id, runtime_config, store_blueprint, content_strategy }",
+      "cloudCompatibility": "FULL",
+      "nodeCount": 7,
+      "nodePattern": "7-node (Trigger → Validate → Fetch Themes → Build Plan → IF write → Write Asset → Summary)",
+      "terminalStatuses": ["PHASE_7B3_COMPLETE", "PHASE_7B3_PARTIAL", "PHASE_7B3_FAILED", "PHASE_7B3_DRY_RUN", "PHASE_7B3_BLOCKED"],
       "safetyModel": {
-        "allow_theme_writes_required": "runtime_config.allow_theme_writes: true must be explicitly set for any live writes",
-        "default_behavior": "Returns PHASE_7B3_DRY_RUN with a planned write operations list — no Shopify API calls to write",
-        "recommended_theme": "Specify runtime_config.shopify_theme_id pointing to a development/preview theme — NEVER target active production theme without manual review"
-      },
-      "implementationStatus": {
-        "scaffold_complete": true,
-        "live_path_implemented": false,
-        "deployed_to_n8n": false,
-        "integrated_in_orchestrator": false,
-        "notes": "Live path requires: Fetch active/target theme ID, Fetch existing assets for diffing, Build section JSON payloads (Dawn/OS 2.0 format), PUT each section asset, PUT other assets, Compile summary. Orchestrator integration should add 5 bridge nodes after Phase 7B.2 Complete."
-      },
-      "nodeCount": 6,
-      "terminalStatuses": ["PHASE_7B3_COMPLETE", "PHASE_7B3_PARTIAL", "PHASE_7B3_FAILED", "PHASE_7B3_DRY_RUN"]
+        "allow_theme_writes_required": "runtime_config.allow_theme_writes: true must be explicitly set",
+        "default_behavior": "Returns PHASE_7B3_DRY_RUN with plan — no Shopify writes",
+        "theme_targeting": "Auto-selects unpublished theme; blocks if only active theme exists; explicit shopify_theme_id overrides",
+        "no_template_modifications": "Does NOT modify templates/*.json or config/settings_data.json",
+        "no_deletes": "No existing theme files are deleted",
+        "idempotent": "PUT /themes/{id}/assets is inherently idempotent"
+      }
     }
   }
 }

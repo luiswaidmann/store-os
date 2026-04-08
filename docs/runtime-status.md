@@ -27,6 +27,29 @@ Recent runtime progression merges (on `main`):
 
 ## Last confirmed end-to-end smoke test
 
+**Phase 7B.3 CONFIRMED (COMPLETE) — Theme Deployment:**
+**Date:** 2026-04-08
+**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async)
+**Input:** `test-data/golden-input.json` (project: `suppliedtech`)
+**Result:** `PHASE_7B3_COMPLETE` — n8n execution 14728, status: success, ~131s — cloud mode
+**Shopify target:** `8zw111-cj.myshopify.com`
+**Theme target:** ST Draft - 2026-03-22 (id: 193655701844, role: unpublished)
+**Theme writes:** sections_written: 4 | assets_written: 3 | errors: 0 | warnings: 0
+**Sections deployed:** store-os-hero, store-os-featured-collection, store-os-value-prop, store-os-trust-social-proof
+**Assets deployed:** store-os-logo-placeholder.svg, store-os-favicon-placeholder.svg, store-os-hero-placeholder.svg
+**Safety confirmed:**
+- Active production theme (Main) was NOT modified
+- No templates/*.json or config/settings_data.json were modified
+- No existing theme files were deleted
+- All keys prefixed `store-os-` to avoid Dawn section collisions
+**Fixes applied during Phase 7B.3:**
+- `orchestrate-phase1` Resolve Runtime Config: added `allow_theme_writes` and `shopify_theme_id` to runtimeConfig assembly
+- `build-shopify-theme` schema name truncated to 25 chars max (Shopify limit)
+- `build-shopify-theme` cta_link setting changed from `url` type to `text` (collection handles aren't valid URLs)
+- `build-shopify-theme` Compile Summary: recovers metadata from Build Deployment Plan via `$()` reference (HTTP node replaces input JSON)
+- `resolve-runtime-config` updated with `allow_theme_writes` and `shopify_theme_id` fields, `callerPolicy: "any"`
+**Persisted:** `outputs/runs/14728.json`
+
 **Full System Consistency Validation — PHASE_7B2_COMPLETE:**
 **Date:** 2026-04-08
 **Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async)
