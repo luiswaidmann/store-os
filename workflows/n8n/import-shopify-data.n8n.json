@@ -7,14 +7,17 @@
       "name": "Subworkflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
-      "position": [250, 300]
+      "position": [
+        250,
+        300
+      ]
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "={{  'https://' + $env.STORE_OS_SHOPIFY_SHOP_URL + '/admin/api/' + $env.STORE_OS_SHOPIFY_API_VERSION + '/shop.json'  }}",
+        "url": "={{  'https://' + $json.runtime_config.shopify_shop_url + '/admin/api/' + $json.runtime_config.shopify_api_version + '/shop.json'  }}",
         "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "shopifyApi",
+        "nodeCredentialType": "shopifyOAuth2Api",
         "options": {
           "response": {
             "response": {
@@ -24,24 +27,27 @@
         }
       },
       "credentials": {
-        "shopifyApi": {
-          "id": "REPLACE_WITH_N8N_SHOPIFY_CREDENTIAL_ID",
-          "name": "Shopify API Credential"
+        "shopifyOAuth2Api": {
+          "id": "CO1JGlTR5RJ9Cs6x",
+          "name": "Shopify SuppliedTech Admin"
         }
       },
       "id": "c3d4e5f6-0003-0003-0003-000000000002",
       "name": "Fetch Shop Basics",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [500, 200],
+      "position": [
+        500,
+        200
+      ],
       "notes": "SETUP: Replace credential id above with your n8n Shopify credential ID. Find it in n8n > Settings > Credentials > your Shopify credential > URL (the numeric ID in the URL path)."
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "={{  'https://' + $env.STORE_OS_SHOPIFY_SHOP_URL + '/admin/api/' + $env.STORE_OS_SHOPIFY_API_VERSION + '/products.json?limit=250&status=active&fields=id,title,handle,body_html,vendor,product_type,tags,status,variants,images'  }}",
+        "url": "={{  'https://' + $json.runtime_config.shopify_shop_url + '/admin/api/' + $json.runtime_config.shopify_api_version + '/products.json?limit=250&status=active&fields=id,title,handle,body_html,vendor,product_type,tags,status,variants,images'  }}",
         "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "shopifyApi",
+        "nodeCredentialType": "shopifyOAuth2Api",
         "options": {
           "response": {
             "response": {
@@ -51,24 +57,27 @@
         }
       },
       "credentials": {
-        "shopifyApi": {
-          "id": "REPLACE_WITH_N8N_SHOPIFY_CREDENTIAL_ID",
-          "name": "Shopify API Credential"
+        "shopifyOAuth2Api": {
+          "id": "CO1JGlTR5RJ9Cs6x",
+          "name": "Shopify SuppliedTech Admin"
         }
       },
       "id": "c3d4e5f6-0003-0003-0003-000000000003",
       "name": "Fetch Active Products",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [500, 380],
+      "position": [
+        500,
+        380
+      ],
       "notes": "Phase 12: fetches first 250 active products (no pagination loop). Pagination for catalogs > 250 products is documented as a known gap — implement via n8n Split In Batches + loop for larger stores."
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "={{  'https://' + $env.STORE_OS_SHOPIFY_SHOP_URL + '/admin/api/' + $env.STORE_OS_SHOPIFY_API_VERSION + '/custom_collections.json?limit=250&fields=id,title,handle,body_html,image,sort_order'  }}",
+        "url": "={{  'https://' + $json.runtime_config.shopify_shop_url + '/admin/api/' + $json.runtime_config.shopify_api_version + '/custom_collections.json?limit=250&fields=id,title,handle,body_html,image,sort_order'  }}",
         "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "shopifyApi",
+        "nodeCredentialType": "shopifyOAuth2Api",
         "options": {
           "response": {
             "response": {
@@ -78,23 +87,26 @@
         }
       },
       "credentials": {
-        "shopifyApi": {
-          "id": "REPLACE_WITH_N8N_SHOPIFY_CREDENTIAL_ID",
-          "name": "Shopify API Credential"
+        "shopifyOAuth2Api": {
+          "id": "CO1JGlTR5RJ9Cs6x",
+          "name": "Shopify SuppliedTech Admin"
         }
       },
       "id": "c3d4e5f6-0003-0003-0003-000000000004",
       "name": "Fetch Custom Collections",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [500, 560]
+      "position": [
+        500,
+        560
+      ]
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "={{  'https://' + $env.STORE_OS_SHOPIFY_SHOP_URL + '/admin/api/' + $env.STORE_OS_SHOPIFY_API_VERSION + '/smart_collections.json?limit=250&fields=id,title,handle,body_html,image,sort_order'  }}",
+        "url": "={{  'https://' + $json.runtime_config.shopify_shop_url + '/admin/api/' + $json.runtime_config.shopify_api_version + '/smart_collections.json?limit=250&fields=id,title,handle,body_html,image,sort_order'  }}",
         "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "shopifyApi",
+        "nodeCredentialType": "shopifyOAuth2Api",
         "options": {
           "response": {
             "response": {
@@ -104,27 +116,34 @@
         }
       },
       "credentials": {
-        "shopifyApi": {
-          "id": "REPLACE_WITH_N8N_SHOPIFY_CREDENTIAL_ID",
-          "name": "Shopify API Credential"
+        "shopifyOAuth2Api": {
+          "id": "CO1JGlTR5RJ9Cs6x",
+          "name": "Shopify SuppliedTech Admin"
         }
       },
       "id": "c3d4e5f6-0003-0003-0003-000000000005",
       "name": "Fetch Smart Collections",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [500, 740]
+      "position": [
+        500,
+        740
+      ]
     },
     {
       "parameters": {
         "mode": "append",
+        "numberInputs": 4,
         "options": {}
       },
       "id": "c3d4e5f6-0003-0003-0003-000000000007",
       "name": "Aggregate API Responses",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 3,
-      "position": [750, 470],
+      "position": [
+        750,
+        470
+      ],
       "notes": "Synchronization barrier: waits for all four Shopify API branches before passing items to Assemble Write and Checkpoint. Required for reliable cloud execution — without this node, n8n Cloud did not guarantee all branches completed before the Code node ran, producing race conditions and missing API responses. Append mode preserves branch order: [shop, products, customCollections, smartCollections], matching $input.all() indexes in the downstream Code node."
     },
     {
@@ -135,49 +154,99 @@
       "name": "Assemble Write and Checkpoint",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1050, 470]
+      "position": [
+        1050,
+        470
+      ]
     }
   ],
   "connections": {
     "Subworkflow Trigger": {
       "main": [
         [
-          { "node": "Fetch Shop Basics",         "type": "main", "index": 0 },
-          { "node": "Fetch Active Products",      "type": "main", "index": 0 },
-          { "node": "Fetch Custom Collections",   "type": "main", "index": 0 },
-          { "node": "Fetch Smart Collections",    "type": "main", "index": 0 }
+          {
+            "node": "Fetch Shop Basics",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Active Products",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Custom Collections",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Smart Collections",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Fetch Shop Basics": {
       "main": [
-        [{ "node": "Aggregate API Responses", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Aggregate API Responses",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Fetch Active Products": {
       "main": [
-        [{ "node": "Aggregate API Responses", "type": "main", "index": 1 }]
+        [
+          {
+            "node": "Aggregate API Responses",
+            "type": "main",
+            "index": 1
+          }
+        ]
       ]
     },
     "Fetch Custom Collections": {
       "main": [
-        [{ "node": "Aggregate API Responses", "type": "main", "index": 2 }]
+        [
+          {
+            "node": "Aggregate API Responses",
+            "type": "main",
+            "index": 2
+          }
+        ]
       ]
     },
     "Fetch Smart Collections": {
       "main": [
-        [{ "node": "Aggregate API Responses", "type": "main", "index": 3 }]
+        [
+          {
+            "node": "Aggregate API Responses",
+            "type": "main",
+            "index": 3
+          }
+        ]
       ]
     },
     "Aggregate API Responses": {
       "main": [
-        [{ "node": "Assemble Write and Checkpoint", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Assemble Write and Checkpoint",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
   "active": false,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "callerPolicy": "any"
   },
   "_meta": {
     "storeOs": {

@@ -48,7 +48,7 @@ Consumes `store_blueprint.products` and `store_blueprint.collections` and deploy
 | `store_blueprint.products` | Phase 7A (`build-store-blueprint`) | ✓ |
 | `store_blueprint.collections` | Phase 7A (`build-store-blueprint`) | optional |
 | `runtime_config.shopify_shop_url` | `resolve-runtime-config` → `STORE_OS_SHOPIFY_SHOP_URL` | ✓ |
-| `runtime_config.shopify_api_version` | `resolve-runtime-config` → `STORE_OS_SHOPIFY_API_VERSION` | optional (default: 2025-01) |
+| `runtime_config.shopify_api_version` | `resolve-runtime-config` → `STORE_OS_SHOPIFY_API_VERSION` | optional (default: 2026-01) |
 
 ### Expected Output: shopify_catalog_deployment
 
@@ -150,24 +150,26 @@ Deployed: LADq8PuMRuswIxJa (activated 2026-04-07)
 
 ### Shopify API Operations
 
-| Operation | Endpoint | Purpose |
-|---|---|---|
-| GET | `/pages.json?limit=250&published_status=any` | Fetch existing pages for handle comparison |
-| GET | `/link_lists.json` | Fetch existing navigation menus for handle comparison |
-| POST | `/pages.json` | Create new page (published: false) |
-| PUT | `/pages/{id}.json` | Update existing page |
-| POST | `/link_lists.json` | Create new navigation menu |
-| PUT | `/link_lists/{id}.json` | Update existing navigation menu |
+| Operation | Endpoint | API | Purpose |
+|---|---|---|---|
+| GET | `/pages.json?limit=250&published_status=any` | REST | Fetch existing pages for handle comparison |
+| POST | `/graphql.json` | GraphQL | Fetch existing menus (`{ menus(first:50) { ... } }`) |
+| POST | `/pages.json` | REST | Create new page (published: false) |
+| PUT | `/pages/{id}.json` | REST | Update existing page |
+| POST | `/graphql.json` | GraphQL | `menuCreate` — create new navigation menu |
+| POST | `/graphql.json` | GraphQL | `menuUpdate` — update existing navigation menu |
 
-### Link Type Mapping
+**API Note:** Navigation was migrated from REST `link_lists` (removed in Shopify API 2025-04) to GraphQL Menu API in April 2026. Pages remain on REST Admin API.
 
-| Blueprint `link_type` | Shopify type | URL |
+### Link Type Mapping (GraphQL MenuItemType)
+
+| Blueprint `link_type` | GraphQL type | URL |
 |---|---|---|
-| `page` | `page` | `/pages/{target}` |
-| `collection` | `collection` | `/collections/{target}` |
-| `home` / `homepage` | `frontpage` | `/` |
-| `product` | `product` | `/products/{target}` |
-| `blog` | `blog` | `/blogs/{target}` |
+| `page` | `HTTP` | `/pages/{target}` |
+| `collection` | `HTTP` | `/collections/{target}` |
+| `home` / `homepage` | `FRONTPAGE` | `/` |
+| `product` | `HTTP` | `/products/{target}` |
+| `blog` | `HTTP` | `/blogs/{target}` |
 
 ---
 
@@ -264,7 +266,7 @@ The `golden-input.json` `smoke_test_config` must include:
 ```json
 {
   "STORE_OS_SHOPIFY_SHOP_URL": "8zw111-cj.myshopify.com",
-  "STORE_OS_SHOPIFY_API_VERSION": "2025-01"
+  "STORE_OS_SHOPIFY_API_VERSION": "2026-01"
 }
 ```
 
