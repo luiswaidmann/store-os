@@ -1,5 +1,86 @@
 [
   {
+    "execution_id": "14604",
+    "project_id": "suppliedtech",
+    "started_at": "2026-04-08T08:10:54.100Z",
+    "finished_at": "2026-04-08T08:12:38.701Z",
+    "duration_ms": 104601,
+    "status": "success",
+    "terminal_status": "PHASE_7B2_COMPLETE"
+  },
+  {
+    "execution_id": "14601",
+    "project_id": "unknown",
+    "started_at": "2026-04-08T08:05:42.405Z",
+    "finished_at": "2026-04-08T08:05:50.334Z",
+    "duration_ms": 7929,
+    "status": "error",
+    "terminal_status": null
+  },
+  {
+    "execution_id": "14587",
+    "project_id": "suppliedtech",
+    "started_at": "2026-04-08T07:46:14.473Z",
+    "finished_at": "2026-04-08T07:48:21.048Z",
+    "duration_ms": 126575,
+    "status": "success",
+    "terminal_status": "PHASE_7B2_COMPLETE"
+  },
+  {
+    "execution_id": "14573",
+    "project_id": "suppliedtech",
+    "started_at": "2026-04-08T07:39:58.456Z",
+    "finished_at": "2026-04-08T07:42:01.429Z",
+    "duration_ms": 122973,
+    "status": "success",
+    "terminal_status": "PHASE_7B2_PARTIAL"
+  },
+  {
+    "execution_id": "14570",
+    "project_id": "unknown",
+    "started_at": "2026-04-08T07:38:29.959Z",
+    "finished_at": "2026-04-08T07:38:37.642Z",
+    "duration_ms": 7683,
+    "status": "error",
+    "terminal_status": null
+  },
+  {
+    "execution_id": "14514",
+    "project_id": "unknown",
+    "started_at": "2026-04-08T06:26:29.921Z",
+    "finished_at": "2026-04-08T06:26:37.910Z",
+    "duration_ms": 7989,
+    "status": "error",
+    "terminal_status": null
+  },
+  {
+    "execution_id": "14500",
+    "project_id": "suppliedtech",
+    "started_at": "2026-04-07T18:16:27.234Z",
+    "finished_at": "2026-04-07T18:18:25.351Z",
+    "duration_ms": 118117,
+    "status": "success",
+    "terminal_status": "PHASE_7B2_PARTIAL"
+  },
+  {
+    "execution_id": "14485",
+    "project_id": "suppliedtech",
+    "started_at": "2026-04-07T17:43:47.887Z",
+    "finished_at": "2026-04-07T17:45:34.976Z",
+    "duration_ms": 107089,
+    "status": "success",
+    "terminal_status": "PHASE_7B2_PARTIAL"
+  },
+  {
+    "execution_id": "14471",
+    "project_id": "suppliedtech",
+    "started_at": "2026-04-07T17:37:44.348Z",
+    "finished_at": "2026-04-07T17:40:00.903Z",
+    "duration_ms": 136555,
+    "status": "success",
+    "terminal_status": "PHASE_7B2_PARTIAL"
+  },
+  {
     "execution_id": "14380",
     "project_id": "suppliedtech",
     "started_at": "2026-04-07T12:29:38.404Z",

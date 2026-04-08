@@ -42,6 +42,6 @@
     "STORE_OS_SHOPIFY_SHOP_URL": "8zw111-cj.myshopify.com",
     "STORE_OS_LLM_MODEL": "gpt-4o-mini",
     "STORE_OS_ENV": "dev",
-    "STORE_OS_SHOPIFY_API_VERSION": "2025-01"
+    "STORE_OS_SHOPIFY_API_VERSION": "2026-01"
   }
 }

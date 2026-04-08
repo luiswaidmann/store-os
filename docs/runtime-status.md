@@ -27,24 +27,29 @@ Recent runtime progression merges (on `main`):
 
 ## Last confirmed end-to-end smoke test
 
-**Phase 7B.2 CONFIRMED (PARTIAL):**
-**Date:** 2026-04-07
-**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async) + `node scripts/poll-execution.js 14457 --json`
+**Full System Consistency Validation — PHASE_7B2_COMPLETE:**
+**Date:** 2026-04-08
+**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async)
 **Input:** `test-data/golden-input.json` (project: `suppliedtech`)
-**Result:** `PHASE_7B2_PARTIAL` — n8n execution 14457, status: success, ~117s — cloud mode
+**Result:** `PHASE_7B2_COMPLETE` — n8n execution 14604, status: success, ~104s — cloud mode
 **Shopify target:** `8zw111-cj.myshopify.com`
-**Pages side effects:**
-- pages_created: 1 (about — new)
-- pages_updated: 2 (faq, contact — pre-existing handles updated)
-- Safety verified: all pages created with `published: false`
-**Navigation side effects:**
-- navigation_created: 0 | navigation_updated: 0
-- errors: 2 × HTTP 406 on link_lists POST
-- Root cause: OAuth credential `edgLmgVntFGX6QYN` lacks `write_online_store_navigation` scope
-- Impact: pages fully deployed; navigation requires scope grant (non-fatal, no incorrect writes)
-**Artifacts returned:** full 11-artifact chain + `shopify_pages_navigation_deployment`
-**Persisted:** `outputs/runs/14457.json`
-**PARTIAL verdict:** Pages deployment: PASS. Navigation deployment: BLOCKED (scope). PHASE_7B2_PARTIAL is correct terminal status.
+**Shopify API version:** `2026-01` (aligned across golden-input, runtime_config, all workflows)
+**Catalog:** products_created: 2 | products_updated: 1 | collections_updated: 2
+**Pages:** pages_updated: 3 (no new creates — idempotent upsert confirmed)
+**Navigation:** navigation_updated: 2 | errors: 0 (GraphQL Menu API)
+**Fixes validated in this run:**
+- `import-shopify-data` migrated from `$env.*` to `$json.runtime_config.*` — API version now propagates from golden-input through runtime_config
+- Merge node fixed with `numberInputs: 4` for 4-branch parallel fetch
+- All workflows on Shopify API 2026-01 (was 2025-01)
+- All workflows on credential `CO1JGlTR5RJ9Cs6x` (shopifyOAuth2Api)
+**Artifacts returned:** full 11-artifact chain
+**Persisted:** `outputs/runs/14604.json`
+
+**Phase 7B.2 CONFIRMED (COMPLETE) — post GraphQL migration:**
+**Date:** 2026-04-08
+**Result:** `PHASE_7B2_COMPLETE` — n8n execution 14587, ~127s — cloud mode
+**Fix applied:** Migrated navigation from deprecated REST `link_lists` endpoint (removed in Shopify API 2025-04) to GraphQL Menu API. Updated credential from `edgLmgVntFGX6QYN` to `CO1JGlTR5RJ9Cs6x`.
+**Persisted:** `outputs/runs/14587.json`
 
 **Phase 7B.1 CONFIRMED:**
 **Date:** 2026-04-07
@@ -102,7 +107,8 @@ The currently confirmed n8n execution path (Phase 7A — 2026-04-07) is:
 - `build-content-strategy` (Phase 6b)
 - `build-gtm-plan` (Phase 6c)
 - `build-store-blueprint` (Phase 7A)
-- `build-shopify-catalog` ← **NEW** (Phase 7B.1, `feature/phase-7b1-shopify-catalog`)
+- `build-shopify-catalog` (Phase 7B.1)
+- `build-shopify-pages-navigation` ← **NEW** (Phase 7B.2 — pages REST + navigation GraphQL)
 
 **Async model:** Chains run ~117s+. The webhook returns HTTP 202 within ~2s with an `execution_id`. The CLI polls `GET /api/v1/executions/{id}` until `finished: true`. Cloudflare's 100s timeout is no longer hit. See `docs/async-execution-model.md`.
 
@@ -119,7 +125,8 @@ The chain currently returns these runtime artifacts inline in cloud mode:
 - `content_strategy`
 - `gtm_plan`
 - `store_blueprint`
-- `shopify_catalog_deployment` ← **NEW** (Phase 7B.1)
+- `shopify_catalog_deployment` (Phase 7B.1)
+- `shopify_pages_navigation_deployment` ← **NEW** (Phase 7B.2)
 
 ## Runtime Hardening (Phase 16)
 
@@ -389,10 +396,12 @@ orchestrate-phase1
   │  build-offer-architecture     (Phase 6a)              │
   │  build-content-strategy       (Phase 6b)              │
   │  build-gtm-plan               (Phase 6c)              │
-  │  build-store-blueprint        (Phase 7A) ← TERMINAL   │
+  │  build-store-blueprint        (Phase 7A)               │
+  │  build-shopify-catalog        (Phase 7B.1)             │
+  │  build-shopify-pages-navigation (Phase 7B.2) ← TERMINAL │
   └───────────────────────────────────────────────────────┘
       │
-  Phase 7A Complete → returns inline artifacts + metadata
+  Phase 7B.2 Complete → returns inline artifacts + metadata
 
 CALLER FLOW (async)
   1. POST webhook → HTTP 202 { execution_id, status: "started" }  (~2s)
@@ -401,11 +410,12 @@ CALLER FLOW (async)
 
 OUTPUT (extracted from execution data)
   status, execution_id, completed_at
-  next_phase (Phase 7B — Shopify API deployment)
+  next_phase (Phase 7B.3 — theme sections, assets)
   store_profile, market_intelligence, brand_positioning,
   competitor_clusters, strategy_synthesis,
   offer_architecture, content_strategy, gtm_plan,
-  store_blueprint (all inline in cloud mode)
+  store_blueprint, shopify_catalog_deployment,
+  shopify_pages_navigation_deployment (all inline in cloud mode)
 ```
 
 ---
@@ -428,19 +438,30 @@ DIRECT fields are passed through verbatim and override any LLM-generated values.
 
 ## Confirmed next planned runtime step
 
-Next feature branch: **Phase 7B — Store Build (Shopify API)**
+Next: **Phase 7B.3 — Store Build (theme sections, assets)** — scaffold exists, not yet deployed. See `docs/phase-7b-architecture.md`.
 
-- `build-shopify-products` — create/update products and variants from store_blueprint
-- `build-shopify-collections` — create/update smart and custom collections
-- `build-shopify-pages` — publish About, FAQ, Contact pages
-- `build-shopify-navigation` — deploy menus
-- `build-shopify-theme` — configure and publish theme sections
+Phase 7B.2 is **COMPLETE** — `build-shopify-pages-navigation` deployed, navigation uses GraphQL Menu API (REST link_lists removed in Shopify 2025-04).
 
-Phase 7A is **COMPLETE** — `build-store-blueprint` is deployed, activated, and end-to-end confirmed (n8n execution status: success). Cloud timeout limitation documented.
+Phase 7B.1 is **COMPLETE** — `build-shopify-catalog` deployed, products + collections via REST Admin API.
 
-Phase 6 is **COMPLETE** — all three Phase 6 subworkflows (`build-offer-architecture`, `build-content-strategy`, `build-gtm-plan`) are deployed, activated, and end-to-end confirmed.
+Phase 7A is **COMPLETE** — `build-store-blueprint` deployed and confirmed.
 
-See `docs/phase-7-architecture.md` for Phase 7A/7B architecture and cloud timeout mitigation plan.
+Phase 6 is **COMPLETE** — all three Phase 6 subworkflows confirmed.
+
+## Shopify API configuration
+
+All Shopify-facing workflows use:
+- **API version:** `2026-01` (configured via `runtime_config.shopify_api_version`, propagated from golden-input)
+- **Credential:** `shopifyOAuth2Api` — `CO1JGlTR5RJ9Cs6x` ("Shopify SuppliedTech Admin")
+- **Shop URL:** `runtime_config.shopify_shop_url` (no `$env` dependencies)
+
+| Workflow | Shopify API | Notes |
+|---|---|---|
+| `import-shopify-data` | REST (GET shop, products, collections) | Migrated from `$env.*` to `runtime_config.*` (2026-04-08) |
+| `build-shopify-catalog` | REST (GET/POST/PUT products, collections) | Upsert by handle, draft-only creates |
+| `build-shopify-pages-navigation` | REST (pages) + GraphQL (menus) | Navigation migrated from REST link_lists to GraphQL Menu API (2026-04-08) |
+
+See `docs/phase-7b-architecture.md` for full Phase 7B architecture.
 
 ---
 

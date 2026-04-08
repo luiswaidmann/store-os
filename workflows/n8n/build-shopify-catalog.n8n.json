@@ -7,17 +7,23 @@
       "name": "Subworkflow Trigger",
       "type": "n8n-nodes-base.executeWorkflowTrigger",
       "typeVersion": 1,
-      "position": [250, 300]
+      "position": [
+        250,
+        300
+      ]
     },
     {
       "parameters": {
-        "jsCode": "// build-shopify-catalog — Validate Catalog Input\n// Validates store_blueprint and runtime_config; extracts shop_url and api_version.\n// Safety rules: no deletes, idempotent upsert by handle, draft status for new products.\n\nconst input = $input.first().json;\n\nconst runtimeConfig  = input.runtime_config  || {};\nconst storeBlueprint = input.store_blueprint  || null;\n// project_id is top-level; runtime_config does not carry it directly\nconst projectId      = input.project_id       || runtimeConfig.project_id || null;\n\nif (!projectId) {\n  throw new Error('MISSING_RUNTIME_CONFIG: build-shopify-catalog requires project_id (top-level) or runtime_config.project_id');\n}\n\nif (!storeBlueprint) {\n  throw new Error('MISSING_ARTIFACT: store_blueprint is required but was not found in trigger input');\n}\n\nif (!Array.isArray(storeBlueprint.products) || storeBlueprint.products.length === 0) {\n  throw new Error('INVALID_BLUEPRINT: store_blueprint.products must be a non-empty array');\n}\n\n// resolve-runtime-config uses keys: shopify_shop_url, shopify_api_version\n// Also accept flat keys for direct invocation / self-hosted fallbacks\nconst shopUrl    = runtimeConfig.shopify_shop_url    || runtimeConfig.shop_url    || runtimeConfig.STORE_OS_SHOPIFY_SHOP_URL    || null;\nconst apiVersion = runtimeConfig.shopify_api_version || runtimeConfig.api_version || runtimeConfig.STORE_OS_SHOPIFY_API_VERSION || '2025-01';\n\nif (!shopUrl) {\n  throw new Error(\n    'MISSING_CONFIG: shop_url not found in runtime_config. ' +\n    'Ensure STORE_OS_SHOPIFY_SHOP_URL is set in env or passed as smoke_test_config.STORE_OS_SHOPIFY_SHOP_URL'\n  );\n}\n\n// Normalise: strip https:// if present (we add it in URL expressions)\nconst shopDomain = shopUrl.replace(/^https?:\\/\\//, '').replace(/\\/$/, '');\nconst shopifyBase = 'https://' + shopDomain + '/admin/api/' + apiVersion;\n\nconst products    = storeBlueprint.products    || [];\nconst collections = storeBlueprint.collections || [];\n\nconsole.log(\n  `build-shopify-catalog: project=${projectId}, shop=${shopDomain}, ` +\n  `products=${products.length}, collections=${collections.length}`\n);\n\nreturn [{\n  json: {\n    project_id:      projectId,\n    runtime_config:  runtimeConfig,\n    store_blueprint: storeBlueprint,\n    shop_url:        shopUrl,\n    shop_domain:     shopDomain,\n    api_version:     apiVersion,\n    shopify_base:    shopifyBase,\n    products_count:  products.length,\n    collections_count: collections.length,\n  },\n}];\n"
+        "jsCode": "// build-shopify-catalog — Validate Catalog Input\n// Validates store_blueprint and runtime_config; extracts shop_url and api_version.\n// Safety rules: no deletes, idempotent upsert by handle, draft status for new products.\n\nconst input = $input.first().json;\n\nconst runtimeConfig  = input.runtime_config  || {};\nconst storeBlueprint = input.store_blueprint  || null;\n// project_id is top-level; runtime_config does not carry it directly\nconst projectId      = input.project_id       || runtimeConfig.project_id || null;\n\nif (!projectId) {\n  throw new Error('MISSING_RUNTIME_CONFIG: build-shopify-catalog requires project_id (top-level) or runtime_config.project_id');\n}\n\nif (!storeBlueprint) {\n  throw new Error('MISSING_ARTIFACT: store_blueprint is required but was not found in trigger input');\n}\n\nif (!Array.isArray(storeBlueprint.products) || storeBlueprint.products.length === 0) {\n  throw new Error('INVALID_BLUEPRINT: store_blueprint.products must be a non-empty array');\n}\n\n// resolve-runtime-config uses keys: shopify_shop_url, shopify_api_version\n// Also accept flat keys for direct invocation / self-hosted fallbacks\nconst shopUrl    = runtimeConfig.shopify_shop_url    || runtimeConfig.shop_url    || runtimeConfig.STORE_OS_SHOPIFY_SHOP_URL    || null;\nconst apiVersion = runtimeConfig.shopify_api_version || runtimeConfig.api_version || runtimeConfig.STORE_OS_SHOPIFY_API_VERSION || '2026-01';\n\nif (!shopUrl) {\n  throw new Error(\n    'MISSING_CONFIG: shop_url not found in runtime_config. ' +\n    'Ensure STORE_OS_SHOPIFY_SHOP_URL is set in env or passed as smoke_test_config.STORE_OS_SHOPIFY_SHOP_URL'\n  );\n}\n\n// Normalise: strip https:// if present (we add it in URL expressions)\nconst shopDomain = shopUrl.replace(/^https?:\\/\\//, '').replace(/\\/$/, '');\nconst shopifyBase = 'https://' + shopDomain + '/admin/api/' + apiVersion;\n\nconst products    = storeBlueprint.products    || [];\nconst collections = storeBlueprint.collections || [];\n\nconsole.log(\n  `build-shopify-catalog: project=${projectId}, shop=${shopDomain}, ` +\n  `products=${products.length}, collections=${collections.length}`\n);\n\nreturn [{\n  json: {\n    project_id:      projectId,\n    runtime_config:  runtimeConfig,\n    store_blueprint: storeBlueprint,\n    shop_url:        shopUrl,\n    shop_domain:     shopDomain,\n    api_version:     apiVersion,\n    shopify_base:    shopifyBase,\n    products_count:  products.length,\n    collections_count: collections.length,\n  },\n}];\n"
       },
       "id": "7b1a0001-0007-07b1-07b1-000000000002",
       "name": "Validate Catalog Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [500, 300]
+      "position": [
+        500,
+        300
+      ]
     },
     {
       "parameters": {
@@ -29,7 +35,7 @@
       },
       "credentials": {
         "shopifyOAuth2Api": {
-          "id": "edgLmgVntFGX6QYN",
+          "id": "CO1JGlTR5RJ9Cs6x",
           "name": "Shopify SuppliedTech Admin"
         }
       },
@@ -37,7 +43,10 @@
       "name": "Fetch Existing Collections",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [750, 180]
+      "position": [
+        750,
+        180
+      ]
     },
     {
       "parameters": {
@@ -49,7 +58,7 @@
       },
       "credentials": {
         "shopifyOAuth2Api": {
-          "id": "edgLmgVntFGX6QYN",
+          "id": "CO1JGlTR5RJ9Cs6x",
           "name": "Shopify SuppliedTech Admin"
         }
       },
@@ -57,7 +66,10 @@
       "name": "Fetch Existing Products",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [750, 420]
+      "position": [
+        750,
+        420
+      ]
     },
     {
       "parameters": {
@@ -67,7 +79,10 @@
       "name": "Merge Fetch Results",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2,
-      "position": [1000, 300]
+      "position": [
+        1000,
+        300
+      ]
     },
     {
       "parameters": {
@@ -77,7 +92,10 @@
       "name": "Build Upsert Plan",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1250, 300]
+      "position": [
+        1250,
+        300
+      ]
     },
     {
       "parameters": {
@@ -95,7 +113,10 @@
       "name": "Create or Update?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [1500, 300]
+      "position": [
+        1500,
+        300
+      ]
     },
     {
       "parameters": {
@@ -117,7 +138,7 @@
       },
       "credentials": {
         "shopifyOAuth2Api": {
-          "id": "edgLmgVntFGX6QYN",
+          "id": "CO1JGlTR5RJ9Cs6x",
           "name": "Shopify SuppliedTech Admin"
         }
       },
@@ -126,7 +147,10 @@
       "name": "Create Resource",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1750, 180]
+      "position": [
+        1750,
+        180
+      ]
     },
     {
       "parameters": {
@@ -148,7 +172,7 @@
       },
       "credentials": {
         "shopifyOAuth2Api": {
-          "id": "edgLmgVntFGX6QYN",
+          "id": "CO1JGlTR5RJ9Cs6x",
           "name": "Shopify SuppliedTech Admin"
         }
       },
@@ -157,7 +181,10 @@
       "name": "Update Resource",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1750, 420]
+      "position": [
+        1750,
+        420
+      ]
     },
     {
       "parameters": {
@@ -167,7 +194,10 @@
       "name": "Merge Action Results",
       "type": "n8n-nodes-base.merge",
       "typeVersion": 2,
-      "position": [2000, 300]
+      "position": [
+        2000,
+        300
+      ]
     },
     {
       "parameters": {
@@ -177,68 +207,140 @@
       "name": "Compile Deployment Summary",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2250, 300]
+      "position": [
+        2250,
+        300
+      ]
     }
   ],
   "connections": {
     "Subworkflow Trigger": {
       "main": [
-        [{ "node": "Validate Catalog Input", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Validate Catalog Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Validate Catalog Input": {
       "main": [
         [
-          { "node": "Fetch Existing Collections", "type": "main", "index": 0 },
-          { "node": "Fetch Existing Products", "type": "main", "index": 0 }
+          {
+            "node": "Fetch Existing Collections",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Fetch Existing Products",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Fetch Existing Collections": {
       "main": [
-        [{ "node": "Merge Fetch Results", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Merge Fetch Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Fetch Existing Products": {
       "main": [
-        [{ "node": "Merge Fetch Results", "type": "main", "index": 1 }]
+        [
+          {
+            "node": "Merge Fetch Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
       ]
     },
     "Merge Fetch Results": {
       "main": [
-        [{ "node": "Build Upsert Plan", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Build Upsert Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Build Upsert Plan": {
       "main": [
-        [{ "node": "Create or Update?", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Create or Update?",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Create or Update?": {
       "main": [
-        [{ "node": "Create Resource", "type": "main", "index": 0 }],
-        [{ "node": "Update Resource", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Create Resource",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update Resource",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Create Resource": {
       "main": [
-        [{ "node": "Merge Action Results", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Merge Action Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Update Resource": {
       "main": [
-        [{ "node": "Merge Action Results", "type": "main", "index": 1 }]
+        [
+          {
+            "node": "Merge Action Results",
+            "type": "main",
+            "index": 1
+          }
+        ]
       ]
     },
     "Merge Action Results": {
       "main": [
-        [{ "node": "Compile Deployment Summary", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Compile Deployment Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },
   "active": false,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "callerPolicy": "any"
   },
   "_meta": {
     "storeOs": {
@@ -257,17 +359,21 @@
       ],
       "credentials": {
         "shopifyOAuth2Api": {
-          "id": "edgLmgVntFGX6QYN",
+          "id": "CO1JGlTR5RJ9Cs6x",
           "name": "Shopify SuppliedTech Admin",
           "note": "Replace id with your n8n shopifyOAuth2Api credential ID if deploying to a different instance"
         }
       },
       "setupRequired": [
-        "Replace credential id 'edgLmgVntFGX6QYN' in Fetch Existing Collections, Fetch Existing Products, Create Resource, and Update Resource nodes with your n8n shopifyOAuth2Api credential ID",
+        "Replace credential id 'CO1JGlTR5RJ9Cs6x' in Fetch Existing Collections, Fetch Existing Products, Create Resource, and Update Resource nodes with your n8n shopifyOAuth2Api credential ID",
         "Ensure STORE_OS_SHOPIFY_SHOP_URL and STORE_OS_SHOPIFY_API_VERSION are set in env (self-hosted) or smoke_test_config (cloud)"
       ],
       "nodeCount": 11,
-      "terminalStatuses": ["PHASE_7B1_COMPLETE", "PHASE_7B1_PARTIAL", "PHASE_7B1_FAILED"]
+      "terminalStatuses": [
+        "PHASE_7B1_COMPLETE",
+        "PHASE_7B1_PARTIAL",
+        "PHASE_7B1_FAILED"
+      ]
     }
   }
 }

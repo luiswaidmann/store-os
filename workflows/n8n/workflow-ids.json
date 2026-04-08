@@ -47,18 +47,18 @@
       "value": "5CfwoK6S974OrztD"
     },
     "REPLACE_WITH_N8N_SHOPIFY_CREDENTIAL_ID": {
-      "used_in": ["import-shopify-data.n8n.json"],
-      "credential_type": "Shopify API (legacy — shopifyApi type)",
+      "used_in": [],
+      "credential_type": "DEPRECATED — was shopifyApi, now migrated to shopifyOAuth2Api",
       "n8n_credential_name": "Shopify SuppliedTech Admin",
-      "value": "NOT_YET_RECORDED — find in n8n Settings > Credentials > Shopify SuppliedTech Admin URL",
-      "note": "import-shopify-data uses the older shopifyApi credential type. build-shopify-catalog uses shopifyOAuth2Api (edgLmgVntFGX6QYN) — no placeholder needed."
+      "value": "CO1JGlTR5RJ9Cs6x",
+      "note": "import-shopify-data migrated from shopifyApi to shopifyOAuth2Api (2026-04-08). All Shopify workflows now use the same OAuth2 credential."
     },
     "STORE_OS_SHOPIFY_OAUTH2_CREDENTIAL_ID": {
-      "used_in": ["build-shopify-catalog.n8n.json", "build-shopify-pages-navigation.n8n.json"],
+      "used_in": ["import-shopify-data.n8n.json", "build-shopify-catalog.n8n.json", "build-shopify-pages-navigation.n8n.json"],
       "credential_type": "shopifyOAuth2Api",
       "n8n_credential_name": "Shopify SuppliedTech Admin",
-      "value": "edgLmgVntFGX6QYN",
-      "note": "Hardcoded in build-shopify-catalog.n8n.json and build-shopify-pages-navigation.n8n.json. Replace if deploying to a different n8n instance."
+      "value": "CO1JGlTR5RJ9Cs6x",
+      "note": "Updated 2026-04-08: credential recreated with navigation scopes. Hardcoded in build-shopify-catalog.n8n.json and build-shopify-pages-navigation.n8n.json."
     }
   },
   "known_duplicates": {

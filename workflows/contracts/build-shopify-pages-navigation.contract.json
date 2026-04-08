@@ -21,8 +21,8 @@
       "status":               "PHASE_7B2_COMPLETE | PHASE_7B2_PARTIAL | PHASE_7B2_FAILED",
       "pages_created":        "count of new pages created (HTTP 201)",
       "pages_updated":        "count of existing pages updated (HTTP 200)",
-      "navigation_created":   "count of new link lists created (HTTP 201)",
-      "navigation_updated":   "count of existing link lists updated (HTTP 200)",
+      "navigation_created":   "count of new menus created (GraphQL menuCreate)",
+      "navigation_updated":   "count of existing menus updated (GraphQL menuUpdate)",
       "errors":               "array of per-resource errors (resource, handle, status, message)",
       "warnings":             "non-fatal warnings (noop, unexpected status)",
       "blueprint_summary":    "input counts for observability cross-reference",
@@ -30,26 +30,28 @@
     }
   },
   "shopify_api_operations": [
-    { "method": "GET",  "endpoint": "/pages.json?limit=250&published_status=any",  "purpose": "Fetch existing pages for handle comparison" },
-    { "method": "GET",  "endpoint": "/link_lists.json",                             "purpose": "Fetch existing navigation menus for handle comparison" },
-    { "method": "POST", "endpoint": "/pages.json",                                  "purpose": "Create new page (published: false)" },
-    { "method": "PUT",  "endpoint": "/pages/{id}.json",                             "purpose": "Update existing page" },
-    { "method": "POST", "endpoint": "/link_lists.json",                             "purpose": "Create new navigation menu" },
-    { "method": "PUT",  "endpoint": "/link_lists/{id}.json",                        "purpose": "Update existing navigation menu" }
+    { "method": "GET",  "endpoint": "/pages.json?limit=250&published_status=any",  "api": "REST",    "purpose": "Fetch existing pages for handle comparison" },
+    { "method": "POST", "endpoint": "/graphql.json", "query": "{ menus(first:50) { edges { node { id handle title items { id title type url } } } } }", "api": "GraphQL", "purpose": "Fetch existing menus for handle comparison" },
+    { "method": "POST", "endpoint": "/pages.json",                                  "api": "REST",    "purpose": "Create new page (published: false)" },
+    { "method": "PUT",  "endpoint": "/pages/{id}.json",                             "api": "REST",    "purpose": "Update existing page" },
+    { "method": "POST", "endpoint": "/graphql.json", "mutation": "menuCreate",       "api": "GraphQL", "purpose": "Create new navigation menu" },
+    { "method": "POST", "endpoint": "/graphql.json", "mutation": "menuUpdate",       "api": "GraphQL", "purpose": "Update existing navigation menu" }
   ],
+  "api_note": "Navigation was migrated from REST link_lists (removed in Shopify API 2025-04) to GraphQL Menu API in April 2026. Pages remain on REST Admin API.",
   "upsert_logic": {
     "pages": "GET existing pages → index by handle → PUT (update) if handle exists, POST (create, published: false) if new",
-    "navigation": "GET existing link_lists → index by handle → PUT (update) if handle exists, POST (create) if new",
+    "navigation": "GraphQL menus query → index by handle → menuUpdate (if handle exists), menuCreate (if new)",
     "handle_derivation": "blueprint.handle if present, otherwise title.toLowerCase().replace(/[^a-z0-9]+/g, '-')"
   },
   "link_type_mapping": {
-    "page":       "type: 'page',      url: '/pages/{target}'",
-    "collection": "type: 'collection', url: '/collections/{target}'",
-    "home":       "type: 'frontpage',  url: '/'",
-    "homepage":   "type: 'frontpage',  url: '/'",
-    "product":    "type: 'product',    url: '/products/{target}'",
-    "blog":       "type: 'blog',       url: '/blogs/{target}'",
-    "default":    "type: 'http',       url: target"
+    "page":       "type: HTTP, url: '/pages/{target}'",
+    "collection": "type: HTTP, url: '/collections/{target}'",
+    "home":       "type: FRONTPAGE, url: '/'",
+    "homepage":   "type: FRONTPAGE, url: '/'",
+    "product":    "type: HTTP, url: '/products/{target}'",
+    "blog":       "type: HTTP, url: '/blogs/{target}'",
+    "default":    "type: HTTP, url: target",
+    "_note":      "GraphQL MenuItemType values: FRONTPAGE, HTTP, COLLECTION, PAGE, PRODUCT, BLOG. HTTP is used as catch-all for URL-based links."
   },
   "safety_guarantees": [
     "No Shopify resources are ever deleted — only create (POST) and update (PUT) operations",
@@ -60,7 +62,7 @@
   ],
   "credentials": {
     "type": "shopifyOAuth2Api",
-    "id": "edgLmgVntFGX6QYN",
+    "id": "CO1JGlTR5RJ9Cs6x",
     "name": "Shopify SuppliedTech Admin",
     "note": "Replace credential id if deploying to a different n8n instance"
   },

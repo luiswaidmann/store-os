@@ -39,7 +39,7 @@
       },
       {
         "variable": "STORE_OS_SHOPIFY_API_VERSION",
-        "description": "Shopify Admin API version (e.g. 2025-01). Defaults to 2025-01 if not set.",
+        "description": "Shopify Admin API version (e.g. 2026-01). Defaults to 2026-01 if not set.",
         "optional": true
       }
     ],
@@ -47,7 +47,7 @@
       {
         "name": "Shopify SuppliedTech Admin",
         "type": "shopifyOAuth2Api",
-        "n8n_id_placeholder": "edgLmgVntFGX6QYN",
+        "n8n_id_placeholder": "CO1JGlTR5RJ9Cs6x",
         "used_by": ["Fetch Existing Collections", "Fetch Existing Products", "Create Resource", "Update Resource"]
       }
     ]
