@@ -22,7 +22,8 @@
     "build-store-blueprint":     "j1JVNqqyidlKUIHX",
     "build-shopify-catalog":          "oZE0Z9fb4ojnKiDd",
     "build-shopify-pages-navigation": "LADq8PuMRuswIxJa",
-    "build-shopify-theme":            "QG5ezHb3qKjKcvvn"
+    "build-shopify-theme":            "QG5ezHb3qKjKcvvn",
+    "build-media-assets":             "krR10um8F1pT0miQ"
   },
   "placeholder_map": {
     "REPLACE_WITH_INTAKE_STORE_INPUT_WORKFLOW_ID":           "intake-store-input",
@@ -38,12 +39,13 @@
     "REPLACE_WITH_BUILD_STORE_BLUEPRINT_WORKFLOW_ID":        "build-store-blueprint",
     "REPLACE_WITH_BUILD_SHOPIFY_CATALOG_WORKFLOW_ID":             "build-shopify-catalog",
     "REPLACE_WITH_BUILD_SHOPIFY_PAGES_NAVIGATION_WORKFLOW_ID":    "build-shopify-pages-navigation",
-    "REPLACE_WITH_BUILD_SHOPIFY_THEME_WORKFLOW_ID":              "build-shopify-theme"
+    "REPLACE_WITH_BUILD_SHOPIFY_THEME_WORKFLOW_ID":              "build-shopify-theme",
+    "REPLACE_WITH_BUILD_MEDIA_ASSETS_WORKFLOW_ID":               "build-media-assets"
   },
   "credential_placeholders": {
     "_note": "Credential IDs are instance-specific and must be set manually in n8n. These placeholders appear in subworkflow JSON files and require the numeric credential ID from n8n Settings > Credentials (visible in the URL when editing a credential).",
     "REPLACE_WITH_N8N_OPENAI_CREDENTIAL_ID": {
-      "used_in": ["build-market-intelligence.n8n.json", "build-brand-positioning.n8n.json", "build-competitor-clusters.n8n.json", "build-strategy-synthesis.n8n.json", "build-offer-architecture.n8n.json", "build-content-strategy.n8n.json", "build-gtm-plan.n8n.json", "build-store-blueprint.n8n.json"],
+      "used_in": ["build-market-intelligence.n8n.json", "build-brand-positioning.n8n.json", "build-competitor-clusters.n8n.json", "build-strategy-synthesis.n8n.json", "build-offer-architecture.n8n.json", "build-content-strategy.n8n.json", "build-gtm-plan.n8n.json", "build-store-blueprint.n8n.json", "build-media-assets.n8n.json"],
       "credential_type": "OpenAI API",
       "n8n_credential_name": "OpenAI store-os",
       "value": "5CfwoK6S974OrztD"

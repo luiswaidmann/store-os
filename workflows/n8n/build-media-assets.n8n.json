@@ -1,0 +1,185 @@
+{
+  "name": "build-media-assets",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "9a0b0001-0009-0009-0009-000000000001",
+      "name": "Subworkflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-media-assets — Validate Inputs\n// Validates upstream artifacts needed for media generation.\n\nconst input = $input.first().json;\n\nconst runtimeConfig   = input.runtime_config   || {};\nconst storeProfile    = input.store_profile     || null;\nconst brandPositioning = input.brand_positioning || null;\nconst storeBlueprint  = input.store_blueprint   || null;\nconst contentStrategy = input.content_strategy  || null;\nconst projectId       = input.project_id        || runtimeConfig.project_id || null;\n\nif (!projectId) {\n  throw new Error('MISSING_INPUT: build-media-assets requires project_id');\n}\nif (!storeProfile) {\n  throw new Error('MISSING_ARTIFACT: store_profile is required for visual system derivation');\n}\nif (!brandPositioning) {\n  throw new Error('MISSING_ARTIFACT: brand_positioning is required for visual system derivation');\n}\nif (!storeBlueprint) {\n  throw new Error('MISSING_ARTIFACT: store_blueprint is required (products list)');\n}\n\nconst products = storeBlueprint.products || [];\nif (products.length === 0) {\n  throw new Error('INVALID_BLUEPRINT: store_blueprint.products is empty — nothing to generate media for');\n}\n\n// Resolve media config\nconst allowMediaGeneration = runtimeConfig.allow_media_generation === true || runtimeConfig.allow_media_generation === 'true';\nconst mediaModel = runtimeConfig.media_generation_model || 'dall-e-3';\nconst mediaMode = allowMediaGeneration ? 'full_generation' : 'prompts_only';\n\nreturn [{\n  json: {\n    project_id:         projectId,\n    runtime_config:     runtimeConfig,\n    store_profile:      storeProfile,\n    brand_positioning:  brandPositioning,\n    store_blueprint:    storeBlueprint,\n    content_strategy:   contentStrategy,\n    products:           products,\n    allow_generation:   allowMediaGeneration,\n    media_model:        mediaModel,\n    media_mode:         mediaMode,\n    cloud_mode:         runtimeConfig.cloud_mode || false,\n  },\n}];\n"
+      },
+      "id": "9a0b0001-0009-0009-0009-000000000002",
+      "name": "Validate Inputs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-media-assets — Derive Visual System (Phase 9A)\n// Deterministic art direction layer derived from brand_positioning + store_profile.\n// NO randomness. Every derivation is a pure function of inputs.\n\nconst input = $input.first().json;\nconst bp = input.brand_positioning;\nconst sp = input.store_profile;\n\n// ── Style derivation rules ────────────────────────────────────────────────\n// Background: derived from price_positioning + brand_role\nconst backgroundMap = {\n  'luxury':       'soft-gradient',\n  'premium':      'soft-gradient',\n  'mass-premium': 'neutral-studio',\n  'mass-market':  'clean-white',\n  'budget':       'clean-white',\n};\nconst background = backgroundMap[sp.price_positioning] || 'clean-white';\n\n// Lighting: derived from tone_of_voice\nconst lightingMap = {\n  'clear-direct':          'flat-even',\n  'premium-confident':     'dramatic-directional',\n  'warm-helpful':          'warm-golden',\n  'editorial-smart':       'natural-ambient',\n  'playful-bold':          'natural-ambient',\n  'technical-trustworthy': 'soft-studio',\n};\nconst toneStyle = (bp.tone_of_voice && bp.tone_of_voice.style) || 'clear-direct';\nconst lighting = lightingMap[toneStyle] || 'soft-studio';\n\n// Color logic: derived from brand_role + price_positioning\nconst colorMap = {\n  'specialist':        'neutral-dominant',\n  'curator':           'warm-accent',\n  'problem-solver':    'neutral-dominant',\n  'premium-innovator': 'cool-accent',\n  'editorial-guide':   'warm-accent',\n  'value-leader':      'brand-primary',\n};\nconst colorLogic = colorMap[bp.brand_role] || 'neutral-dominant';\n\n// Contrast: derived from price_positioning\nconst contrastMap = {\n  'luxury':       'soft-editorial',\n  'premium':      'balanced-natural',\n  'mass-premium': 'high-clarity',\n  'mass-market':  'punchy-commercial',\n  'budget':       'punchy-commercial',\n};\nconst contrastProfile = contrastMap[sp.price_positioning] || 'high-clarity';\n\n// ── Composition derivation ────────────────────────────────────────────────\nconst framingMap = {\n  'specialist':        'centered-subject',\n  'curator':           'rule-of-thirds',\n  'premium-innovator': 'asymmetric-editorial',\n  'editorial-guide':   'rule-of-thirds',\n  'value-leader':      'centered-subject',\n  'problem-solver':    'centered-subject',\n};\nconst framing = framingMap[bp.brand_role] || 'centered-subject';\n\nconst spacingMap = {\n  'luxury':       'generous-breathing-room',\n  'premium':      'generous-breathing-room',\n  'mass-premium': 'balanced-margins',\n  'mass-market':  'tight-product-focus',\n  'budget':       'tight-product-focus',\n};\nconst spacing = spacingMap[sp.price_positioning] || 'balanced-margins';\n\n// Aspect ratios by vertical\nconst aspectRatios = ['1:1', '4:5', '16:9'];\n\n// ── Product representation ────────────────────────────────────────────────\nconst shadowMap = {\n  'luxury':       'reflection',\n  'premium':      'soft-drop',\n  'mass-premium': 'soft-drop',\n  'mass-market':  'contact-shadow',\n  'budget':       'none',\n};\nconst shadowStyle = shadowMap[sp.price_positioning] || 'soft-drop';\nconst reflection = sp.price_positioning === 'luxury' || sp.price_positioning === 'premium';\n\nconst surfaceMap = {\n  'luxury':       'glossy-surface',\n  'premium':      'matte-white',\n  'mass-premium': 'matte-white',\n  'mass-market':  'none',\n  'budget':       'none',\n};\nconst surfaceMaterial = surfaceMap[sp.price_positioning] || 'none';\n\n// ── Mood derivation ───────────────────────────────────────────────────────\nconst moodParts = [];\nif (bp.brand_traits && bp.brand_traits.length > 0) {\n  moodParts.push(...bp.brand_traits.slice(0, 3));\n} else {\n  moodParts.push('professional', 'clean');\n}\nconst mood = moodParts.join(', ');\n\n// ── Assemble visual system ────────────────────────────────────────────────\nconst visualSystem = {\n  style: {\n    background,\n    lighting,\n    color_logic: colorLogic,\n    contrast_profile: contrastProfile,\n    mood,\n  },\n  composition: {\n    framing,\n    spacing,\n    aspect_ratios: aspectRatios,\n  },\n  product_representation: {\n    isolation: true,\n    shadow_style: shadowStyle,\n    reflection,\n    surface_material: surfaceMaterial,\n  },\n  consistency_rules: {\n    no_random_backgrounds: true,\n    no_random_camera_angles: true,\n    no_mixed_lighting: true,\n    color_temperature_locked: true,\n    brand_watermark: false,\n  },\n  derived_from: {\n    brand_role: bp.brand_role,\n    tone_of_voice: toneStyle,\n    price_positioning: sp.price_positioning,\n    vertical: sp.vertical,\n    visual_positioning_hint: bp.visual_positioning_hint || null,\n    media_style_hint: bp.media_style_hint || null,\n  },\n};\n\nreturn [{\n  json: {\n    ...input,\n    visual_system: visualSystem,\n  },\n}];\n"
+      },
+      "id": "9a0b0001-0009-0009-0009-000000000003",
+      "name": "Derive Visual System",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-media-assets — Build Shot Plan + Generate Prompts (Phase 9B + 9C)\n// Deterministic shot taxonomy + prompt template system.\n// Every product gets the same fixed shot set.\n// Every prompt is a pure function of (product, shot_type, visual_system).\n\nconst input = $input.first().json;\nconst vs = input.visual_system;\nconst products = input.products;\nconst bp = input.brand_positioning;\nconst projectId = input.project_id;\nconst mediaMode = input.media_mode;\nconst cloudMode = input.cloud_mode;\n\n// ── Shot Taxonomy (Phase 9B) ──────────────────────────────────────────────\n// Fixed set of shot types. Same for every product. No randomness.\nconst shotTaxonomy = {\n  shot_types: [\n    {\n      shot_id: 'studio_packshot',\n      shot_name: 'Studio Packshot',\n      camera_angle: 'front-center',\n      composition: 'centered-subject',\n      background_type: 'pure-white',\n      purpose: 'conversion',\n      aspect_ratio: '1:1',\n      priority: 1,\n      required: true,\n      prompt_emphasis: 'clean product isolation, sharp focus, ecommerce-ready',\n    },\n    {\n      shot_id: 'clean_feature',\n      shot_name: 'Clean Feature Shot',\n      camera_angle: 'three-quarter-left',\n      composition: 'rule-of-thirds-left',\n      background_type: 'studio-gradient',\n      purpose: 'clarity',\n      aspect_ratio: '4:5',\n      priority: 2,\n      required: true,\n      prompt_emphasis: 'key features visible, dimensional depth, detail clarity',\n    },\n    {\n      shot_id: 'lifestyle_context',\n      shot_name: 'Lifestyle Context',\n      camera_angle: 'eye-level',\n      composition: 'rule-of-thirds-right',\n      background_type: 'contextual-environment',\n      purpose: 'aspiration',\n      aspect_ratio: '4:5',\n      priority: 3,\n      required: true,\n      prompt_emphasis: 'product in natural use context, aspirational setting',\n    },\n    {\n      shot_id: 'hero_wide',\n      shot_name: 'Hero Wide Banner',\n      camera_angle: 'eye-level',\n      composition: 'negative-space-right',\n      background_type: 'brand-color',\n      purpose: 'hero-impact',\n      aspect_ratio: '16:9',\n      priority: 4,\n      required: false,\n      prompt_emphasis: 'dramatic presentation, banner-ready, space for text overlay',\n    },\n    {\n      shot_id: 'detail_closeup',\n      shot_name: 'Detail Closeup',\n      camera_angle: 'macro-detail',\n      composition: 'full-frame',\n      background_type: 'surface-only',\n      purpose: 'detail-verification',\n      aspect_ratio: '1:1',\n      priority: 5,\n      required: false,\n      prompt_emphasis: 'texture, material quality, craftsmanship details',\n    },\n  ],\n};\n\n// ── Prompt Template System (Phase 9C) ─────────────────────────────────────\n// Pure function: (product, shot_type, visual_system) → deterministic prompt.\n// No randomness. Structured phrasing. Stable across products.\n\nfunction buildPrompt(product, shot, vs) {\n  const parts = [];\n\n  // Subject description\n  const category = product.product_type || 'product';\n  parts.push('Professional ecommerce product photograph of a ' + category + ': \"' + product.title + '\".');\n\n  // Key features from description hint\n  if (product.description_hint) {\n    parts.push(product.description_hint + '.');\n  }\n\n  // Shot-specific composition\n  const angleNames = {\n    'front-center': 'straight-on front view',\n    'three-quarter-left': 'three-quarter angle from the left',\n    'three-quarter-right': 'three-quarter angle from the right',\n    'top-down': 'top-down flat lay',\n    'eye-level': 'eye-level perspective',\n    'low-angle': 'low-angle hero perspective',\n    '45-degree-above': '45 degree angle from above',\n    'macro-detail': 'macro close-up detail shot',\n  };\n  parts.push('Camera angle: ' + (angleNames[shot.camera_angle] || shot.camera_angle) + '.');\n\n  // Composition\n  const compNames = {\n    'centered-subject': 'Subject centered in frame',\n    'rule-of-thirds-left': 'Subject positioned on left third',\n    'rule-of-thirds-right': 'Subject positioned on right third',\n    'full-frame': 'Subject fills the entire frame',\n    'negative-space-right': 'Subject left with negative space on right for text',\n    'negative-space-left': 'Subject right with negative space on left',\n    'symmetrical': 'Symmetrical balanced composition',\n  };\n  parts.push((compNames[shot.composition] || shot.composition) + '.');\n\n  // Background from visual system + shot override\n  const bgNames = {\n    'pure-white': 'Pure white seamless background',\n    'studio-gradient': 'Subtle studio gradient background',\n    'contextual-environment': 'Minimal, clean contextual environment appropriate for ' + category,\n    'brand-color': 'Solid brand-aligned neutral background',\n    'surface-only': 'Product on ' + (vs.product_representation.surface_material || 'clean surface'),\n    'transparent': 'Clean background for transparency',\n  };\n  parts.push((bgNames[shot.background_type] || 'Clean background') + '.');\n\n  // Lighting from visual system\n  const lightNames = {\n    'soft-studio': 'Soft, diffused studio lighting with gentle shadows',\n    'dramatic-directional': 'Dramatic directional key light with defined shadows',\n    'natural-ambient': 'Natural ambient daylight',\n    'flat-even': 'Flat, even lighting with minimal shadows',\n    'warm-golden': 'Warm golden-hour inspired lighting',\n  };\n  parts.push((lightNames[vs.style.lighting] || 'Professional studio lighting') + '.');\n\n  // Shadow and reflection\n  if (shot.background_type === 'pure-white' || shot.background_type === 'studio-gradient') {\n    const shadowNames = {\n      'soft-drop': 'Soft drop shadow beneath product',\n      'contact-shadow': 'Subtle contact shadow only',\n      'reflection': 'Glossy surface reflection beneath product',\n      'none': 'No shadow',\n      'ambient-occlusion': 'Natural ambient occlusion shadow',\n    };\n    parts.push((shadowNames[vs.product_representation.shadow_style] || '') + '.');\n  }\n\n  // Shot emphasis\n  if (shot.prompt_emphasis) {\n    parts.push(shot.prompt_emphasis + '.');\n  }\n\n  // Visual system mood\n  if (vs.style.mood) {\n    parts.push('Overall mood: ' + vs.style.mood + '.');\n  }\n\n  // Technical requirements\n  parts.push('High resolution, sharp focus, professionally color-graded.');\n  parts.push('Aspect ratio: ' + shot.aspect_ratio + '.');\n  parts.push('Style: commercial product photography, ecommerce-optimized.');\n\n  return parts.filter(p => p && p.trim()).join(' ');\n}\n\n// ── Build shot plan for all products ──────────────────────────────────────\nconst mediaAssets = [];\nconst requiredShots = shotTaxonomy.shot_types.filter(s => s.required);\nconst allShots = shotTaxonomy.shot_types;\nconst timestamp = new Date().toISOString();\n\n// Determine storage base path\nconst basePath = cloudMode ? null : ('/assets/media/' + projectId);\n\nfor (const product of products) {\n  const handle = product.handle || product.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');\n\n  for (const shot of allShots) {\n    const assetId = handle + '-' + shot.shot_id;\n    const prompt = buildPrompt(product, shot, vs);\n\n    // Deterministic local path\n    const shotFolder = shot.shot_id.replace(/_/g, '-');\n    const localPath = basePath ? (basePath + '/' + handle + '/' + shotFolder + '/' + assetId + '.png') : null;\n\n    // Shopify mapping (Phase 9G)\n    let shopifyMapping = null;\n    if (shot.shot_id === 'studio_packshot') {\n      shopifyMapping = { target_type: 'product_image', target_handle: handle, position: 1 };\n    } else if (shot.shot_id === 'clean_feature') {\n      shopifyMapping = { target_type: 'product_image', target_handle: handle, position: 2 };\n    } else if (shot.shot_id === 'lifestyle_context') {\n      shopifyMapping = { target_type: 'product_image', target_handle: handle, position: 3 };\n    } else if (shot.shot_id === 'hero_wide') {\n      shopifyMapping = { target_type: 'collection_image', target_handle: (product.collections && product.collections[0]) || handle, position: null };\n    }\n\n    // Aspect ratio → pixel dimensions for DALL-E\n    const dimMap = {\n      '1:1':  '1024x1024',\n      '4:5':  '1024x1280',\n      '3:4':  '768x1024',\n      '16:9': '1792x1024',\n      '9:16': '1024x1792',\n      '3:2':  '1536x1024',\n      '2:3':  '1024x1536',\n    };\n\n    mediaAssets.push({\n      asset_id: assetId,\n      product_handle: handle,\n      product_title: product.title,\n      shot_type: shot.shot_id,\n      prompt: prompt,\n      status: 'prompt_only',\n      local_path: localPath,\n      url: null,\n      metadata: {\n        aspect_ratio: shot.aspect_ratio,\n        generation_model: input.media_model,\n        timestamp: timestamp,\n        dimensions_px: dimMap[shot.aspect_ratio] || '1024x1024',\n        file_size_bytes: null,\n        quality_score: null,\n      },\n      shopify_mapping: shopifyMapping,\n    });\n  }\n}\n\n// ── Summary ───────────────────────────────────────────────────────────────\nconst summary = {\n  products_processed: products.length,\n  total_shots_planned: mediaAssets.length,\n  prompts_generated: mediaAssets.length,\n  images_generated: 0,\n  images_failed: 0,\n  images_skipped: 0,\n  mode: mediaMode,\n};\n\nreturn [{\n  json: {\n    ...input,\n    visual_system: vs,\n    shot_taxonomy: shotTaxonomy,\n    media_assets: mediaAssets,\n    generation_summary: summary,\n    storage: {\n      mode: cloudMode ? 'cloud_inline' : 'local',\n      base_path: basePath,\n      total_files: 0,\n      total_size_bytes: null,\n    },\n  },\n}];\n"
+      },
+      "id": "9a0b0001-0009-0009-0009-000000000004",
+      "name": "Build Shot Plan and Prompts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "9a0b-cond-0001",
+              "leftValue": "={{ $json.allow_generation }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9a0b0001-0009-0009-0009-000000000005",
+      "name": "Generation Enabled?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-media-assets — Image Generation Dispatcher\n// Splits media_assets into individual items for the image generation node.\n// Only processes required shots to manage API costs.\n\nconst input = $input.first().json;\nconst assets = input.media_assets;\nconst requiredOnly = assets.filter(a => {\n  // Only generate required shots (priority <= 3)\n  const taxonomy = input.shot_taxonomy.shot_types.find(s => s.shot_id === a.shot_type);\n  return taxonomy && taxonomy.required;\n});\n\n// Pass metadata for reassembly\nconst items = requiredOnly.map((asset, idx) => ({\n  json: {\n    _asset_index: idx,\n    _total_assets: requiredOnly.length,\n    _project_id: input.project_id,\n    asset_id: asset.asset_id,\n    prompt: asset.prompt,\n    dimensions: asset.metadata.dimensions_px,\n    shot_type: asset.shot_type,\n    product_handle: asset.product_handle,\n    model: asset.metadata.generation_model,\n  },\n}));\n\nreturn items;\n"
+      },
+      "id": "9a0b0001-0009-0009-0009-000000000006",
+      "name": "Prepare Generation Batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1500, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/images/generations",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $json.model || 'dall-e-3', prompt: $json.prompt, n: 1, size: ($json.dimensions === '1024x1280' || $json.dimensions === '1024x1792' ? '1024x1792' : $json.dimensions === '1792x1024' ? '1792x1024' : '1024x1024'), quality: 'standard', response_format: 'url' }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "credentials": {
+        "openAiApi": {
+          "id": "REPLACE_WITH_N8N_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI store-os"
+        }
+      },
+      "id": "9a0b0001-0009-0009-0009-000000000007",
+      "name": "Generate Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1750, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-media-assets — Compile Media Manifest (Phase 9D + 9F + 9G)\n// Assembles final output from generation results or prompt-only path.\n// Includes quality gate stub and Shopify mapping.\n\nconst allItems = $input.all();\nconst firstItem = allItems[0].json;\n\n// Detect which path we came from\nconst isGenerationPath = firstItem.hasOwnProperty('_asset_index') || (firstItem.body && firstItem.statusCode);\nconst isPromptOnlyPath = firstItem.hasOwnProperty('media_assets');\n\nlet result;\n\nif (isPromptOnlyPath) {\n  // ── Prompt-only path (no generation) ───────────────────────────────────\n  const input = firstItem;\n  result = {\n    status: 'PHASE_9_PROMPTS_ONLY',\n    project_id: input.project_id,\n    completed_at: new Date().toISOString(),\n    visual_system: input.visual_system,\n    shot_taxonomy: input.shot_taxonomy,\n    media_assets: input.media_assets,\n    generation_summary: input.generation_summary,\n    storage: input.storage,\n    errors: [],\n    warnings: ['PROMPTS_ONLY: allow_media_generation not set. Prompts generated but no images produced. Set runtime_config.allow_media_generation: true to generate.'],\n  };\n} else {\n  // ── Generation path — reassemble results ─────────────────────────────\n  const planItems = $('Build Shot Plan and Prompts').first().json;\n  const mediaAssets = [...planItems.media_assets];\n  let imagesGenerated = 0;\n  let imagesFailed = 0;\n  const errors = [];\n\n  for (let i = 0; i < allItems.length; i++) {\n    const resp = allItems[i].json;\n    const dispatchItems = $('Prepare Generation Batch').all();\n    const dispatch = dispatchItems[i]?.json || {};\n    const assetId = dispatch.asset_id;\n\n    // Find matching asset in manifest\n    const assetIdx = mediaAssets.findIndex(a => a.asset_id === assetId);\n    if (assetIdx === -1) continue;\n\n    const statusCode = resp.statusCode || 0;\n    const body = resp.body || resp;\n\n    if (statusCode >= 200 && statusCode < 300 && body.data && body.data[0]) {\n      // Success — update asset with URL\n      mediaAssets[assetIdx].status = 'generated';\n      mediaAssets[assetIdx].url = body.data[0].url || null;\n      mediaAssets[assetIdx].metadata.timestamp = new Date().toISOString();\n      imagesGenerated++;\n    } else {\n      // Failed\n      mediaAssets[assetIdx].status = 'failed';\n      const errMsg = body.error?.message || body.body?.error?.message || 'HTTP ' + statusCode;\n      errors.push({ asset_id: assetId, error_type: 'generation_failed', message: errMsg });\n      imagesFailed++;\n    }\n  }\n\n  // Mark non-required shots that weren't sent for generation as skipped\n  const imagesSkipped = mediaAssets.filter(a => a.status === 'prompt_only').length;\n\n  // Quality gate stub (Phase 9F)\n  // For now: all generated images pass. Future: implement actual validation.\n  for (const asset of mediaAssets) {\n    if (asset.status === 'generated') {\n      asset.metadata.quality_score = 1.0; // Placeholder — replace with real scoring\n    }\n  }\n\n  const totalGenerated = imagesGenerated;\n  let status;\n  if (imagesFailed === 0 && imagesGenerated > 0) {\n    status = 'PHASE_9_COMPLETE';\n  } else if (imagesGenerated > 0) {\n    status = 'PHASE_9_PARTIAL';\n  } else {\n    status = 'PHASE_9_FAILED';\n  }\n\n  result = {\n    status: status,\n    project_id: planItems.project_id,\n    completed_at: new Date().toISOString(),\n    visual_system: planItems.visual_system,\n    shot_taxonomy: planItems.shot_taxonomy,\n    media_assets: mediaAssets,\n    generation_summary: {\n      products_processed: planItems.generation_summary.products_processed,\n      total_shots_planned: mediaAssets.length,\n      prompts_generated: mediaAssets.length,\n      images_generated: imagesGenerated,\n      images_failed: imagesFailed,\n      images_skipped: imagesSkipped,\n      mode: 'full_generation',\n    },\n    storage: planItems.storage,\n    errors: errors,\n    warnings: [],\n  };\n}\n\nreturn [{ json: result }];\n"
+      },
+      "id": "9a0b0001-0009-0009-0009-000000000008",
+      "name": "Compile Media Manifest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 300]
+    }
+  ],
+  "connections": {
+    "Subworkflow Trigger": {
+      "main": [
+        [{ "node": "Validate Inputs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Validate Inputs": {
+      "main": [
+        [{ "node": "Derive Visual System", "type": "main", "index": 0 }]
+      ]
+    },
+    "Derive Visual System": {
+      "main": [
+        [{ "node": "Build Shot Plan and Prompts", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Shot Plan and Prompts": {
+      "main": [
+        [{ "node": "Generation Enabled?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Generation Enabled?": {
+      "main": [
+        [{ "node": "Prepare Generation Batch", "type": "main", "index": 0 }],
+        [{ "node": "Compile Media Manifest", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Generation Batch": {
+      "main": [
+        [{ "node": "Generate Image", "type": "main", "index": 0 }]
+      ]
+    },
+    "Generate Image": {
+      "main": [
+        [{ "node": "Compile Media Manifest", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "any"
+  },
+  "_meta": {
+    "storeOs": {
+      "phase": "Phase 9",
+      "status": "EXECUTABLE",
+      "format": "n8n-executable",
+      "outputSchema": "schemas/phase-9/media-generation.schema.json",
+      "cloudCompatibility": "FULL",
+      "nodeCount": 8,
+      "nodePattern": "8-node (Trigger -> Validate -> Derive Visual System -> Build Shot Plan + Prompts -> IF generate -> [Batch -> Generate Image] -> Compile Manifest)",
+      "terminalStatuses": ["PHASE_9_COMPLETE", "PHASE_9_PARTIAL", "PHASE_9_PROMPTS_ONLY", "PHASE_9_FAILED"],
+      "safetyModel": {
+        "allow_media_generation_required": "runtime_config.allow_media_generation: true must be set for image generation",
+        "default_behavior": "Returns PHASE_9_PROMPTS_ONLY with all prompts but no API calls",
+        "deterministic": "All prompts are pure functions of (product, shot_type, visual_system) — no randomness",
+        "idempotent": "Same inputs always produce same prompts and shot plans",
+        "cost_control": "Only required shots (priority 1-3) are sent for generation; optional shots are prompt_only"
+      }
+    }
+  }
+}

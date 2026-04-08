@@ -204,7 +204,8 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
                              'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
                              'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
                              'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
-                             'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED']);
+                             'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED',
+                             'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED']);
   const isSuccess = TERMINAL.has(d.status);
 
   console.log('');
@@ -373,7 +374,11 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
 
   console.log('');
   if (isSuccess) {
-    const chainDesc = d.status === 'PHASE_7B3_COMPLETE' ? 'Phase 1–7B.3 chain finished (catalog + pages + navigation + theme deployed).'
+    const chainDesc = d.status === 'PHASE_9_COMPLETE' ? 'Phase 9 media generation finished (all images generated).'
+      : d.status === 'PHASE_9_PARTIAL' ? 'Phase 9 media generation finished with partial results (some images failed).'
+      : d.status === 'PHASE_9_PROMPTS_ONLY' ? 'Phase 9 media generation finished (prompts only — no image API calls).'
+      : d.status === 'PHASE_9_FAILED' ? 'Phase 9 media generation failed.'
+      : d.status === 'PHASE_7B3_COMPLETE' ? 'Phase 1–7B.3 chain finished (catalog + pages + navigation + theme deployed).'
       : d.status === 'PHASE_7B3_PARTIAL' ? 'Phase 1–7B.3 finished with partial theme deployment.'
       : d.status === 'PHASE_7B3_DRY_RUN' ? 'Phase 1–7B.3 finished (theme: dry run only — no writes performed).'
       : d.status === 'PHASE_7B3_BLOCKED' ? 'Phase 1–7B.3 finished (theme: BLOCKED — no safe target theme found).'
@@ -597,7 +602,8 @@ async function main() {
                                  'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
                                  'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
                                  'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
-                                 'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED']);
+                                 'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED',
+                                 'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED']);
       if (!TERMINAL.has(finalResult.status)) process.exit(1);
     } else {
       console.error('ERROR: Could not extract result from execution data.');
@@ -667,7 +673,8 @@ async function main() {
                                       'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
                                       'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
                                       'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
-                                      'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED']);
+                                      'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED',
+                                      'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED']);
   const isLegacySync = startData.status && TERMINAL_STATUSES.has(startData.status);
 
   if (isLegacySync) {

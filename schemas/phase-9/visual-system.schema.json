@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://store-os.dev/schemas/phase-9/visual-system.schema.json",
+  "title": "Visual System Schema",
+  "description": "Art direction layer for deterministic media generation. Derived from brand_positioning and store_profile. Governs all visual output consistency.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "style",
+    "composition",
+    "product_representation",
+    "consistency_rules",
+    "derived_from"
+  ],
+  "properties": {
+    "style": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["background", "lighting", "color_logic", "contrast_profile"],
+      "properties": {
+        "background": {
+          "type": "string",
+          "enum": [
+            "clean-white",
+            "soft-gradient",
+            "neutral-studio",
+            "brand-tinted",
+            "contextual-minimal"
+          ],
+          "description": "Background treatment for product and lifestyle shots."
+        },
+        "lighting": {
+          "type": "string",
+          "enum": [
+            "soft-studio",
+            "dramatic-directional",
+            "natural-ambient",
+            "flat-even",
+            "warm-golden"
+          ],
+          "description": "Primary lighting style applied across all generated media."
+        },
+        "color_logic": {
+          "type": "string",
+          "enum": [
+            "brand-primary",
+            "neutral-dominant",
+            "warm-accent",
+            "cool-accent",
+            "monochromatic"
+          ],
+          "description": "Color palette strategy derived from brand positioning."
+        },
+        "contrast_profile": {
+          "type": "string",
+          "enum": [
+            "high-clarity",
+            "balanced-natural",
+            "soft-editorial",
+            "punchy-commercial"
+          ],
+          "description": "Contrast and tonal range optimized for ecommerce conversion."
+        },
+        "mood": {
+          "type": "string",
+          "description": "Overall visual mood in 2-3 words (e.g., 'professional, clean, trustworthy')."
+        }
+      }
+    },
+    "composition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["framing", "spacing", "aspect_ratios"],
+      "properties": {
+        "framing": {
+          "type": "string",
+          "enum": [
+            "centered-subject",
+            "rule-of-thirds",
+            "asymmetric-editorial",
+            "symmetrical-formal"
+          ],
+          "description": "Primary framing rule for product compositions."
+        },
+        "spacing": {
+          "type": "string",
+          "enum": [
+            "generous-breathing-room",
+            "tight-product-focus",
+            "balanced-margins",
+            "edge-to-edge"
+          ],
+          "description": "Whitespace and margin strategy."
+        },
+        "aspect_ratios": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": ["1:1", "4:5", "3:4", "16:9", "9:16", "3:2", "2:3"]
+          },
+          "description": "Supported aspect ratios in order of priority."
+        }
+      }
+    },
+    "product_representation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["isolation", "shadow_style"],
+      "properties": {
+        "isolation": {
+          "type": "boolean",
+          "description": "Whether products are shown isolated (true) or in context (false) for packshots."
+        },
+        "shadow_style": {
+          "type": "string",
+          "enum": [
+            "soft-drop",
+            "contact-shadow",
+            "reflection",
+            "none",
+            "ambient-occlusion"
+          ],
+          "description": "Shadow treatment for isolated product shots."
+        },
+        "reflection": {
+          "type": "boolean",
+          "description": "Whether to add surface reflection beneath products."
+        },
+        "surface_material": {
+          "type": "string",
+          "enum": [
+            "none",
+            "matte-white",
+            "glossy-surface",
+            "textured-fabric",
+            "wooden-surface",
+            "marble"
+          ],
+          "description": "Optional surface material for product staging."
+        }
+      }
+    },
+    "consistency_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "no_random_backgrounds",
+        "no_random_camera_angles",
+        "no_mixed_lighting",
+        "color_temperature_locked",
+        "brand_watermark"
+      ],
+      "properties": {
+        "no_random_backgrounds": {
+          "type": "boolean",
+          "const": true,
+          "description": "All backgrounds must match style.background — no randomness."
+        },
+        "no_random_camera_angles": {
+          "type": "boolean",
+          "const": true,
+          "description": "Camera angles are defined per shot_type — no freestyle angles."
+        },
+        "no_mixed_lighting": {
+          "type": "boolean",
+          "const": true,
+          "description": "All shots in a set must use the same lighting style."
+        },
+        "color_temperature_locked": {
+          "type": "boolean",
+          "description": "Whether color temperature is fixed across all shots."
+        },
+        "brand_watermark": {
+          "type": "boolean",
+          "description": "Whether generated assets include brand identification."
+        }
+      }
+    },
+    "derived_from": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["brand_role", "tone_of_voice", "price_positioning", "vertical"],
+      "properties": {
+        "brand_role": { "type": "string" },
+        "tone_of_voice": { "type": "string" },
+        "price_positioning": { "type": "string" },
+        "vertical": { "type": "string" },
+        "visual_positioning_hint": { "type": "string" },
+        "media_style_hint": { "type": "string" }
+      },
+      "description": "Source signals used to derive this visual system."
+    }
+  }
+}

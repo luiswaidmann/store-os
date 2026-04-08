@@ -27,6 +27,23 @@ Recent runtime progression merges (on `main`):
 
 ## Last confirmed end-to-end smoke test
 
+**Phase 9 CONFIRMED (PROMPTS_ONLY) — Media Generation:**
+**Date:** 2026-04-08
+**Method:** Standalone sub-workflow test via webhook wrapper → `build-media-assets` (ID: krR10um8F1pT0miQ)
+**Input:** 2-product test payload (heavy-duty-cable-ties, safety-goggles-pro) with mass-premium/specialist config
+**Result:** `PHASE_9_PROMPTS_ONLY` — execution successful, ~1.9s — cloud mode
+**Visual system derived:**
+- Background: neutral-studio (mass-premium) | Lighting: soft-studio (technical-trustworthy)
+- Framing: centered-subject (specialist) | Shadow: soft-drop (mass-premium)
+- Mood: reliable, efficient, professional (from brand_traits)
+**Shot taxonomy:** 5 fixed shot types applied to both products (10 total assets)
+**Prompts generated:** 10 deterministic prompts (pure function of inputs)
+**Images generated:** 0 (prompts_only mode — allow_media_generation: false)
+**Shopify mapping:** studio_packshot→pos 1, clean_feature→pos 2, lifestyle_context→pos 3, hero_wide→collection_image
+**Errors:** 0 | **Warnings:** 1 (expected: "PROMPTS_ONLY: allow_media_generation not set")
+**n8n validation:** 0 errors, 12 warnings (all minor — typeVersion hints, error handling suggestions)
+**Not yet integrated into orchestrator chain** — standalone sub-workflow, will be added in future phase
+
 **Phase 7B.3 CONFIRMED (COMPLETE) — Theme Deployment:**
 **Date:** 2026-04-08
 **Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async)
@@ -461,7 +478,11 @@ DIRECT fields are passed through verbatim and override any LLM-generated values.
 
 ## Confirmed next planned runtime step
 
-Next: **Phase 7B.3 — Store Build (theme sections, assets)** — scaffold exists, not yet deployed. See `docs/phase-7b-architecture.md`.
+Next: **Orchestrator integration** — integrate `build-media-assets` into the orchestrator chain after Phase 7B.3.
+
+Phase 9 is **CONFIRMED (standalone)** — `build-media-assets` deployed (ID: krR10um8F1pT0miQ), prompts_only mode validated. Not yet integrated into orchestrator chain.
+
+Phase 7B.3 is **COMPLETE** — `build-shopify-theme` deployed, theme sections + assets written to Shopify dev theme.
 
 Phase 7B.2 is **COMPLETE** — `build-shopify-pages-navigation` deployed, navigation uses GraphQL Menu API (REST link_lists removed in Shopify 2025-04).
 

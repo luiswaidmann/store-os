@@ -1,0 +1,123 @@
+{
+  "_meta": {
+    "format": "store-os-runtime-contract",
+    "version": "1.0",
+    "phase_id": "phase-9",
+    "category": "media-generation",
+    "cloud_compatibility": "FULL",
+    "description": "Contract for build-media-assets: deterministic visual system derivation, shot planning, prompt generation, and optional image generation."
+  },
+  "phase_id": "phase-9",
+  "category": "media-generation",
+  "cloud_compatibility": "FULL",
+  "upstream_dependencies": [
+    "resolve-runtime-config",
+    "build-store-profile",
+    "build-brand-positioning",
+    "build-store-blueprint"
+  ],
+  "required_inputs": {
+    "from_pipeline": [
+      {
+        "field": "store_profile",
+        "source": "build-store-profile",
+        "required_subfields": [
+          "price_positioning",
+          "vertical",
+          "store_type"
+        ]
+      },
+      {
+        "field": "brand_positioning",
+        "source": "build-brand-positioning",
+        "required_subfields": [
+          "brand_role",
+          "tone_of_voice",
+          "brand_traits"
+        ]
+      },
+      {
+        "field": "store_blueprint",
+        "source": "build-store-blueprint",
+        "required_subfields": [
+          "products"
+        ]
+      },
+      {
+        "field": "runtime_config",
+        "source": "resolve-runtime-config",
+        "required_subfields": [
+          "env",
+          "cloud_mode"
+        ],
+        "cloud_note": "allow_media_generation and media_generation_model are optional config fields"
+      }
+    ]
+  },
+  "optional_inputs": [
+    {
+      "field": "content_strategy",
+      "source": "build-content-strategy",
+      "purpose": "Additional context for prompt generation (messaging, tone)"
+    }
+  ],
+  "output_contract": {
+    "media_generation": {
+      "description": "Complete media generation output including visual system, shot taxonomy, prompts, and optionally generated images.",
+      "schema_ref": "schemas/phase-9/media-generation.schema.json",
+      "required_fields": [
+        "status",
+        "project_id",
+        "completed_at",
+        "visual_system",
+        "shot_taxonomy",
+        "media_assets",
+        "generation_summary",
+        "storage"
+      ]
+    }
+  },
+  "runtime_config_fields": {
+    "allow_media_generation": {
+      "env_var": "STORE_OS_ALLOW_MEDIA_GENERATION",
+      "type": "boolean_string",
+      "default": "false",
+      "description": "Set to 'true' to enable image generation API calls. Default: prompts_only mode."
+    },
+    "media_generation_model": {
+      "env_var": "STORE_OS_MEDIA_GENERATION_MODEL",
+      "type": "string",
+      "default": "dall-e-3",
+      "description": "Image generation model to use. Must be available on configured OpenAI credential."
+    }
+  },
+  "terminal_statuses": {
+    "PHASE_9_COMPLETE": "All required images generated successfully",
+    "PHASE_9_PARTIAL": "Some images generated, some failed",
+    "PHASE_9_PROMPTS_ONLY": "Prompts generated but no image API calls (default mode)",
+    "PHASE_9_FAILED": "No images could be generated"
+  },
+  "determinism_guarantees": {
+    "visual_system": "Pure function of (brand_positioning, store_profile). Same inputs → same visual system.",
+    "shot_taxonomy": "Fixed set of shot types. Not input-dependent. Same for every product.",
+    "prompts": "Pure function of (product, shot_type, visual_system). Same inputs → same prompt string.",
+    "shot_plan": "Deterministic cross-product of (products × shot_types). Same inputs → same plan.",
+    "shopify_mapping": "Deterministic mapping of shot_types to Shopify image roles."
+  },
+  "cost_controls": {
+    "default_mode": "prompts_only — no API costs",
+    "generation_mode": "Only required shots (priority 1-3) sent for generation",
+    "optional_shots": "hero_wide, detail_closeup remain prompt_only even in generation mode",
+    "model_selection": "dall-e-3 standard quality by default"
+  },
+  "cloud_behavior": {
+    "storage": "cloud_inline — no filesystem writes",
+    "image_urls": "Returned as temporary OpenAI URLs (expire after ~1h)",
+    "local_path": "null in cloud mode"
+  },
+  "self_hosted_behavior": {
+    "storage": "local — images saved to /assets/media/{project_id}/{product_handle}/{shot_type}/",
+    "image_persistence": "Downloaded from URL and saved as PNG",
+    "local_path": "Populated with full filesystem path"
+  }
+}
