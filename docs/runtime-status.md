@@ -27,6 +27,22 @@ Recent runtime progression merges (on `main`):
 
 ## Last confirmed end-to-end smoke test
 
+**Phase 11 CONFIRMED (PROMPTS_ONLY) — Theme-Driven Media Orchestration:**
+**Date:** 2026-04-08
+**Method:** Standalone sub-workflow test via webhook wrapper → `build-media-assets` (ID: krR10um8F1pT0miQ)
+**Input:** 1-product payload (industrial-sensor-v2) with `theme_rules` (pattern: technical-b2b-specialist, 4-section stack)
+**Result:** `PHASE_9_PROMPTS_ONLY` — execution successful — Phase 11 media_plan and per-asset fields all correct
+**media_plan:** `derived_from_theme_rules: true` | `store_pattern: technical-b2b-specialist`
+**Section coverage:** hero→[hero_wide, lifestyle_context] | value-prop→[clean_feature] | featured-collection→[studio_packshot] | trust-social-proof→[detail_closeup]
+**Shot plan (priority-ordered):** high: hero_wide, studio_packshot | medium: lifestyle_context, clean_feature | low: detail_closeup
+**required_shots: 3 | optional_shots: 2 | total: 5**
+**Phase 11 per-asset fields verified:** source_section ✓ | priority ✓ | required ✓ | intended_usage ✓ | used_in_layout ✓ | derived_from_theme_rules ✓ | generation_needed ✓
+**Generation batch ordering:** required+high first → required+medium → optional+high (low optional skipped)
+**Prompts generated:** 5 (1 per shot type) | **Images generated:** 0 (prompts_only mode)
+**Errors:** 0 | **Warnings:** 1 (expected: PROMPTS_ONLY)
+**New schema:** schemas/phase-11/media-plan.schema.json
+**Schema updated:** schemas/phase-9/media-generation.schema.json (added media_plan + 7 Phase 11 per-asset fields)
+
 **Phase 10 CONFIRMED (COMPLETE) — Theme Rules Engine:**
 **Date:** 2026-04-08
 **Method:** Full orchestrator chain (execution 14747) — `build-theme-rules` runs between Phase 7B.2 Complete and `build-shopify-theme`
