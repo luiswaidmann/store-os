@@ -1,5 +1,14 @@
 [
   {
+    "execution_id": "15185",
+    "project_id": "suppliedtech",
+    "started_at": "2026-04-09T18:04:15.547Z",
+    "finished_at": "2026-04-09T18:06:29.170Z",
+    "duration_ms": 133623,
+    "status": "success",
+    "terminal_status": "GOLD_PATH_PARTIAL"
+  },
+  {
     "execution_id": "15168",
     "project_id": "suppliedtech",
     "started_at": "2026-04-09T17:13:52.694Z",
