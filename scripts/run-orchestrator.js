@@ -200,7 +200,7 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
     return;
   }
 
-  const TERMINAL = new Set(['GOLD_PATH_COMPLETE',
+  const TERMINAL = new Set(['GOLD_PATH_COMPLETE', 'GOLD_PATH_PARTIAL',
                              'PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                              'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
                              'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
@@ -377,6 +377,7 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
   console.log('');
   if (isSuccess) {
     const chainDesc = d.status === 'GOLD_PATH_COMPLETE' ? 'Full gold path complete — all phases 1–7B.3 finished, 6 theme assets written, 0 errors.'
+      : d.status === 'GOLD_PATH_PARTIAL' ? 'Gold path complete with partial media results — theme fully deployed, some media assets failed (transient).'
       : d.status === 'PHASE_9_COMPLETE' ? 'Phase 9 media generation finished (all images generated).'
       : d.status === 'PHASE_9_PARTIAL' ? 'Phase 9 media generation finished with partial results (some images failed).'
       : d.status === 'PHASE_9_PROMPTS_ONLY' ? 'Phase 9 media generation finished (prompts only — no image API calls).'
@@ -601,7 +602,7 @@ async function main() {
       } else {
         printSummary(finalResult, 200, durationMs, pollStartedAt);
       }
-      const TERMINAL = new Set(['GOLD_PATH_COMPLETE',
+      const TERMINAL = new Set(['GOLD_PATH_COMPLETE', 'GOLD_PATH_PARTIAL',
                                  'PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                                  'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
                                  'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
@@ -674,7 +675,7 @@ async function main() {
   const startData = typeof startResponse.data === 'object' ? startResponse.data : {};
 
   // Detect async response vs legacy synchronous response
-  const TERMINAL_STATUSES = new Set(['GOLD_PATH_COMPLETE',
+  const TERMINAL_STATUSES = new Set(['GOLD_PATH_COMPLETE', 'GOLD_PATH_PARTIAL',
                                       'PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                                       'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
                                       'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',

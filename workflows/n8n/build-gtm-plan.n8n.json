@@ -52,7 +52,7 @@
       "parameters": {
         "resource": "chat",
         "operation": "complete",
-        "chatModel": "gpt-4o",
+        "model": "gpt-4o-mini",
         "prompt": {
           "messages": [
             {
@@ -64,7 +64,7 @@
         "simplifyOutput": true,
         "options": {
           "temperature": 0.3,
-          "maxTokens": 4000
+          "maxTokens": 4096
         }
       },
       "credentials": {
