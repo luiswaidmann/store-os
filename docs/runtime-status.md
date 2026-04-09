@@ -27,6 +27,19 @@ Recent runtime progression merges (on `main`):
 
 ## Last confirmed end-to-end smoke test
 
+**Persistent Draft Theme CONFIRMED — Theme System Locked:**
+**Date:** 2026-04-09
+**Theme ID:** `194584281428`
+**Theme Name:** `store-os // system-draft`
+**Theme Role:** `unpublished` (draft — NOT published, production theme NOT affected)
+**Shop:** `8zw111-cj.myshopify.com`
+**Created via:** Shopify Admin API POST /themes.json
+**Persisted in:** `test-data/golden-input.json` (STORE_OS_SHOPIFY_THEME_ID), `workflows/n8n/workflow-ids.json` (persistent_theme)
+**Write test 1:** 4 sections + 3 assets → PHASE_7B3_COMPLETE (hero, value-prop, featured-collection, trust-social-proof)
+**Write test 2 (reuse check):** Same theme_id `194584281428` targeted, no new theme created
+**Safety:** Explicit shopify_theme_id always wins. Active production theme NOT modified.
+**Files written to theme:** `sections/store-os-hero.liquid`, `sections/store-os-value-prop.liquid`, `sections/store-os-featured-collection.liquid`, `sections/store-os-trust-social-proof.liquid`, `assets/store-os-logo-placeholder.svg`, `assets/store-os-hero-placeholder.svg`, `assets/store-os-favicon-placeholder.svg`
+
 **Phase 9 CONFIRMED (COMPLETE — LIVE GENERATION) — Media Runtime Operational:**
 **Date:** 2026-04-09
 **Method:** `validate-media-generation.js` → webhook wrapper → `build-media-assets` (ID: krR10um8F1pT0miQ)
