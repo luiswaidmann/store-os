@@ -1,0 +1,12 @@
+{
+  "execution_id": "14986",
+  "project_id": "unknown",
+  "started_at": "2026-04-09T12:02:15.932Z",
+  "finished_at": "2026-04-09T12:03:40.949Z",
+  "duration_ms": 85017,
+  "status": "error",
+  "terminal_status": null,
+  "cloud_mode": null,
+  "artifacts": null,
+  "error": "n8n execution 14986 finished with status: error"
+}

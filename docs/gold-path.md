@@ -124,9 +124,12 @@ The terminal node returns all artifacts plus:
     "status": "PHASE_7B3_COMPLETE",
     "theme_id": "194584281428",
     "sections_written": 4,
-    "assets_written": 3,
+    "assets_written": 6,
     "templates_written": 1,
     "written_files": [
+      "layout/theme.liquid",
+      "config/settings_schema.json",
+      "config/settings_data.json",
       "sections/store-os-hero.liquid",
       "sections/store-os-value-prop.liquid",
       "sections/store-os-featured-collection.liquid",
@@ -142,7 +145,7 @@ The terminal node returns all artifacts plus:
 
 ## Storefront Assembly Model
 
-`build-shopify-theme` (Phase 7B.3) writes three categories of files to the draft theme:
+`build-shopify-theme` (Phase 7B.3) writes four categories of files to the draft theme:
 
 ### 1. Section Liquid Files (`sections/store-os-*.liquid`)
 Each section is a complete Shopify OS 2.0 section with:
@@ -165,6 +168,12 @@ This is the **critical wiring step**. Without it, sections exist but never appea
 
 ### 3. Asset Placeholders (`assets/store-os-*.svg`)
 SVG placeholders for logo, favicon, and hero image (replaced by real assets in editor).
+
+### 4. Required OS 2.0 Theme Files
+Three files required for the Shopify theme editor to function:
+- **`layout/theme.liquid`** — Minimal OS 2.0 layout: `{{ content_for_header }}` + `{{ content_for_layout }}`. No Dawn dependency; no snippet references that would fail on a blank theme.
+- **`config/settings_schema.json`** — `theme_info` section with valid `theme_documentation_url` and `theme_support_url` (Shopify rejects empty/invalid URLs with 422). Required for editor sidebar initialization.
+- **`config/settings_data.json`** — `{"current":{}}` blank settings. Required for editor to load without errors.
 
 ### Section Stack (determined by store pattern)
 7 patterns × 4 section types → deterministic homepage layout:
@@ -245,6 +254,13 @@ node scripts/inspect-run.js --latest
 ```
 
 ## Validated Runs
+
+**Execution 15067 — 2026-04-09 — GOLD_PATH_COMPLETE (editor compatibility validated)**
+- Theme deployment: PHASE_7B3_COMPLETE — 4 sections + 6 assets written, 0 errors, 0 warnings
+- Required files now written: `layout/theme.liquid` (minimal OS 2.0), `config/settings_schema.json` (theme_info with valid URLs), `config/settings_data.json` (blank current settings)
+- Editor sidebar: all 4 sections load by name (store-os: Hero, Value Prop, Products, Trust Signals) — skeleton state resolved
+- assets_written=6: 3 SVG placeholders + layout.liquid + settings_schema.json + settings_data.json
+- Runtime: ~134s
 
 **Execution 14888 — 2026-04-09 — GOLD_PATH_PARTIAL (schema name fix validated)**
 - Theme deployment: PHASE_7B3_COMPLETE — 4 sections + 3 assets written, 0 errors, 0 warnings
