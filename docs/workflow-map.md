@@ -1,5 +1,10 @@
 Workflow Map
 
+> **Note:** This document describes the original *aspirational* end-to-end vision for store-os.
+> For the actual running system (15-workflow orchestrator chain with confirmed validation), see **[gold-path.md](gold-path.md)**.
+> The gold path implements a subset of this vision: Phases 1–7B.3 plus Phase 10 (theme rules).
+> Phases not yet implemented (pattern manifest, design system, section library, SEO/AEO, validation, publish decision) remain aspirational targets.
+
 Purpose
 
 This document describes the intended end-to-end operating flow for store-os.

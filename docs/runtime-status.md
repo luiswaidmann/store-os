@@ -204,26 +204,36 @@ Previous confirmed test (Phase 6a):
 Previous confirmed test (Phase 5):
 **Date:** 2026-04-07 | **Result:** `PHASE_5_COMPLETE` — HTTP 200, ~90s
 
-## Current confirmed executable chain
+## Current confirmed executable chain (Gold Path)
 
-The currently confirmed n8n execution path (Phase 7A — 2026-04-07) is:
+The full n8n orchestrator execution chain (15 subworkflow calls, sequential):
 
-- `resolve-runtime-config`
-- `intake-store-input`
-- `import-shopify-data`
-- `build-store-profile`
-- `build-market-intelligence`
-- `build-brand-positioning`
-- `build-competitor-clusters`
-- `build-strategy-synthesis` (Phase 16)
-- `build-offer-architecture` (Phase 6a)
-- `build-content-strategy` (Phase 6b)
-- `build-gtm-plan` (Phase 6c)
-- `build-store-blueprint` (Phase 7A)
-- `build-shopify-catalog` (Phase 7B.1)
-- `build-shopify-pages-navigation` ← **NEW** (Phase 7B.2 — pages REST + navigation GraphQL)
+1. `resolve-runtime-config` (inline Code node — not a subworkflow)
+2. `intake-store-input` (Phase 1 — input normalization)
+3. `import-shopify-data` (Phase 1 — Shopify API fetch)
+4. `build-store-profile` (Phase 1 — profile synthesis)
+5. `build-market-intelligence` (Phase 2 — LLM: gpt-4o)
+6. `build-brand-positioning` (Phase 3 — LLM: gpt-4o)
+7. `build-competitor-clusters` (Phase 4 — LLM: gpt-4o)
+8. `build-strategy-synthesis` (Phase 5 — LLM: gpt-4o, cross-artifact)
+9. `build-offer-architecture` (Phase 6a — LLM: gpt-4o)
+10. `build-content-strategy` (Phase 6b — LLM: gpt-4o)
+11. `build-gtm-plan` (Phase 6c — LLM: gpt-4o)
+12. `build-store-blueprint` (Phase 7A — LLM: gpt-4o)
+13. `build-shopify-catalog` (Phase 7B.1 — Shopify REST writes)
+14. `build-shopify-pages-navigation` (Phase 7B.2 — Shopify REST + GraphQL writes)
+15. `build-theme-rules` (Phase 10 — deterministic, `continueOnFail: true`)
+16. `build-shopify-theme` (Phase 7B.3 — Shopify Theme API writes) ← **TERMINAL**
 
-**Async model:** Chains run ~117s+. The webhook returns HTTP 202 within ~2s with an `execution_id`. The CLI polls `GET /api/v1/executions/{id}` until `finished: true`. Cloudflare's 100s timeout is no longer hit. See `docs/async-execution-model.md`.
+**Failure semantics:**
+- Phases 1–7A: `== SUCCESS` required, chain halts on failure
+- Phases 7B.1–7B.2: `!= FAILED` (allows PARTIAL to proceed)
+- Phase 10: `continueOnFail: true` (optional — theme falls back to blueprint sections)
+- Phase 7B.3: `!= FAILED` (allows DRY_RUN, BLOCKED, PARTIAL to proceed)
+
+**Not yet in orchestrator chain:** `build-media-assets` (Phase 9), `build-image-grounding` (Phase 12). Both are validated standalone.
+
+**Async model:** Chains run ~130s+. The webhook returns HTTP 202 within ~2s with an `execution_id`. The CLI polls `GET /api/v1/executions/{id}` until `finished: true`. Cloudflare's 100s timeout is no longer hit. See `docs/async-execution-model.md`.
 
 ## Current confirmed inline outputs
 
@@ -239,7 +249,9 @@ The chain currently returns these runtime artifacts inline in cloud mode:
 - `gtm_plan`
 - `store_blueprint`
 - `shopify_catalog_deployment` (Phase 7B.1)
-- `shopify_pages_navigation_deployment` ← **NEW** (Phase 7B.2)
+- `shopify_pages_navigation_deployment` (Phase 7B.2)
+- `theme_rules` (Phase 10 — when available)
+- `shopify_theme_deployment` (Phase 7B.3)
 
 ## Runtime Hardening (Phase 16)
 
@@ -499,36 +511,38 @@ orchestrate-phase1
       │                         execution continues asynchronously
   Validate Orchestrate Input ← fast-fail schema check
       │
-  ┌── PHASE CHAIN ────────────────────────────────────────┐
-  │  intake-store-input → import-shopify-data             │
-  │  build-store-profile          (Phase 1)               │
-  │  build-market-intelligence    (Phase 2)               │
-  │  build-brand-positioning      (Phase 3)               │
-  │  build-competitor-clusters    (Phase 4)               │
-  │  build-strategy-synthesis     (Phase 5)               │
-  │  build-offer-architecture     (Phase 6a)              │
-  │  build-content-strategy       (Phase 6b)              │
-  │  build-gtm-plan               (Phase 6c)              │
-  │  build-store-blueprint        (Phase 7A)               │
-  │  build-shopify-catalog        (Phase 7B.1)             │
-  │  build-shopify-pages-navigation (Phase 7B.2) ← TERMINAL │
-  └───────────────────────────────────────────────────────┘
+  ┌── PHASE CHAIN ─────────────────────────────────────────────┐
+  │  intake-store-input → import-shopify-data                  │
+  │  build-store-profile            (Phase 1)                  │
+  │  build-market-intelligence      (Phase 2)                  │
+  │  build-brand-positioning        (Phase 3)                  │
+  │  build-competitor-clusters      (Phase 4)                  │
+  │  build-strategy-synthesis       (Phase 5)                  │
+  │  build-offer-architecture       (Phase 6a)                 │
+  │  build-content-strategy         (Phase 6b)                 │
+  │  build-gtm-plan                 (Phase 6c)                 │
+  │  build-store-blueprint          (Phase 7A)                 │
+  │  build-shopify-catalog          (Phase 7B.1)               │
+  │  build-shopify-pages-navigation (Phase 7B.2)               │
+  │  build-theme-rules              (Phase 10, continueOnFail) │
+  │  build-shopify-theme            (Phase 7B.3) ← TERMINAL   │
+  └────────────────────────────────────────────────────────────┘
       │
-  Phase 7B.2 Complete → returns inline artifacts + metadata
+  Phase 7B.3 Complete → returns inline artifacts + metadata
 
 CALLER FLOW (async)
   1. POST webhook → HTTP 202 { execution_id, status: "started" }  (~2s)
   2. Poll GET /api/v1/executions/{id}?includeData=true  (every 5s)
-  3. finished: true → extract result from Phase 7A Complete node
+  3. finished: true → extract result from Phase 7B.3 Complete node
 
 OUTPUT (extracted from execution data)
   status, execution_id, completed_at
-  next_phase (Phase 7B.3 — theme sections, assets)
   store_profile, market_intelligence, brand_positioning,
   competitor_clusters, strategy_synthesis,
   offer_architecture, content_strategy, gtm_plan,
   store_blueprint, shopify_catalog_deployment,
-  shopify_pages_navigation_deployment (all inline in cloud mode)
+  shopify_pages_navigation_deployment, theme_rules,
+  shopify_theme_deployment (all inline in cloud mode)
 ```
 
 ---
