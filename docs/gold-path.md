@@ -210,18 +210,31 @@ All CTA targets are resolved to proper Shopify storefront paths:
 - Sequential pipeline: grounding → enhanced prompts → DALL-E renders
 
 ### What Shopify Renders
-After a successful gold path run + editor setup:
-- **Homepage:** Hero (gradient fallback) → featured collection (empty until collection picked) → value prop columns → trust signals
+After a successful gold path run (no editor action required for core commerce):
+- **Homepage:** Hero (gradient fallback) → **featured collection (auto-binds to first published collection, products + images show immediately)** → value prop columns → trust signals
 - **Collection pages:** Dawn's native collection grid (fully functional)
 - **Product pages:** Dawn's native product page (fully functional)
-- **Navigation:** Main menu + footer menu with valid Shopify paths
+- **Navigation:** Main menu + footer menu written to Shopify — not visible (minimal layout has no header/footer sections)
 - **Pages:** About, FAQ, etc. updated with content (unpublished, visible when published)
 - **404:** Dawn's native 404 page (fully functional)
 
+### Commerce Surface Binding State
+| Surface | State | Notes |
+|---------|-------|-------|
+| Hero heading + CTA | ✅ Fully bound | From blueprint/theme_rules |
+| Featured collection products | ✅ Auto-bound | Liquid falls back to `collections.first` (non-frontpage) |
+| Featured collection CTA | ✅ Auto-bound | `fc.url` resolved from active collection |
+| Product images | ✅ Permanent CDN | Real Shopify CDN images from product catalog |
+| Value prop blocks | 🟡 Placeholder | Block titles/descriptions are generic placeholder text |
+| Trust signal blocks | 🟡 Placeholder | Block titles/descriptions are generic placeholder text |
+| Hero image | 🟡 Gradient fallback | DALL-E CDN URLs expire; set real image in editor |
+| Navigation (header/footer) | ❌ Not rendered | Menus written to Shopify but minimal layout has no nav sections |
+
 ### What Requires Editor Action After Deployment
 1. **Hero image:** Pick an image in the theme editor → hero renders with real background
-2. **Featured collection:** Select a collection in the theme editor → products appear
+2. **Value prop + trust blocks:** Edit placeholder text in editor to use real copy
 3. **Publish pages:** Pages are created unpublished — publish them in Shopify admin
+4. **Navigation:** Add header/footer sections to layout or use a standard Dawn layout to expose menus
 
 ## Theme Target
 
@@ -254,6 +267,13 @@ node scripts/inspect-run.js --latest
 ```
 
 ## Validated Runs
+
+**Execution 15101 — 2026-04-09 — GOLD_PATH_COMPLETE (commerce binding validated)**
+- Theme deployment: PHASE_7B3_COMPLETE — 4 sections + 6 assets, 0 errors
+- Featured collection: auto-binds to first published collection via Liquid fallback — products and images show immediately, no editor action required
+- Commerce links confirmed: Shop Now → `/collections/tech-accessories`, product cards → `/products/{handle}`, View All → `fc.url`
+- Product images: real Shopify CDN URLs (permanent), not DALL-E temporary URLs
+- Runtime: ~145s
 
 **Execution 15067 — 2026-04-09 — GOLD_PATH_COMPLETE (editor compatibility validated)**
 - Theme deployment: PHASE_7B3_COMPLETE — 4 sections + 6 assets written, 0 errors, 0 warnings
