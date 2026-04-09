@@ -27,6 +27,16 @@ Recent runtime progression merges (on `main`):
 
 ## Last confirmed end-to-end smoke test
 
+**GOLD_PATH_PARTIAL — Schema Name Fix Validated (Execution 14888):**
+**Date:** 2026-04-09
+**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async)
+**Terminal status:** `GOLD_PATH_PARTIAL` — theme fully complete, media absent (grounding/DALL-E skipped this run)
+**Theme deployment:** PHASE_7B3_COMPLETE — 4 sections + 3 assets written to theme 194584281428, **0 errors**, **0 warnings**
+**Schema names:** store-os: Hero (14), store-os: Value Prop (20), store-os: Products (18), store-os: Trust Signals (23) — all ≤ 25 chars ✓
+**Sections written:** hero.liquid, value-prop.liquid, featured-collection.liquid, trust-social-proof.liquid
+**Assets written:** logo-placeholder.svg, favicon-placeholder.svg, hero-placeholder.svg
+**Runtime:** ~97s
+
 **GOLD_PATH_PARTIAL — Storefront Assembly Validated (Execution 14854):**
 **Date:** 2026-04-09
 **Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async)

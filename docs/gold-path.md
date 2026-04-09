@@ -146,54 +146,73 @@ The terminal node returns all artifacts plus:
 
 ### 1. Section Liquid Files (`sections/store-os-*.liquid`)
 Each section is a complete Shopify OS 2.0 section with:
-- HTML template using `{{ section.settings.* }}` variables
+- HTML template using `{{ section.settings.* | escape }}` (XSS-safe)
 - Inline `{% schema %}` block with configurable settings and defaults
+- `disabled_on: { "groups": ["header","footer"] }` — prevents sections from appearing in header/footer section groups where they can't render (fixes "not compatible with your theme" editor error)
 - Presets for theme editor discovery (add sections via editor)
 - Block support for value-prop columns and trust signals
+- Empty-state fallbacks for all sections (editor renders cleanly even without data)
 
 ### 2. Homepage Template (`templates/index.json`)
 This is the **critical wiring step**. Without it, sections exist but never appear on any page.
 - References each section by type (`store-os-hero`, `store-os-featured-collection`, etc.)
-- Pre-populates settings from theme_rules + blueprint hints
-- Pre-populates blocks for value-prop and trust sections
+- Pre-populates text/richtext settings from theme_rules + blueprint hints
+- Pre-populates `overlay_opacity`, `products_to_show`, `columns` from theme_rules
+- Pre-populates blocks for value-prop and trust sections with placeholder content
 - Controls section order deterministically from `section_stack`
-- Binds generated media URLs where available
+- **Collection setting left empty** — Shopify OS 2.0 does not support handle seeding in JSON templates; collection type settings must be selected in the theme editor (stores as GID internally)
+- **Hero image left empty** — DALL-E CDN URLs expire in ~4h; set via theme editor image picker
 
 ### 3. Asset Placeholders (`assets/store-os-*.svg`)
 SVG placeholders for logo, favicon, and hero image (replaced by real assets in editor).
 
 ### Section Stack (determined by store pattern)
 7 patterns × 4 section types → deterministic homepage layout:
-- **hero** — background image, headline, CTA (always first)
-- **featured-collection** — product grid from Shopify collection
-- **value-prop** — column layout with configurable block count
-- **trust-social-proof** — trust signals (evidence-led, social-proof-led, etc.)
+- **hero** — background image (image_picker), headline, CTA (always first)
+- **featured-collection** — product grid (collection picker, empty until set in editor)
+- **value-prop** — column layout with pre-populated block content
+- **trust-social-proof** — trust signals with pre-populated block content
+
+### Template Coverage
+| Template | Source | Custom sections |
+|----------|--------|----------------|
+| `templates/index.json` | store-os (custom) | hero, featured-collection, value-prop, trust-social-proof |
+| `templates/collection.json` | Dawn default | main-collection-banner, main-collection-product-grid |
+| `templates/product.json` | Dawn default | main-product, product-recommendations |
+| `templates/page.json` | Dawn default | main-page |
+| `templates/404.json` | Dawn default | main-404 |
 
 ### CTA Link Resolution
-All CTA targets are resolved to proper Shopify paths:
+All CTA targets are resolved to proper Shopify storefront paths:
 - `collection-handle` → `/collections/collection-handle`
-- `about` → `/pages/about`
+- `about`, `faq`, `contact` → `/pages/{handle}`
 - Already-prefixed paths (`/collections/...`, `http://...`) pass through unchanged
+
+### Media Binding Truth
+- **DALL-E-3 image URLs are temporary** (expire ~4 hours after generation)
+- These URLs are **not written to the theme template JSON** — writing them would cause broken images in the editor after expiration
+- **Production path:** Generated images must be uploaded to Shopify Files API (permanent CDN) and then bound via the theme editor's image picker setting
+- **Current state:** Hero section renders gradient fallback until an image is picked in the editor
 
 ### Image Model Architecture
 - **Generation:** DALL-E-3 (OpenAI) — photorealistic product images
-- **Grounding:** Gemini 2.0 Flash (Google) — vision analysis of existing Shopify product images
-- This is intentional dual-model architecture: Gemini understands, DALL-E generates
-- Sequential pipeline: grounding → generation prompts → DALL-E renders
+- **Grounding:** Gemini 2.0 Flash (Google) — vision analysis of Shopify product images
+- Intentional dual-model: Gemini understands existing images → DALL-E generates faithful product shots
+- Sequential pipeline: grounding → enhanced prompts → DALL-E renders
 
 ### What Shopify Renders
-After a successful gold path run, the draft theme preview shows:
-- **Homepage:** Hero section with CTA → featured collection grid → value prop columns → trust signals
-- **Collection pages:** Default Dawn template (not yet customized)
-- **Product pages:** Default Dawn template (not yet customized)
+After a successful gold path run + editor setup:
+- **Homepage:** Hero (gradient fallback) → featured collection (empty until collection picked) → value prop columns → trust signals
+- **Collection pages:** Dawn's native collection grid (fully functional)
+- **Product pages:** Dawn's native product page (fully functional)
 - **Navigation:** Main menu + footer menu with valid Shopify paths
-- **Pages:** About, FAQ, etc. created with content (unpublished)
+- **Pages:** About, FAQ, etc. updated with content (unpublished, visible when published)
+- **404:** Dawn's native 404 page (fully functional)
 
-### What Remains on Dawn Defaults
-- Collection/product/page templates (`templates/collection.json`, etc.)
-- Layout file (`layout/theme.liquid`)
-- CSS/JS assets (sections use inline styles)
-- `config/settings_data.json` (global theme settings)
+### What Requires Editor Action After Deployment
+1. **Hero image:** Pick an image in the theme editor → hero renders with real background
+2. **Featured collection:** Select a collection in the theme editor → products appear
+3. **Publish pages:** Pages are created unpublished — publish them in Shopify admin
 
 ## Theme Target
 
@@ -226,6 +245,12 @@ node scripts/inspect-run.js --latest
 ```
 
 ## Validated Runs
+
+**Execution 14888 — 2026-04-09 — GOLD_PATH_PARTIAL (schema name fix validated)**
+- Theme deployment: PHASE_7B3_COMPLETE — 4 sections + 3 assets written, 0 errors, 0 warnings
+- Schema names: "store-os: Hero" (14), "store-os: Value Prop" (20), "store-os: Products" (18), "store-os: Trust Signals" (23) — all ≤ 25 chars
+- Schema name bug fixed: `typeDisplayMap` replaces heading_hint-based `rawName.slice(0, 25)` (was producing 35-char names)
+- Runtime: ~97s
 
 **Execution 14854 — 2026-04-09 — GOLD_PATH_PARTIAL (storefront assembly validated)**
 - Theme deployment: PHASE_7B3_COMPLETE — 4 sections + 3 assets + templates/index.json, 0 errors
