@@ -1,0 +1,132 @@
+{
+  "name": "build-image-grounding",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "ig-0001",
+      "name": "Subworkflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-image-grounding — Validate Inputs\n// Extracts products with their Shopify image URLs.\n\nconst input = $input.first().json;\nconst projectId = input.project_id || null;\nconst products  = input.products || (input.store_blueprint && input.store_blueprint.products) || [];\nconst shopifyImport = input.shopify_import || null;\nconst runtimeConfig = input.runtime_config || {};\n\nif (!projectId) throw new Error('MISSING_INPUT: build-image-grounding requires project_id');\nif (products.length === 0) throw new Error('MISSING_INPUT: no products provided');\n\n// Merge Shopify import image data onto products\nconst rawProducts = (shopifyImport && shopifyImport.raw_products) || [];\nconst rawByHandle = {};\nfor (const rp of rawProducts) {\n  if (rp.handle) rawByHandle[rp.handle] = rp;\n}\n\nconst enrichedProducts = products.map(p => {\n  const raw = rawByHandle[p.handle] || {};\n  const images = raw.images || p.images || [];\n  return {\n    handle: p.handle,\n    title: p.title || raw.title || p.handle,\n    images: images.map(img => ({\n      url: img.src || img.url || img,\n      alt: img.alt || null,\n      id: img.id || null,\n    })).filter(img => img.url),\n  };\n});\n\nconst productsWithImages = enrichedProducts.filter(p => p.images.length > 0);\nconst productsWithout    = enrichedProducts.filter(p => p.images.length === 0);\n\nconst groundingModel = runtimeConfig.grounding_model || 'gemini-2.0-flash';\n\nconsole.log('build-image-grounding: ' + productsWithImages.length + ' products with images, ' + productsWithout.length + ' without');\n\nreturn [{\n  json: {\n    project_id: projectId,\n    grounding_model: groundingModel,\n    products_with_images: productsWithImages,\n    products_without_images: productsWithout.map(p => p.handle),\n    total_images: productsWithImages.reduce((sum, p) => sum + p.images.length, 0),\n  },\n}];\n"
+      },
+      "id": "ig-0002",
+      "name": "Validate Inputs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-image-grounding — Prepare Vision Requests\n// Downloads each product's primary image, converts to base64,\n// and builds Gemini Vision API payloads.\n\nconst input = $input.first().json;\nconst products = input.products_with_images;\nconst model = input.grounding_model;\n\nconst ANALYSIS_PROMPT = `You are a product image analyst for an ecommerce platform. Analyze this product image and return a JSON object with EXACTLY this structure (no markdown, no code fences, just raw JSON):\n\n{\n  \"category\": \"<product category>\",\n  \"form_factor\": \"<physical shape/silhouette description>\",\n  \"materials\": [\"<material1>\", \"<material2>\"],\n  \"primary_colors\": [\"<hex1>\", \"<hex2>\"],\n  \"color_description\": \"<human-readable color summary>\",\n  \"distinctive_features\": [\"<feature1>\", \"<feature2>\"],\n  \"dimensions_estimate\": \"<relative size estimate>\",\n  \"orientation\": \"<primary product orientation>\",\n  \"surface_finish\": \"<matte/glossy/brushed/textured/etc>\",\n  \"brand_markings\": \"<visible brand text or null>\",\n  \"background_quality\": \"<assessment of background>\",\n  \"lighting_quality\": \"<assessment of lighting>\",\n  \"ecommerce_suitability\": \"<high/medium/low>\",\n  \"improvement_suggestions\": [\"<suggestion1>\"],\n  \"product_description_grounded\": \"<detailed physical description for image generation prompts — be specific about shape, material, color, texture, distinctive features>\",\n  \"material_keywords\": \"<comma-separated material terms>\",\n  \"shape_keywords\": \"<comma-separated shape/form terms>\",\n  \"detail_focus_areas\": [\"<area1>\", \"<area2>\"],\n  \"quality_score\": <0.0-1.0>,\n  \"usable_as\": [\"<product_image/hero_banner/collection_image/lifestyle/detail_shot>\"],\n  \"reuse_recommendation\": \"<keep/enhance/replace>\",\n  \"issues\": [\"<issue1 or empty>\"]\n}\n\nBe precise about physical product characteristics. Focus on what makes this product visually unique and recognizable. The grounded description will be used to generate faithful product photography.`;\n\nconst items = [];\n\nfor (const product of products) {\n  // Use first image, resize via Shopify CDN for efficiency\n  const primaryImg = product.images[0];\n  let imgUrl = primaryImg.url;\n  // Shopify CDN resize: append width parameter\n  if (imgUrl.includes('cdn.shopify.com')) {\n    const sep = imgUrl.includes('?') ? '&' : '?';\n    imgUrl = imgUrl + sep + 'width=800';\n  }\n\n  // Download image and convert to base64\n  let base64Data = null;\n  let mimeType = 'image/jpeg';\n  try {\n    const response = await this.helpers.httpRequest({\n      method: 'GET',\n      url: imgUrl,\n      encoding: 'arraybuffer',\n      returnFullResponse: true,\n    });\n    const buffer = Buffer.from(response.body);\n    base64Data = buffer.toString('base64');\n    mimeType = response.headers['content-type'] || 'image/jpeg';\n    if (mimeType.includes(';')) mimeType = mimeType.split(';')[0].trim();\n  } catch (err) {\n    console.log('Failed to download image for ' + product.handle + ': ' + err.message);\n  }\n\n  if (!base64Data) {\n    items.push({\n      json: {\n        product_handle: product.handle,\n        product_title: product.title,\n        primary_image_url: primaryImg.url,\n        all_images: product.images,\n        _skip: true,\n        _error: 'Failed to download image',\n        _project_id: input.project_id,\n        _model: model,\n      },\n    });\n    continue;\n  }\n\n  // Build Gemini request body\n  const geminiBody = {\n    contents: [{\n      parts: [\n        { text: ANALYSIS_PROMPT },\n        {\n          inlineData: {\n            mimeType: mimeType,\n            data: base64Data,\n          },\n        },\n      ],\n    }],\n    generationConfig: {\n      temperature: 0.1,\n      maxOutputTokens: 2048,\n      responseMimeType: 'application/json',\n    },\n  };\n\n  items.push({\n    json: {\n      product_handle: product.handle,\n      product_title: product.title,\n      primary_image_url: primaryImg.url,\n      all_images: product.images,\n      gemini_request_body: geminiBody,\n      _skip: false,\n      _project_id: input.project_id,\n      _model: model,\n    },\n  });\n}\n\nreturn items;\n"
+      },
+      "id": "ig-0003",
+      "name": "Prepare Vision Requests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "ig-cond-0001",
+              "leftValue": "={{ $json._skip }}",
+              "rightValue": false,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ig-0004",
+      "name": "Has Image?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://generativelanguage.googleapis.com/v1beta/models/{{ $json._model }}:generateContent",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googlePalmApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.gemini_request_body) }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ISGPBEdBrApjlhNC",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "id": "ig-0005",
+      "name": "Analyze Product Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1250, 200],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// build-image-grounding — Compile Grounding Artifact\n// Parses Gemini Vision responses and assembles the final grounding artifact.\n\nconst allItems = $input.all();\nconst prepItems = $('Prepare Vision Requests').all();\n\nconst products = [];\nconst errors = [];\nlet totalImagesAnalyzed = 0;\nlet projectId = null;\nlet groundingModel = null;\n\nfor (let i = 0; i < allItems.length; i++) {\n  const item = allItems[i].json;\n  // Find matching prep item\n  const prep = prepItems[i]?.json || {};\n  const handle = prep.product_handle || item.product_handle || 'unknown';\n  const title = prep.product_title || item.product_title || handle;\n  const primaryUrl = prep.primary_image_url || item.primary_image_url || null;\n  const allImages = prep.all_images || [];\n  projectId = projectId || prep._project_id;\n  groundingModel = groundingModel || prep._model;\n\n  // Check if this was a skipped item (no image)\n  if (prep._skip) {\n    products.push({\n      product_handle: handle,\n      product_title: title,\n      primary_image_url: null,\n      source_images_analyzed: 0,\n      visual_analysis: {\n        category: 'unknown',\n        form_factor: 'unknown',\n        materials: [],\n        primary_colors: [],\n        color_description: 'no image available',\n        distinctive_features: [],\n        dimensions_estimate: null,\n        orientation: null,\n        surface_finish: 'unknown',\n        brand_markings: null,\n        background_quality: 'n/a',\n        lighting_quality: 'n/a',\n        ecommerce_suitability: 'low',\n        improvement_suggestions: ['No source images available — product images needed'],\n      },\n      grounding_prompt_additions: {\n        product_description_grounded: title,\n        material_keywords: '',\n        shape_keywords: '',\n        detail_focus_areas: [],\n      },\n      source_image_assessment: [],\n      analysis_error: prep._error || 'No image available',\n    });\n    errors.push({ product_handle: handle, error_type: 'no_image', message: prep._error || 'No source image' });\n    continue;\n  }\n\n  // Parse Gemini response\n  const resp = item;\n  const statusCode = resp.statusCode || 0;\n  const body = resp.body || resp;\n\n  let analysis = null;\n  let parseError = null;\n\n  if (statusCode >= 200 && statusCode < 300) {\n    try {\n      // Gemini response: body.candidates[0].content.parts[0].text\n      const candidates = body.candidates || [];\n      const textPart = candidates[0]?.content?.parts?.[0]?.text || '';\n      // Parse JSON from response\n      let cleaned = textPart.trim();\n      // Strip markdown code fences if present\n      if (cleaned.startsWith('```')) {\n        cleaned = cleaned.replace(/^```(?:json)?\\n?/, '').replace(/\\n?```$/, '').trim();\n      }\n      analysis = JSON.parse(cleaned);\n      totalImagesAnalyzed++;\n    } catch (e) {\n      parseError = 'Failed to parse Gemini response: ' + e.message;\n    }\n  } else {\n    const errMsg = body?.error?.message || JSON.stringify(body).slice(0, 200);\n    parseError = 'Gemini API error (HTTP ' + statusCode + '): ' + errMsg;\n  }\n\n  if (!analysis) {\n    products.push({\n      product_handle: handle,\n      product_title: title,\n      primary_image_url: primaryUrl,\n      source_images_analyzed: 0,\n      visual_analysis: {\n        category: 'unknown', form_factor: 'unknown', materials: [], primary_colors: [],\n        color_description: 'analysis failed', distinctive_features: [],\n        surface_finish: 'unknown', ecommerce_suitability: 'low',\n        improvement_suggestions: ['Visual analysis failed — retry needed'],\n      },\n      grounding_prompt_additions: {\n        product_description_grounded: title,\n        material_keywords: '', shape_keywords: '', detail_focus_areas: [],\n      },\n      source_image_assessment: [],\n      analysis_error: parseError,\n    });\n    errors.push({ product_handle: handle, error_type: 'analysis_failed', message: parseError });\n    continue;\n  }\n\n  // Build structured product grounding from Gemini analysis\n  products.push({\n    product_handle: handle,\n    product_title: title,\n    primary_image_url: primaryUrl,\n    source_images_analyzed: 1,\n    visual_analysis: {\n      category: analysis.category || 'unknown',\n      form_factor: analysis.form_factor || 'unknown',\n      materials: analysis.materials || [],\n      primary_colors: analysis.primary_colors || [],\n      color_description: analysis.color_description || '',\n      distinctive_features: analysis.distinctive_features || [],\n      dimensions_estimate: analysis.dimensions_estimate || null,\n      orientation: analysis.orientation || null,\n      surface_finish: analysis.surface_finish || 'unknown',\n      brand_markings: analysis.brand_markings || null,\n      background_quality: analysis.background_quality || 'unknown',\n      lighting_quality: analysis.lighting_quality || 'unknown',\n      ecommerce_suitability: ['high', 'medium', 'low'].includes(analysis.ecommerce_suitability) ? analysis.ecommerce_suitability : 'medium',\n      improvement_suggestions: analysis.improvement_suggestions || [],\n    },\n    grounding_prompt_additions: {\n      product_description_grounded: analysis.product_description_grounded || title,\n      material_keywords: analysis.material_keywords || '',\n      shape_keywords: analysis.shape_keywords || '',\n      detail_focus_areas: analysis.detail_focus_areas || [],\n    },\n    source_image_assessment: [{\n      image_url: primaryUrl,\n      quality_score: typeof analysis.quality_score === 'number' ? Math.min(1, Math.max(0, analysis.quality_score)) : 0.5,\n      usable_as: analysis.usable_as || ['product_image'],\n      issues: analysis.issues || [],\n      reuse_recommendation: ['keep', 'enhance', 'replace'].includes(analysis.reuse_recommendation) ? analysis.reuse_recommendation : 'enhance',\n    }],\n    analysis_error: null,\n  });\n}\n\nconst successCount = products.filter(p => !p.analysis_error).length;\nlet status;\nif (successCount === products.length && products.length > 0) {\n  status = 'PHASE_12_COMPLETE';\n} else if (successCount > 0) {\n  status = 'PHASE_12_PARTIAL';\n} else {\n  status = 'PHASE_12_FAILED';\n}\n\nreturn [{\n  json: {\n    status,\n    project_id: projectId,\n    completed_at: new Date().toISOString(),\n    products_analyzed: successCount,\n    total_images_analyzed: totalImagesAnalyzed,\n    grounding_model: groundingModel || 'gemini-2.0-flash',\n    products,\n    errors,\n  },\n}];\n"
+      },
+      "id": "ig-0006",
+      "name": "Compile Grounding Artifact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1500, 300]
+    }
+  ],
+  "connections": {
+    "Subworkflow Trigger": {
+      "main": [
+        [{ "node": "Validate Inputs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Validate Inputs": {
+      "main": [
+        [{ "node": "Prepare Vision Requests", "type": "main", "index": 0 }]
+      ]
+    },
+    "Prepare Vision Requests": {
+      "main": [
+        [{ "node": "Has Image?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Has Image?": {
+      "main": [
+        [{ "node": "Analyze Product Image", "type": "main", "index": 0 }],
+        [{ "node": "Compile Grounding Artifact", "type": "main", "index": 0 }]
+      ]
+    },
+    "Analyze Product Image": {
+      "main": [
+        [{ "node": "Compile Grounding Artifact", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "_meta": {
+    "phase": "12",
+    "description": "Gemini Vision product image grounding — analyzes existing Shopify product images to extract structured visual understanding for product-faithful media generation."
+  }
+}

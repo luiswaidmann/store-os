@@ -32,7 +32,8 @@
     "build-shopify-pages-navigation": "LADq8PuMRuswIxJa",
     "build-theme-rules":              "KzFBogj7kusXQqlp",
     "build-shopify-theme":            "QG5ezHb3qKjKcvvn",
-    "build-media-assets":             "krR10um8F1pT0miQ"
+    "build-media-assets":             "krR10um8F1pT0miQ",
+    "build-image-grounding":          "s5aWmVZcerBgc6kM"
   },
   "placeholder_map": {
     "REPLACE_WITH_INTAKE_STORE_INPUT_WORKFLOW_ID":           "intake-store-input",
@@ -66,6 +67,12 @@
       "n8n_credential_name": "Shopify SuppliedTech Admin",
       "value": "CO1JGlTR5RJ9Cs6x",
       "note": "import-shopify-data migrated from shopifyApi to shopifyOAuth2Api (2026-04-08). All Shopify workflows now use the same OAuth2 credential."
+    },
+    "STORE_OS_GEMINI_CREDENTIAL_ID": {
+      "used_in": ["build-image-grounding.n8n.json"],
+      "credential_type": "googlePalmApi",
+      "n8n_credential_name": "Google Gemini(PaLM) Api account",
+      "value": "ISGPBEdBrApjlhNC"
     },
     "STORE_OS_SHOPIFY_OAUTH2_CREDENTIAL_ID": {
       "used_in": ["import-shopify-data.n8n.json", "build-shopify-catalog.n8n.json", "build-shopify-pages-navigation.n8n.json"],

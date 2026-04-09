@@ -40,6 +40,20 @@ Recent runtime progression merges (on `main`):
 **Safety:** Explicit shopify_theme_id always wins. Active production theme NOT modified.
 **Files written to theme:** `sections/store-os-hero.liquid`, `sections/store-os-value-prop.liquid`, `sections/store-os-featured-collection.liquid`, `sections/store-os-trust-social-proof.liquid`, `assets/store-os-logo-placeholder.svg`, `assets/store-os-hero-placeholder.svg`, `assets/store-os-favicon-placeholder.svg`
 
+**Phase 12 CONFIRMED (COMPLETE) — Image Grounding Layer:**
+**Date:** 2026-04-09
+**Method:** Webhook wrapper → `build-media-assets` (ID: krR10um8F1pT0miQ) with `image_grounding` artifact
+**Input:** 1-product payload (basswave-kabellose-kopfhorer) with real Shopify image + theme_rules (specialist-standard, 4-section stack) + image_grounding (Gemini 2.0 Flash)
+**Result:** `PHASE_9_PROMPTS_ONLY` — all grounded prompts correct, all Phase 12 per-asset fields present
+**Grounding model:** gemini-2.0-flash | **Grounding confidence:** 0.82
+**Grounded prompts verified:** All 5 assets contain Gemini-derived physical descriptions (materials, shape, colors) instead of title-only descriptions
+**Phase 12 per-asset fields verified:** generation_mode (grounded_generate) | grounding_source_type (shopify_product_image) | grounded_from_image | grounding_confidence | product_faithfulness_required
+**Detail closeup focus areas:** earcup padding texture, headband adjustment mechanism, microphone boom detail, mint green color finish
+**New workflow:** build-image-grounding (ID: s5aWmVZcerBgc6kM)
+**New schema:** schemas/phase-12/image-grounding.schema.json
+**Schema updated:** schemas/phase-9/media-generation.schema.json (added 5 Phase 12 per-asset fields)
+**Doc:** docs/phase-12-architecture.md
+
 **Phase 9 CONFIRMED (COMPLETE — LIVE GENERATION) — Media Runtime Operational:**
 **Date:** 2026-04-09
 **Method:** `validate-media-generation.js` → webhook wrapper → `build-media-assets` (ID: krR10um8F1pT0miQ)

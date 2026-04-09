@@ -189,6 +189,29 @@
           "generation_needed": {
             "type": "boolean",
             "description": "Phase 11: Whether this shot should be generated (required=true or priority=high). false = prompt-only, skip generation."
+          },
+          "generation_mode": {
+            "type": ["string", "null"],
+            "enum": ["reuse", "grounded_generate", "generate", null],
+            "description": "Phase 12: How this asset should be produced. reuse = use source image as-is, grounded_generate = generate using visual grounding, generate = text-only generation."
+          },
+          "grounding_source_type": {
+            "type": ["string", "null"],
+            "description": "Phase 12: Source of grounding data (e.g. 'shopify_product_image'). null when ungrounded."
+          },
+          "grounded_from_image": {
+            "type": ["string", "null"],
+            "description": "Phase 12: URL of the source image used for visual grounding. null when ungrounded."
+          },
+          "grounding_confidence": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Phase 12: Confidence score of the grounding analysis (0-1). null when ungrounded."
+          },
+          "product_faithfulness_required": {
+            "type": "boolean",
+            "description": "Phase 12: Whether this asset must faithfully represent the actual product appearance."
           }
         }
       }
