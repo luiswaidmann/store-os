@@ -8,7 +8,9 @@ A run is `GOLD_PATH_COMPLETE` only when:
 - All analysis and strategy phases succeed
 - Shopify catalog, pages, and navigation are written
 - Media assets are generated (DALL-E-3, real images)
-- Theme is written to the persistent draft theme
+- Theme sections AND `templates/index.json` are written to the persistent draft theme
+- Homepage is correctly assembled: sections wired in order, settings pre-populated
+- CTA links use proper Shopify paths (`/collections/handle`, `/pages/handle`)
 - Section→media and product→media mappings are confirmed
 
 ```
@@ -122,10 +124,76 @@ The terminal node returns all artifacts plus:
     "status": "PHASE_7B3_COMPLETE",
     "theme_id": "194584281428",
     "sections_written": 4,
-    "assets_written": 3
+    "assets_written": 3,
+    "templates_written": 1,
+    "written_files": [
+      "sections/store-os-hero.liquid",
+      "sections/store-os-value-prop.liquid",
+      "sections/store-os-featured-collection.liquid",
+      "sections/store-os-trust-social-proof.liquid",
+      "assets/store-os-logo-placeholder.svg",
+      "assets/store-os-favicon-placeholder.svg",
+      "assets/store-os-hero-placeholder.svg",
+      "templates/index.json"
+    ]
   }
 }
 ```
+
+## Storefront Assembly Model
+
+`build-shopify-theme` (Phase 7B.3) writes three categories of files to the draft theme:
+
+### 1. Section Liquid Files (`sections/store-os-*.liquid`)
+Each section is a complete Shopify OS 2.0 section with:
+- HTML template using `{{ section.settings.* }}` variables
+- Inline `{% schema %}` block with configurable settings and defaults
+- Presets for theme editor discovery (add sections via editor)
+- Block support for value-prop columns and trust signals
+
+### 2. Homepage Template (`templates/index.json`)
+This is the **critical wiring step**. Without it, sections exist but never appear on any page.
+- References each section by type (`store-os-hero`, `store-os-featured-collection`, etc.)
+- Pre-populates settings from theme_rules + blueprint hints
+- Pre-populates blocks for value-prop and trust sections
+- Controls section order deterministically from `section_stack`
+- Binds generated media URLs where available
+
+### 3. Asset Placeholders (`assets/store-os-*.svg`)
+SVG placeholders for logo, favicon, and hero image (replaced by real assets in editor).
+
+### Section Stack (determined by store pattern)
+7 patterns × 4 section types → deterministic homepage layout:
+- **hero** — background image, headline, CTA (always first)
+- **featured-collection** — product grid from Shopify collection
+- **value-prop** — column layout with configurable block count
+- **trust-social-proof** — trust signals (evidence-led, social-proof-led, etc.)
+
+### CTA Link Resolution
+All CTA targets are resolved to proper Shopify paths:
+- `collection-handle` → `/collections/collection-handle`
+- `about` → `/pages/about`
+- Already-prefixed paths (`/collections/...`, `http://...`) pass through unchanged
+
+### Image Model Architecture
+- **Generation:** DALL-E-3 (OpenAI) — photorealistic product images
+- **Grounding:** Gemini 2.0 Flash (Google) — vision analysis of existing Shopify product images
+- This is intentional dual-model architecture: Gemini understands, DALL-E generates
+- Sequential pipeline: grounding → generation prompts → DALL-E renders
+
+### What Shopify Renders
+After a successful gold path run, the draft theme preview shows:
+- **Homepage:** Hero section with CTA → featured collection grid → value prop columns → trust signals
+- **Collection pages:** Default Dawn template (not yet customized)
+- **Product pages:** Default Dawn template (not yet customized)
+- **Navigation:** Main menu + footer menu with valid Shopify paths
+- **Pages:** About, FAQ, etc. created with content (unpublished)
+
+### What Remains on Dawn Defaults
+- Collection/product/page templates (`templates/collection.json`, etc.)
+- Layout file (`layout/theme.liquid`)
+- CSS/JS assets (sections use inline styles)
+- `config/settings_data.json` (global theme settings)
 
 ## Theme Target
 
@@ -157,11 +225,19 @@ node scripts/poll-execution.js <execution_id>
 node scripts/inspect-run.js --latest
 ```
 
-## Validated Run
+## Validated Runs
+
+**Execution 14854 — 2026-04-09 — GOLD_PATH_PARTIAL (storefront assembly validated)**
+- Theme deployment: PHASE_7B3_COMPLETE — 4 sections + 3 assets + templates/index.json, 0 errors
+- Homepage template wired to 4 sections in deterministic order from theme_rules
+- CTA links resolved to proper Shopify paths
+- Section settings pre-populated, blocks pre-populated for value-prop and trust
+- Media: 8/15 generated (1 DALL-E intermittent failure), 6 skipped
+- Runtime: ~128s
 
 **Execution 14820 — 2026-04-09 — GOLD_PATH_COMPLETE**
 - 3 products × 5 shots = 15 media assets planned
 - 9 images generated (DALL-E-3), 0 failed, 6 skipped (low-priority optional)
 - 4 homepage sections mapped: hero, featured-collection, value-prop, trust-social-proof
-- Theme: 4 sections + 3 assets written to theme 194584281428
+- Theme: 4 sections + 3 assets written to theme 194584281428 (pre-storefront-assembly)
 - Runtime: ~126s (17 subworkflow calls, 7 LLM calls, 9 DALL-E calls, 3 Shopify write phases)

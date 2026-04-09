@@ -27,6 +27,20 @@ Recent runtime progression merges (on `main`):
 
 ## Last confirmed end-to-end smoke test
 
+**GOLD_PATH_PARTIAL — Storefront Assembly Validated (Execution 14854):**
+**Date:** 2026-04-09
+**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async)
+**Terminal status:** `GOLD_PATH_PARTIAL` — theme fully complete, media partial (1 DALL-E image failed)
+**Chain:** intake → analysis (7 LLM phases) → Shopify writes → theme-rules → grounding → media (8 DALL-E-3 images) → theme + storefront assembly
+**Theme deployment:** PHASE_7B3_COMPLETE — 4 sections + 3 assets + 1 template written to theme 194584281428, 0 errors
+**Storefront assembly:** `templates/index.json` written — homepage wired to 4 store-os sections in order
+**Written files:** hero.liquid, value-prop.liquid, featured-collection.liquid, trust-social-proof.liquid, 3 SVG assets, templates/index.json
+**CTA links:** Resolved to proper Shopify paths (/collections/handle, /pages/handle)
+**Section settings:** Pre-populated from theme_rules (pattern: technical-b2b-specialist)
+**Blocks:** Value-prop columns and trust signals pre-populated with placeholder content
+**Media generation:** PHASE_9_PARTIAL — 8/15 generated, 1 failed (DALL-E intermittent), 6 skipped (optional)
+**Runtime:** ~128s (n8n Cloud)
+
 **GOLD_PATH_COMPLETE — Full End-to-End Validated (Execution 14820):**
 **Date:** 2026-04-09
 **Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async)
@@ -49,8 +63,9 @@ Recent runtime progression merges (on `main`):
 **Persisted in:** `test-data/golden-input.json` (STORE_OS_SHOPIFY_THEME_ID), `workflows/n8n/workflow-ids.json` (persistent_theme)
 **Write test 1:** 4 sections + 3 assets → PHASE_7B3_COMPLETE (hero, value-prop, featured-collection, trust-social-proof)
 **Write test 2 (reuse check):** Same theme_id `194584281428` targeted, no new theme created
+**Write test 3 (storefront assembly):** 4 sections + 3 assets + `templates/index.json` → PHASE_7B3_COMPLETE, homepage wired to 4 sections
 **Safety:** Explicit shopify_theme_id always wins. Active production theme NOT modified.
-**Files written to theme:** `sections/store-os-hero.liquid`, `sections/store-os-value-prop.liquid`, `sections/store-os-featured-collection.liquid`, `sections/store-os-trust-social-proof.liquid`, `assets/store-os-logo-placeholder.svg`, `assets/store-os-hero-placeholder.svg`, `assets/store-os-favicon-placeholder.svg`
+**Files written to theme:** `sections/store-os-hero.liquid`, `sections/store-os-value-prop.liquid`, `sections/store-os-featured-collection.liquid`, `sections/store-os-trust-social-proof.liquid`, `assets/store-os-logo-placeholder.svg`, `assets/store-os-hero-placeholder.svg`, `assets/store-os-favicon-placeholder.svg`, `templates/index.json`
 
 **Phase 12 CONFIRMED (COMPLETE) — Image Grounding Layer:**
 **Date:** 2026-04-09
@@ -272,7 +287,7 @@ The chain currently returns these runtime artifacts inline in cloud mode:
 - `media_generation` (Phase 9 — DALL-E-3 generation results)
 - `section_media_map` (section→media asset mapping)
 - `product_media_map` (product→media asset mapping)
-- `shopify_theme_deployment` (Phase 7B.3)
+- `shopify_theme_deployment` (Phase 7B.3 — includes templates_written, written_files)
 
 ## Runtime Hardening (Phase 16)
 
