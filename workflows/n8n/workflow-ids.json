@@ -51,7 +51,8 @@
     "REPLACE_WITH_BUILD_SHOPIFY_PAGES_NAVIGATION_WORKFLOW_ID":    "build-shopify-pages-navigation",
     "REPLACE_WITH_BUILD_THEME_RULES_WORKFLOW_ID":                "build-theme-rules",
     "REPLACE_WITH_BUILD_SHOPIFY_THEME_WORKFLOW_ID":              "build-shopify-theme",
-    "REPLACE_WITH_BUILD_MEDIA_ASSETS_WORKFLOW_ID":               "build-media-assets"
+    "REPLACE_WITH_BUILD_MEDIA_ASSETS_WORKFLOW_ID":               "build-media-assets",
+    "REPLACE_WITH_BUILD_IMAGE_GROUNDING_WORKFLOW_ID":            "build-image-grounding"
   },
   "credential_placeholders": {
     "_note": "Credential IDs are instance-specific and must be set manually in n8n. These placeholders appear in subworkflow JSON files and require the numeric credential ID from n8n Settings > Credentials (visible in the URL when editing a credential).",

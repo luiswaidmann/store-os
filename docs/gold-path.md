@@ -2,7 +2,14 @@
 
 ## What is the Gold Path?
 
-The gold path is the single official end-to-end execution chain in store-os. It takes a minimal input payload, runs 15 sequential subworkflow calls through the orchestrator, and produces a fully configured Shopify store with products, pages, navigation, and theme sections written to a persistent draft theme.
+The gold path is the single official end-to-end execution chain in store-os. It takes a minimal input payload, runs 17 sequential subworkflow calls through the orchestrator, and produces a fully configured Shopify store with products, pages, navigation, generated media, and theme sections written to a persistent draft theme.
+
+A run is `GOLD_PATH_COMPLETE` only when:
+- All analysis and strategy phases succeed
+- Shopify catalog, pages, and navigation are written
+- Media assets are generated (DALL-E-3, real images)
+- Theme is written to the persistent draft theme
+- Section→media and product→media mappings are confirmed
 
 ```
 INPUT (golden-input.json)
@@ -28,11 +35,21 @@ orchestrate-phase1 (webhook or manual trigger)
   ├─ 12. build-shopify-catalog      → shopify_catalog_deployment    (Phase 7B.1, Shopify writes)
   ├─ 13. build-shopify-pages-nav    → shopify_pages_nav_deployment  (Phase 7B.2, Shopify writes)
   ├─ 14. build-theme-rules          → theme_rules             (Phase 10, deterministic)
-  ├─ 15. build-shopify-theme        → shopify_theme_deployment      (Phase 7B.3, Shopify writes)
+  ├─ 15. build-image-grounding      → image_grounding         (Phase 12, conditional on images)
+  ├─ 16. build-media-assets         → media_generation        (Phase 9, DALL-E-3)
+  ├─ 17. build-shopify-theme        → shopify_theme_deployment      (Phase 7B.3, Shopify writes)
   │
   ▼
-PHASE_7B3_COMPLETE (all 13 artifacts returned inline)
+GOLD_PATH_COMPLETE (all artifacts + media + mappings returned inline)
 ```
+
+## Terminal Status
+
+| Status | Meaning |
+|--------|---------|
+| `GOLD_PATH_COMPLETE` | Theme + media both fully succeeded |
+| `GOLD_PATH_PARTIAL` | Theme or media had partial results (explicitly surfaced) |
+| `PHASE_7B3_*` | Theme-specific status (DRY_RUN, BLOCKED, etc.) |
 
 ## Workflow IDs
 
@@ -55,27 +72,60 @@ All IDs are canonical and tracked in `workflows/n8n/workflow-ids.json`.
 | 12 | build-shopify-catalog | `oZE0Z9fb4ojnKiDd` | executeWorkflowTrigger |
 | 13 | build-shopify-pages-navigation | `LADq8PuMRuswIxJa` | executeWorkflowTrigger |
 | 14 | build-theme-rules | `KzFBogj7kusXQqlp` | executeWorkflowTrigger |
-| 15 | build-shopify-theme | `QG5ezHb3qKjKcvvn` | executeWorkflowTrigger |
+| 15 | build-image-grounding | `s5aWmVZcerBgc6kM` | executeWorkflowTrigger |
+| 16 | build-media-assets | `krR10um8F1pT0miQ` | executeWorkflowTrigger |
+| 17 | build-shopify-theme | `QG5ezHb3qKjKcvvn` | executeWorkflowTrigger |
 
-### Standalone (not yet in orchestrator chain)
+### Not on gold path
 
-| Workflow | n8n ID | Purpose |
-|---------|--------|---------|
-| build-media-assets | `krR10um8F1pT0miQ` | Phase 9 — image generation (DALL-E-3) |
-| build-image-grounding | `s5aWmVZcerBgc6kM` | Phase 12 — Gemini Vision grounding |
-| resolve-runtime-config | `pKr1kcFlwSqFMkGm` | Legacy standalone (config is inline in orchestrator) |
+| Workflow | n8n ID | Status |
+|---------|--------|--------|
+| resolve-runtime-config | `eTYCcPaj66bFYeXL` | Legacy standalone (config is inline in orchestrator) |
 
-## Failure Semantics
+## Failure Semantics (Hardened)
 
 | Phase | Success Criteria | On Failure |
 |-------|-----------------|------------|
 | 1–7A (steps 1–11) | `status == "SUCCESS"` | Chain halts, throws error |
-| 7B.1 (step 12) | `status != "PHASE_7B1_FAILED"` | PARTIAL proceeds forward |
-| 7B.2 (step 13) | `status != "PHASE_7B2_FAILED"` | PARTIAL proceeds forward |
+| 7B.1 (step 12) | `status == COMPLETE \|\| PARTIAL` | FAILED halts chain |
+| 7B.2 (step 13) | `status == COMPLETE \|\| PARTIAL` | FAILED halts chain |
 | 10 (step 14) | `continueOnFail: true` | Chain continues, theme falls back to blueprint sections |
-| 7B.3 (step 15) | `status != "PHASE_7B3_FAILED"` | DRY_RUN/BLOCKED/PARTIAL proceed forward |
+| 12 (step 15) | Conditional bypass | Skipped when no product images; errors caught by normalize node |
+| 9 (step 16) | `status == COMPLETE \|\| PARTIAL` | PROMPTS_ONLY and FAILED halt chain |
+| 7B.3 (step 17) | `status == COMPLETE \|\| PARTIAL` | DRY_RUN/BLOCKED/FAILED halt chain |
 
-**Known risk:** Phases 7B.1–7B.3 use `!= FAILED` instead of `== COMPLETE`. This means PARTIAL deployments are treated as success by the orchestrator. The caller must inspect `shopify_*_deployment.status` for actual deployment results.
+## Output Structure
+
+The terminal node returns all artifacts plus:
+
+```json
+{
+  "status": "GOLD_PATH_COMPLETE",
+  "media_generation": {
+    "status": "PHASE_9_COMPLETE",
+    "mode": "full_generation",
+    "images_generated": 9,
+    "images_failed": 0,
+    "images_skipped": 6,
+    "total_assets": 15
+  },
+  "section_media_map": {
+    "hero": [{ "asset_id": "...", "shot_type": "hero_wide", "status": "generated" }],
+    "featured-collection": [{ "asset_id": "...", "shot_type": "studio_packshot", "status": "generated" }],
+    "value-prop": [{ "asset_id": "...", "shot_type": "clean_feature", "status": "generated" }],
+    "trust-social-proof": [{ "asset_id": "...", "shot_type": "detail_closeup", "status": "prompt_only" }]
+  },
+  "product_media_map": {
+    "product-handle": [{ "asset_id": "...", "shot_type": "hero_wide", "status": "generated" }]
+  },
+  "shopify_theme_deployment": {
+    "status": "PHASE_7B3_COMPLETE",
+    "theme_id": "194584281428",
+    "sections_written": 4,
+    "assets_written": 3
+  }
+}
+```
 
 ## Theme Target
 
@@ -107,17 +157,11 @@ node scripts/poll-execution.js <execution_id>
 node scripts/inspect-run.js --latest
 ```
 
-## Shopify API Configuration
+## Validated Run
 
-- **API version:** `2026-01`
-- **Credential:** `shopifyOAuth2Api` — `CO1JGlTR5RJ9Cs6x`
-- **Shop:** `8zw111-cj.myshopify.com`
-- **Propagation:** `runtime_config.shopify_shop_url` and `runtime_config.shopify_api_version` (no `$env` dependencies)
-
-## What is NOT on the Gold Path
-
-- `resolve-runtime-config` standalone workflow (legacy — config is inline in orchestrator)
-- `build-media-assets` (Phase 9 — validated standalone, not yet in orchestrator)
-- `build-image-grounding` (Phase 12 — validated standalone, not yet in orchestrator)
-- Any `_test-*` or `ST-*` workflows (archived or legacy)
-- `validate-*.js` scripts (dev utilities, not production orchestration)
+**Execution 14820 — 2026-04-09 — GOLD_PATH_COMPLETE**
+- 3 products × 5 shots = 15 media assets planned
+- 9 images generated (DALL-E-3), 0 failed, 6 skipped (low-priority optional)
+- 4 homepage sections mapped: hero, featured-collection, value-prop, trust-social-proof
+- Theme: 4 sections + 3 assets written to theme 194584281428
+- Runtime: ~126s (17 subworkflow calls, 7 LLM calls, 9 DALL-E calls, 3 Shopify write phases)

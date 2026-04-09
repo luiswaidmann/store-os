@@ -929,16 +929,25 @@
           },
           "conditions": [
             {
-              "id": "7b1aorch-cond-07b1-07b1-000000000001",
+              "id": "7b1-hard-0001",
               "leftValue": "={{ $json.status }}",
-              "rightValue": "PHASE_7B1_FAILED",
+              "rightValue": "PHASE_7B1_COMPLETE",
               "operator": {
                 "type": "string",
-                "operation": "notEquals"
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "7b1-hard-0002",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "PHASE_7B1_PARTIAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
               }
             }
           ],
-          "combinator": "and"
+          "combinator": "or"
         },
         "options": {}
       },
@@ -1014,16 +1023,25 @@
           },
           "conditions": [
             {
-              "id": "7b2aorch-cond-07b2-07b2-000000000001",
+              "id": "7b2-hard-0001",
               "leftValue": "={{ $json.status }}",
-              "rightValue": "PHASE_7B2_FAILED",
+              "rightValue": "PHASE_7B2_COMPLETE",
               "operator": {
                 "type": "string",
-                "operation": "notEquals"
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "7b2-hard-0002",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "PHASE_7B2_PARTIAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
               }
             }
           ],
-          "combinator": "and"
+          "combinator": "or"
         },
         "options": {}
       },
@@ -1092,14 +1110,14 @@
     },
     {
       "parameters": {
-        "jsCode": "// orchestrate-phase1 — Prepare Theme Input\n// Assembles Phase 7B.3 input from Phase 7B.2 Complete output.\n// Passes store_blueprint + runtime_config + theme_rules to build-shopify-theme.\n// Phase 10: theme_rules from build-theme-rules is included when available.\n// If build-theme-rules failed (continueOnFail), theme_rules is omitted gracefully.\n\nconst phase7b2Out  = $('Phase 7B.2 Complete').first().json;\nconst themeRulesOut = $input.first().json;  // output from Run build-theme-rules\n\n// Extract theme_rules if build-theme-rules succeeded\nconst themeRules = (themeRulesOut && themeRulesOut.theme_rules && themeRulesOut.theme_rules.status === 'PHASE_10_COMPLETE')\n  ? themeRulesOut.theme_rules\n  : null;\n\nif (themeRules) {\n  console.log('Prepare Theme Input: theme_rules present — pattern=' + themeRules.store_pattern);\n} else {\n  console.log('Prepare Theme Input: no theme_rules — build-shopify-theme will use blueprint sections');\n}\n\nconst output = {\n  project_id:       phase7b2Out.project_id,\n  runtime_config:   phase7b2Out.runtime_config,\n  store_blueprint:  phase7b2Out.store_blueprint,\n  content_strategy: phase7b2Out.content_strategy,\n  theme_rules:      themeRules,\n};\n\nif (!output.store_blueprint) {\n  throw new Error('Prepare Theme Input: store_blueprint missing from Phase 7B.2 Complete output.');\n}\nif (!output.runtime_config) {\n  throw new Error('Prepare Theme Input: runtime_config missing from Phase 7B.2 Complete output.');\n}\n\nconsole.log('Prepare Theme Input: assembled for project=' + output.project_id);\nreturn [{ json: output }];\n"
+        "jsCode": "// orchestrate-phase1 — Prepare Theme Input\n// Assembles Phase 7B.3 input from upstream artifacts.\n// Now includes theme_rules (Phase 10) and media_assets (Phase 9).\n\nconst phase7b2Out   = $('Phase 7B.2 Complete').first().json;\nconst themeRulesOut = $('Run build-theme-rules').first().json;\nconst mediaOut      = $('Run build-media-assets').first().json;\n\n// Extract theme_rules if build-theme-rules succeeded\nconst themeRules = (themeRulesOut && themeRulesOut.theme_rules && themeRulesOut.theme_rules.status === 'PHASE_10_COMPLETE')\n  ? themeRulesOut.theme_rules\n  : null;\n\nif (themeRules) {\n  console.log('Prepare Theme Input: theme_rules present — pattern=' + themeRules.store_pattern);\n} else {\n  console.log('Prepare Theme Input: no theme_rules — build-shopify-theme will use blueprint sections');\n}\n\n// Extract media_assets for theme asset binding\nconst mediaAssets = (mediaOut && (mediaOut.status === 'PHASE_9_COMPLETE' || mediaOut.status === 'PHASE_9_PARTIAL'))\n  ? mediaOut.media_assets\n  : [];\n\nconsole.log('Prepare Theme Input: ' + mediaAssets.length + ' media assets available for theme binding');\n\nconst output = {\n  project_id:       phase7b2Out.project_id,\n  runtime_config:   phase7b2Out.runtime_config,\n  store_blueprint:  phase7b2Out.store_blueprint,\n  content_strategy: phase7b2Out.content_strategy,\n  theme_rules:      themeRules,\n  media_assets:     mediaAssets,\n};\n\nif (!output.store_blueprint) {\n  throw new Error('Prepare Theme Input: store_blueprint missing from Phase 7B.2 Complete output.');\n}\nif (!output.runtime_config) {\n  throw new Error('Prepare Theme Input: runtime_config missing from Phase 7B.2 Complete output.');\n}\n\nconsole.log('Prepare Theme Input: assembled for project=' + output.project_id);\nreturn [{ json: output }];"
       },
       "id": "7b3-bridge-0001",
       "name": "Prepare Theme Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        12750,
+        14250,
         180
       ]
     },
@@ -1113,7 +1131,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1,
       "position": [
-        13000,
+        14500,
         180
       ]
     },
@@ -1127,16 +1145,25 @@
           },
           "conditions": [
             {
-              "id": "7b3-bridge-cond-0001",
+              "id": "7b3-hard-0001",
               "leftValue": "={{ $json.status }}",
-              "rightValue": "PHASE_7B3_FAILED",
+              "rightValue": "PHASE_7B3_COMPLETE",
               "operator": {
                 "type": "string",
-                "operation": "notEquals"
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "7b3-hard-0002",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "PHASE_7B3_PARTIAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
               }
             }
           ],
-          "combinator": "and"
+          "combinator": "or"
         },
         "options": {}
       },
@@ -1145,20 +1172,20 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        13250,
+        14750,
         180
       ]
     },
     {
       "parameters": {
-        "jsCode": "// orchestrate-phase1 — Phase 7B.3 Complete\n// Terminal node for the full Phase 1–7B.3 chain.\n// Returns all 12 artifacts inline. Top-level status reflects theme deployment result.\n\nconst phase7b2Out = $('Phase 7B.2 Complete').first().json;\nconst themeOut    = $('Run build-shopify-theme').first().json;\n\n// Determine top-level status from theme deployment\nconst themeStatus = themeOut.status || 'PHASE_7B3_FAILED';\nlet topStatus;\nif (themeStatus === 'PHASE_7B3_COMPLETE') topStatus = 'PHASE_7B3_COMPLETE';\nelse if (themeStatus === 'PHASE_7B3_PARTIAL') topStatus = 'PHASE_7B3_PARTIAL';\nelse if (themeStatus === 'PHASE_7B3_DRY_RUN') topStatus = 'PHASE_7B3_DRY_RUN';\nelse if (themeStatus === 'PHASE_7B3_BLOCKED') topStatus = 'PHASE_7B3_BLOCKED';\nelse topStatus = 'PHASE_7B3_FAILED';\n\nconst summary = {\n  ...phase7b2Out,\n  status: topStatus,\n  next_phase: 'Phase 7B.4 — Store Build (theme publish)',\n\n  shopify_theme_deployment: {\n    status:           themeOut.status,\n    theme_id:         themeOut.theme_id,\n    theme_name:       themeOut.theme_name,\n    sections_written: themeOut.sections_written,\n    assets_written:   themeOut.assets_written,\n    dry_run:          themeOut.dry_run,\n    dry_run_plan:     themeOut.dry_run_plan || undefined,\n    errors:           themeOut.errors,\n    warnings:         themeOut.warnings,\n    shop_url:         themeOut.shop_url,\n    blueprint_summary: themeOut.blueprint_summary,\n    safety_notes:     themeOut.safety_notes,\n  },\n};\n\nreturn [{ json: summary }];\n"
+        "jsCode": "// orchestrate-phase1 — Phase 7B.3 Complete (TERMINAL)\n// Returns all artifacts inline. Includes media generation + section→media mapping.\n// Success requires: theme written + media generated + mappings confirmed.\n\nconst phase7b2Out = $('Phase 7B.2 Complete').first().json;\nconst themeOut    = $('Run build-shopify-theme').first().json;\nconst mediaOut    = $('Run build-media-assets').first().json;\nlet groundOut = null;\ntry { groundOut = $('Run build-image-grounding').first().json; } catch (_e) { /* grounding was bypassed — no images */ }\nconst themeRulesOut = $('Run build-theme-rules').first().json;\n\n// ── Determine top-level status ──\nconst themeStatus = themeOut.status || 'PHASE_7B3_FAILED';\nconst mediaStatus = mediaOut.status || 'PHASE_9_FAILED';\n\nlet topStatus;\nif (themeStatus === 'PHASE_7B3_COMPLETE' && mediaStatus === 'PHASE_9_COMPLETE') {\n  topStatus = 'GOLD_PATH_COMPLETE';\n} else if (themeStatus === 'PHASE_7B3_COMPLETE' && mediaStatus === 'PHASE_9_PARTIAL') {\n  topStatus = 'GOLD_PATH_PARTIAL';\n} else if (themeStatus === 'PHASE_7B3_PARTIAL' || mediaStatus === 'PHASE_9_PARTIAL') {\n  topStatus = 'GOLD_PATH_PARTIAL';\n} else {\n  topStatus = themeStatus;  // DRY_RUN, BLOCKED, etc.\n}\n\n// ── Build section → media mapping ──\nconst mediaAssets = mediaOut.media_assets || [];\nconst sectionMediaMap = {};\nfor (const asset of mediaAssets) {\n  const section = asset.source_section || 'unassigned';\n  if (!sectionMediaMap[section]) sectionMediaMap[section] = [];\n  sectionMediaMap[section].push({\n    asset_id:         asset.asset_id,\n    shot_type:        asset.shot_type,\n    product_handle:   asset.product_handle,\n    status:           asset.status,\n    generation_mode:  asset.generation_mode,\n    grounding_confidence: asset.grounding_confidence,\n    url:              asset.url || null,\n    local_path:       asset.local_path || null,\n  });\n}\n\n// ── Build product → media mapping ──\nconst productMediaMap = {};\nfor (const asset of mediaAssets) {\n  const handle = asset.product_handle;\n  if (!productMediaMap[handle]) productMediaMap[handle] = [];\n  productMediaMap[handle].push({\n    asset_id:   asset.asset_id,\n    shot_type:  asset.shot_type,\n    status:     asset.status,\n    url:        asset.url || null,\n  });\n}\n\n// ── Extract theme_rules ──\nconst themeRules = (themeRulesOut && themeRulesOut.theme_rules && themeRulesOut.theme_rules.status === 'PHASE_10_COMPLETE')\n  ? themeRulesOut.theme_rules\n  : null;\n\n// ── Extract image_grounding summary ──\nconst groundingSummary = (groundOut && groundOut.status)\n  ? {\n      status: groundOut.status,\n      products_analyzed: groundOut.products_analyzed || 0,\n      grounding_model: groundOut.grounding_model || null,\n    }\n  : null;\n\n// ── Assemble final output ──\nconst summary = {\n  ...phase7b2Out,\n  status: topStatus,\n\n  // Phase 10 — Theme Rules\n  theme_rules: themeRules,\n\n  // Phase 12 — Image Grounding\n  image_grounding_summary: groundingSummary,\n\n  // Phase 9 — Media Generation\n  media_generation: {\n    status:             mediaOut.status,\n    mode:               (mediaOut.generation_summary || {}).mode,\n    images_generated:   (mediaOut.generation_summary || {}).images_generated || 0,\n    images_failed:      (mediaOut.generation_summary || {}).images_failed || 0,\n    images_skipped:     (mediaOut.generation_summary || {}).images_skipped || 0,\n    prompts_generated:  (mediaOut.generation_summary || {}).prompts_generated || 0,\n    total_assets:       mediaAssets.length,\n    assets_by_status:   mediaAssets.reduce((acc, a) => { acc[a.status] = (acc[a.status] || 0) + 1; return acc; }, {}),\n  },\n\n  // Visible output mappings\n  section_media_map:  sectionMediaMap,\n  product_media_map:  productMediaMap,\n\n  // Phase 7B.3 — Theme Deployment\n  shopify_theme_deployment: {\n    status:           themeOut.status,\n    theme_id:         themeOut.theme_id,\n    theme_name:       themeOut.theme_name,\n    sections_written: themeOut.sections_written,\n    assets_written:   themeOut.assets_written,\n    dry_run:          themeOut.dry_run,\n    dry_run_plan:     themeOut.dry_run_plan || undefined,\n    errors:           themeOut.errors,\n    warnings:         themeOut.warnings,\n    shop_url:         themeOut.shop_url,\n    safety_notes:     themeOut.safety_notes,\n  },\n};\n\nreturn [{ json: summary }];"
       },
       "id": "7b3-bridge-0004",
       "name": "Phase 7B.3 Complete",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        13500,
+        15000,
         60
       ]
     },
@@ -1171,8 +1198,172 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        13500,
+        15000,
         300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Prepare Image Grounding Input (Phase 12)\n// Assembles input for build-image-grounding from upstream artifacts.\n// Adds has_images flag for conditional routing.\n\nconst phase7b2Out = $('Phase 7B.2 Complete').first().json;\nconst importOut   = $('Run import-shopify-data').first().json;\n\n// Get product image URLs from Shopify import (real CDN images)\nconst shopifyImport = importOut.shopify_import || importOut;\nconst rawProducts = shopifyImport.raw_products || shopifyImport.products || [];\n\n// Map product handles to their images from Shopify\nconst productImages = {};\nfor (const p of rawProducts) {\n  const handle = p.handle;\n  if (handle && p.images && p.images.length > 0) {\n    productImages[handle] = p.images;\n  }\n}\n\n// Merge image URLs into store_blueprint products\nconst products = (phase7b2Out.store_blueprint.products || []).map(bp => {\n  const shopifyImages = productImages[bp.handle] || [];\n  return {\n    ...bp,\n    images: shopifyImages.length > 0\n      ? shopifyImages.map(img => ({ src: img.src, alt: img.alt || bp.title }))\n      : (bp.images || []),\n  };\n});\n\nconst productsWithImages = products.filter(p => p.images && p.images.length > 0);\nconst hasImages = productsWithImages.length > 0;\n\nconsole.log('Prepare Image Grounding Input: ' + productsWithImages.length + '/' + products.length + ' products have images. has_images=' + hasImages);\n\nreturn [{\n  json: {\n    has_images:      hasImages,\n    project_id:      phase7b2Out.project_id,\n    runtime_config:  phase7b2Out.runtime_config,\n    store_blueprint: { ...phase7b2Out.store_blueprint, products },\n  },\n}];"
+      },
+      "id": "p12-orch-0001",
+      "name": "Prepare Image Grounding Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        12750,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_BUILD_IMAGE_GROUNDING_WORKFLOW_ID",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "p12-orch-0002",
+      "name": "Run build-image-grounding",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        13000,
+        180
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Prepare Media Assets Input (Phase 9)\n// Assembles input for build-media-assets from all upstream artifacts.\n// Receives input from EITHER:\n//   1. Normalize Grounding Result (when products had images)\n//   2. Has Images To Ground? false branch (when no images available)\n\nconst phase7b2Out    = $('Phase 7B.2 Complete').first().json;\nconst themeRulesOut  = $('Run build-theme-rules').first().json;\n\n// Get grounding data from input (may come from either path)\nconst inputData = $input.first().json;\n\n// Extract theme_rules if build-theme-rules succeeded\nconst themeRules = (themeRulesOut && themeRulesOut.theme_rules && themeRulesOut.theme_rules.status === 'PHASE_10_COMPLETE')\n  ? themeRulesOut.theme_rules\n  : null;\n\n// Extract image_grounding — either from grounding workflow or null\nlet imageGrounding = null;\nif (inputData && inputData.status &&\n    (inputData.status === 'PHASE_12_COMPLETE' || inputData.status === 'PHASE_12_PARTIAL')) {\n  imageGrounding = inputData;\n}\n\nif (themeRules) {\n  console.log('Prepare Media Assets Input: theme_rules present — pattern=' + themeRules.store_pattern);\n} else {\n  console.log('Prepare Media Assets Input: no theme_rules — will use 5-shot fallback');\n}\n\nif (imageGrounding) {\n  console.log('Prepare Media Assets Input: image_grounding present — ' + (imageGrounding.products_analyzed || 0) + ' products analyzed');\n} else {\n  console.log('Prepare Media Assets Input: no image_grounding — will use text-only prompts');\n}\n\nreturn [{\n  json: {\n    project_id:        phase7b2Out.project_id,\n    runtime_config:    phase7b2Out.runtime_config,\n    store_profile:     phase7b2Out.store_profile,\n    brand_positioning: phase7b2Out.brand_positioning,\n    store_blueprint:   phase7b2Out.store_blueprint,\n    content_strategy:  phase7b2Out.content_strategy,\n    theme_rules:       themeRules,\n    image_grounding:   imageGrounding,\n  },\n}];"
+      },
+      "id": "p9-orch-0001",
+      "name": "Prepare Media Assets Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        13250,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_BUILD_MEDIA_ASSETS_WORKFLOW_ID",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "p9-orch-0002",
+      "name": "Run build-media-assets",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        13500,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "p9-orch-cond-0001",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "PHASE_9_COMPLETE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "p9-orch-cond-0002",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "PHASE_9_PARTIAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "p9-orch-0003",
+      "name": "Media Assets Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        13750,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Halt: Media Assets Failed\n// Reached when build-media-assets does not return PHASE_9_COMPLETE or PHASE_9_PARTIAL.\n\nconst mediaOut = $('Run build-media-assets').first().json;\n\nthrow new Error(\n  'CHAIN_HALT: build-media-assets returned ' + (mediaOut.status || 'unknown') +\n  '. Expected PHASE_9_COMPLETE or PHASE_9_PARTIAL. ' +\n  'Errors: ' + JSON.stringify(mediaOut.errors || [])\n);"
+      },
+      "id": "p9-orch-0004",
+      "name": "Halt - Media Assets Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        14000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "p12-ground-cond-0001",
+              "leftValue": "={{ $json.has_images }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "p12-orch-0010",
+      "name": "Has Images To Ground?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        12875,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Normalize Grounding Result\n// Ensures the grounding step always produces exactly 1 item for downstream consumption.\n// If build-image-grounding returned data, pass it through.\n// If it returned nothing (0 items) or errored, produce a null placeholder.\n\nconst items = $input.all();\n\nif (items.length > 0 && items[0].json && items[0].json.status) {\n  // Grounding returned valid data\n  console.log('Normalize Grounding Result: grounding data present — status=' + items[0].json.status);\n  return items;\n}\n\n// Grounding returned nothing or errored — produce null placeholder\nconsole.log('Normalize Grounding Result: no grounding data — continuing with text-only prompts');\nconst prepInput = $('Prepare Image Grounding Input').first().json;\nreturn [{\n  json: {\n    status: null,\n    project_id: prepInput.project_id,\n    products_analyzed: 0,\n    grounding_model: null,\n    products: [],\n    _grounding_skipped: true,\n  },\n}];"
+      },
+      "id": "p12-orch-0011",
+      "name": "Normalize Grounding Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        13125,
+        60
       ]
     }
   ],
@@ -1877,7 +2068,7 @@
       "main": [
         [
           {
-            "node": "Prepare Theme Input",
+            "node": "Prepare Image Grounding Input",
             "type": "main",
             "index": 0
           }
@@ -1918,6 +2109,97 @@
         [
           {
             "node": "Halt - Shopify Theme Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Image Grounding Input": {
+      "main": [
+        [
+          {
+            "node": "Has Images To Ground?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run build-image-grounding": {
+      "main": [
+        [
+          {
+            "node": "Normalize Grounding Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Media Assets Input": {
+      "main": [
+        [
+          {
+            "node": "Run build-media-assets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run build-media-assets": {
+      "main": [
+        [
+          {
+            "node": "Media Assets Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Media Assets Success?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Theme Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Halt - Media Assets Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Images To Ground?": {
+      "main": [
+        [
+          {
+            "node": "Run build-image-grounding",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Media Assets Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Grounding Result": {
+      "main": [
+        [
+          {
+            "node": "Prepare Media Assets Input",
             "type": "main",
             "index": 0
           }

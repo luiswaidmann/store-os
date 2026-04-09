@@ -27,6 +27,18 @@ Recent runtime progression merges (on `main`):
 
 ## Last confirmed end-to-end smoke test
 
+**GOLD_PATH_COMPLETE — Full End-to-End Validated (Execution 14820):**
+**Date:** 2026-04-09
+**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async)
+**Terminal status:** `GOLD_PATH_COMPLETE` — all 17 subworkflow calls succeeded
+**Chain:** intake → analysis (7 LLM phases) → Shopify writes (catalog, pages, nav) → theme-rules → media (9 DALL-E-3 images) → theme write
+**Media generation:** PHASE_9_COMPLETE — 9/15 images generated (3 products × 3 required shots), 0 failed, 6 optional skipped
+**Section→media mapping:** hero(6 assets), featured-collection(3), value-prop(3), trust-social-proof(3)
+**Theme deployment:** PHASE_7B3_COMPLETE — 4 sections + 3 assets written to theme 194584281428
+**Grounding:** Bypassed (no product images in Shopify — LLM-generated catalog). Text-only generation mode used.
+**Hardened success criteria:** All Shopify phases now require == COMPLETE || == PARTIAL (was: != FAILED)
+**Runtime:** ~126s (n8n Cloud)
+
 **Persistent Draft Theme CONFIRMED — Theme System Locked:**
 **Date:** 2026-04-09
 **Theme ID:** `194584281428`
@@ -206,7 +218,7 @@ Previous confirmed test (Phase 5):
 
 ## Current confirmed executable chain (Gold Path)
 
-The full n8n orchestrator execution chain (15 subworkflow calls, sequential):
+The full n8n orchestrator execution chain (17 subworkflow calls, sequential):
 
 1. `resolve-runtime-config` (inline Code node — not a subworkflow)
 2. `intake-store-input` (Phase 1 — input normalization)
@@ -223,15 +235,20 @@ The full n8n orchestrator execution chain (15 subworkflow calls, sequential):
 13. `build-shopify-catalog` (Phase 7B.1 — Shopify REST writes)
 14. `build-shopify-pages-navigation` (Phase 7B.2 — Shopify REST + GraphQL writes)
 15. `build-theme-rules` (Phase 10 — deterministic, `continueOnFail: true`)
-16. `build-shopify-theme` (Phase 7B.3 — Shopify Theme API writes) ← **TERMINAL**
+16. `build-image-grounding` (Phase 12 — conditional: skipped when no product images)
+17. `build-media-assets` (Phase 9 — DALL-E-3 image generation)
+18. `build-shopify-theme` (Phase 7B.3 — Shopify Theme API writes) ← **TERMINAL**
 
-**Failure semantics:**
-- Phases 1–7A: `== SUCCESS` required, chain halts on failure
-- Phases 7B.1–7B.2: `!= FAILED` (allows PARTIAL to proceed)
-- Phase 10: `continueOnFail: true` (optional — theme falls back to blueprint sections)
-- Phase 7B.3: `!= FAILED` (allows DRY_RUN, BLOCKED, PARTIAL to proceed)
+**Failure semantics (hardened):**
+- Phases 1–7A (steps 1–12): `status == "SUCCESS"` required, chain halts on failure
+- Phase 7B.1 (step 13): `status == COMPLETE || == PARTIAL` required, FAILED halts chain
+- Phase 7B.2 (step 14): `status == COMPLETE || == PARTIAL` required, FAILED halts chain
+- Phase 10 (step 15): `continueOnFail: true` (optional — theme falls back to blueprint sections)
+- Phase 12 (step 16): Conditional bypass — skipped when no product images; errors caught by normalize node
+- Phase 9 (step 17): `status == COMPLETE || == PARTIAL` required, PROMPTS_ONLY and FAILED halt chain
+- Phase 7B.3 (step 18): `status == COMPLETE || == PARTIAL` required, DRY_RUN/BLOCKED/FAILED halt chain
 
-**Not yet in orchestrator chain:** `build-media-assets` (Phase 9), `build-image-grounding` (Phase 12). Both are validated standalone.
+**Terminal status:** `GOLD_PATH_COMPLETE` (theme + media both fully succeeded) or `GOLD_PATH_PARTIAL` (theme or media had partial results).
 
 **Async model:** Chains run ~130s+. The webhook returns HTTP 202 within ~2s with an `execution_id`. The CLI polls `GET /api/v1/executions/{id}` until `finished: true`. Cloudflare's 100s timeout is no longer hit. See `docs/async-execution-model.md`.
 
@@ -251,6 +268,10 @@ The chain currently returns these runtime artifacts inline in cloud mode:
 - `shopify_catalog_deployment` (Phase 7B.1)
 - `shopify_pages_navigation_deployment` (Phase 7B.2)
 - `theme_rules` (Phase 10 — when available)
+- `image_grounding` (Phase 12 — when products have images)
+- `media_generation` (Phase 9 — DALL-E-3 generation results)
+- `section_media_map` (section→media asset mapping)
+- `product_media_map` (product→media asset mapping)
 - `shopify_theme_deployment` (Phase 7B.3)
 
 ## Runtime Hardening (Phase 16)
