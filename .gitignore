@@ -12,6 +12,7 @@ tmp/
 coverage/
 *.zip
 
+outputs/media/
 outputs/previews/
 outputs/snapshots/
 projects/*/exports/shopify/
