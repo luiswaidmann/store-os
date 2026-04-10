@@ -200,7 +200,8 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
     return;
   }
 
-  const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
+  const TERMINAL = new Set(['GOLD_PATH_COMPLETE', 'GOLD_PATH_PARTIAL',
+                             'PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                              'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
                              'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
                              'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
@@ -373,7 +374,9 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
 
   console.log('');
   if (isSuccess) {
-    const chainDesc = d.status === 'PHASE_7B3_COMPLETE' ? 'Phase 1–7B.3 chain finished (catalog + pages + navigation + theme deployed).'
+    const chainDesc = d.status === 'GOLD_PATH_COMPLETE' ? 'Gold path complete — theme deployed + media generated. Full storefront ready.'
+      : d.status === 'GOLD_PATH_PARTIAL' ? 'Gold path complete with partial media results — theme fully deployed, some media assets failed (transient).'
+      : d.status === 'PHASE_7B3_COMPLETE' ? 'Phase 1–7B.3 chain finished (catalog + pages + navigation + theme deployed).'
       : d.status === 'PHASE_7B3_PARTIAL' ? 'Phase 1–7B.3 finished with partial theme deployment.'
       : d.status === 'PHASE_7B3_DRY_RUN' ? 'Phase 1–7B.3 finished (theme: dry run only — no writes performed).'
       : d.status === 'PHASE_7B3_BLOCKED' ? 'Phase 1–7B.3 finished (theme: BLOCKED — no safe target theme found).'
@@ -593,7 +596,8 @@ async function main() {
       } else {
         printSummary(finalResult, 200, durationMs, pollStartedAt);
       }
-      const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
+      const TERMINAL = new Set(['GOLD_PATH_COMPLETE', 'GOLD_PATH_PARTIAL',
+                                 'PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                                  'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
                                  'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
                                  'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
@@ -663,7 +667,8 @@ async function main() {
   const startData = typeof startResponse.data === 'object' ? startResponse.data : {};
 
   // Detect async response vs legacy synchronous response
-  const TERMINAL_STATUSES = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
+  const TERMINAL_STATUSES = new Set(['GOLD_PATH_COMPLETE', 'GOLD_PATH_PARTIAL',
+                                      'PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                                       'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
                                       'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
                                       'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
