@@ -3,7 +3,7 @@
     "description": "Golden path smoke-test input for the full Phase 1–7B.3 chain via webhook. Media generation is ON.",
     "usage": "node scripts/run-orchestrator.js --input test-data/golden-input.json",
     "project": "suppliedtech",
-    "last_verified": "2026-04-09"
+    "last_verified": "2026-04-10"
   },
   "intake_payload": {
     "project_id": "suppliedtech",
