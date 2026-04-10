@@ -1,0 +1,352 @@
+{
+  "status": "PHASE_9_COMPLETE",
+  "project_id": "media-gen-validation-1775667649681",
+  "completed_at": "2026-04-08T17:01:22.626Z",
+  "visual_system": {
+    "style": {
+      "background": "soft-gradient",
+      "lighting": "soft-studio",
+      "color_logic": "neutral-dominant",
+      "contrast_profile": "balanced-natural",
+      "mood": "reliable, efficient, professional"
+    },
+    "composition": {
+      "framing": "centered-subject",
+      "spacing": "generous-breathing-room",
+      "aspect_ratios": [
+        "1:1",
+        "4:5",
+        "16:9"
+      ]
+    },
+    "product_representation": {
+      "isolation": true,
+      "shadow_style": "soft-drop",
+      "reflection": true,
+      "surface_material": "matte-white"
+    },
+    "consistency_rules": {
+      "no_random_backgrounds": true,
+      "no_random_camera_angles": true,
+      "no_mixed_lighting": true,
+      "color_temperature_locked": true,
+      "brand_watermark": false
+    },
+    "derived_from": {
+      "brand_role": "specialist",
+      "tone_of_voice": "technical-trustworthy",
+      "price_positioning": "premium",
+      "visual_positioning_hint": null,
+      "media_style_hint": null
+    }
+  },
+  "shot_taxonomy": {
+    "shot_types": [
+      {
+        "shot_id": "hero_wide",
+        "shot_name": "Hero Wide Banner",
+        "camera_angle": "eye-level",
+        "composition": "negative-space-right",
+        "background_type": "brand-color",
+        "purpose": "hero section banner image",
+        "aspect_ratio": "16:9",
+        "priority": 1,
+        "required": true,
+        "prompt_emphasis": "dramatic presentation, banner-ready, space for text overlay"
+      },
+      {
+        "shot_id": "studio_packshot",
+        "shot_name": "Studio Packshot",
+        "camera_angle": "front-center",
+        "composition": "centered-subject",
+        "background_type": "pure-white",
+        "purpose": "product grid thumbnail (1:1)",
+        "aspect_ratio": "1:1",
+        "priority": 1,
+        "required": true,
+        "prompt_emphasis": "clean product isolation, sharp focus, ecommerce-ready"
+      },
+      {
+        "shot_id": "lifestyle_context",
+        "shot_name": "Lifestyle Context",
+        "camera_angle": "eye-level",
+        "composition": "rule-of-thirds-right",
+        "background_type": "contextual-environment",
+        "purpose": "hero lifestyle support image",
+        "aspect_ratio": "4:5",
+        "priority": 2,
+        "required": false,
+        "prompt_emphasis": "product in natural use context, aspirational setting"
+      },
+      {
+        "shot_id": "clean_feature",
+        "shot_name": "Clean Feature Shot",
+        "camera_angle": "three-quarter-left",
+        "composition": "rule-of-thirds-left",
+        "background_type": "studio-gradient",
+        "purpose": "value proposition feature image",
+        "aspect_ratio": "4:5",
+        "priority": 2,
+        "required": true,
+        "prompt_emphasis": "key features visible, dimensional depth, detail clarity"
+      },
+      {
+        "shot_id": "detail_closeup",
+        "shot_name": "Detail Closeup",
+        "camera_angle": "macro-detail",
+        "composition": "full-frame",
+        "background_type": "surface-only",
+        "purpose": "trust section detail image",
+        "aspect_ratio": "1:1",
+        "priority": 3,
+        "required": false,
+        "prompt_emphasis": "texture, material quality, craftsmanship details"
+      }
+    ]
+  },
+  "media_plan": {
+    "derived_from_theme_rules": true,
+    "store_pattern": "technical-b2b-specialist",
+    "section_coverage": [
+      {
+        "section_type": "hero",
+        "section_order": 1,
+        "shots_needed": [
+          "hero_wide",
+          "lifestyle_context"
+        ]
+      },
+      {
+        "section_type": "value-prop",
+        "section_order": 2,
+        "shots_needed": [
+          "clean_feature"
+        ]
+      },
+      {
+        "section_type": "featured-collection",
+        "section_order": 3,
+        "shots_needed": [
+          "studio_packshot"
+        ]
+      },
+      {
+        "section_type": "trust-social-proof",
+        "section_order": 4,
+        "shots_needed": [
+          "detail_closeup"
+        ]
+      }
+    ],
+    "shot_plan": [
+      {
+        "shot_type": "hero_wide",
+        "required": true,
+        "priority": "high",
+        "intended_usage": "hero section banner image",
+        "aspect_ratio": "16:9",
+        "source_section": "hero"
+      },
+      {
+        "shot_type": "studio_packshot",
+        "required": true,
+        "priority": "high",
+        "intended_usage": "product grid thumbnail (1:1)",
+        "aspect_ratio": "1:1",
+        "source_section": "featured-collection"
+      },
+      {
+        "shot_type": "lifestyle_context",
+        "required": false,
+        "priority": "medium",
+        "intended_usage": "hero lifestyle support image",
+        "aspect_ratio": "4:5",
+        "source_section": "hero"
+      },
+      {
+        "shot_type": "clean_feature",
+        "required": true,
+        "priority": "medium",
+        "intended_usage": "value proposition feature image",
+        "aspect_ratio": "4:5",
+        "source_section": "value-prop"
+      },
+      {
+        "shot_type": "detail_closeup",
+        "required": false,
+        "priority": "low",
+        "intended_usage": "trust section detail image",
+        "aspect_ratio": "1:1",
+        "source_section": "trust-social-proof"
+      }
+    ],
+    "total_shot_types": 5,
+    "required_shots": 3,
+    "optional_shots": 2
+  },
+  "media_assets": [
+    {
+      "asset_id": "industrial-sensor-v2-hero_wide",
+      "product_handle": "industrial-sensor-v2",
+      "product_title": "Industrial Sensor V2",
+      "shot_type": "hero_wide",
+      "source_section": "hero",
+      "priority": "high",
+      "required": true,
+      "intended_usage": "hero section banner image",
+      "used_in_layout": true,
+      "derived_from_theme_rules": true,
+      "generation_needed": true,
+      "prompt": "Professional ecommerce product photograph of a product: \"Industrial Sensor V2\". Camera angle: eye-level perspective. Subject left with negative space on right for text. Solid brand-aligned neutral background. Soft, diffused studio lighting with gentle shadows. dramatic presentation, banner-ready, space for text overlay. Overall mood: reliable, efficient, professional. High resolution, sharp focus, professionally color-graded. Aspect ratio: 16:9. Style: commercial product photography, ecommerce-optimized.",
+      "status": "generated",
+      "local_path": "/Users/luiswaidmann/Projects/store-os/outputs/media/media-gen-validation-1775667649681/industrial-sensor-v2/hero-wide/industrial-sensor-v2-hero_wide.png",
+      "url": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-FmXNANxOZWayEiqiOgmBtYqO/user-Ex1bi0B3q6QLW8eCroQx1ONa/img-0MDgUTPkklKJxuJ3uAlnUImA.png?st=2026-04-08T16%3A01%3A18Z&se=2026-04-08T18%3A01%3A18Z&sp=r&sv=2026-02-06&sr=b&rscd=inline&rsct=image/png&skoid=7daae675-7b42-4e2e-ab4c-8d8419a28d99&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-04-08T12%3A15%3A18Z&ske=2026-04-09T12%3A15%3A18Z&sks=b&skv=2026-02-06&sig=lNQgtf6tbM3MBv6bTFAFf5VcNpnvecZr0QUfOYi5ZmE%3D",
+      "metadata": {
+        "aspect_ratio": "16:9",
+        "generation_model": "dall-e-3",
+        "timestamp": "2026-04-08T17:01:22.625Z",
+        "dimensions_px": "1792x1024",
+        "file_size_bytes": 2034215,
+        "quality_score": 1
+      },
+      "shopify_mapping": {
+        "target_type": "collection_image",
+        "target_handle": "industrial-sensor-v2",
+        "position": null
+      }
+    },
+    {
+      "asset_id": "industrial-sensor-v2-studio_packshot",
+      "product_handle": "industrial-sensor-v2",
+      "product_title": "Industrial Sensor V2",
+      "shot_type": "studio_packshot",
+      "source_section": "featured-collection",
+      "priority": "high",
+      "required": true,
+      "intended_usage": "product grid thumbnail (1:1)",
+      "used_in_layout": true,
+      "derived_from_theme_rules": true,
+      "generation_needed": true,
+      "prompt": "Professional ecommerce product photograph of a product: \"Industrial Sensor V2\". Camera angle: straight-on front view. Subject centered in frame. Pure white seamless background. Soft, diffused studio lighting with gentle shadows. Soft drop shadow beneath product. clean product isolation, sharp focus, ecommerce-ready. Overall mood: reliable, efficient, professional. High resolution, sharp focus, professionally color-graded. Aspect ratio: 1:1. Style: commercial product photography, ecommerce-optimized.",
+      "status": "generated",
+      "local_path": "/Users/luiswaidmann/Projects/store-os/outputs/media/media-gen-validation-1775667649681/industrial-sensor-v2/studio-packshot/industrial-sensor-v2-studio_packshot.png",
+      "url": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-FmXNANxOZWayEiqiOgmBtYqO/user-Ex1bi0B3q6QLW8eCroQx1ONa/img-Yi3GfctS1N2m3W4bsyWtwPee.png?st=2026-04-08T16%3A01%3A15Z&se=2026-04-08T18%3A01%3A15Z&sp=r&sv=2026-02-06&sr=b&rscd=inline&rsct=image/png&skoid=9346e9b9-5d29-4d37-a0a9-c6f95f09f79d&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-04-08T04%3A54%3A48Z&ske=2026-04-09T04%3A54%3A48Z&sks=b&skv=2026-02-06&sig=goo4sMBqNnhpn84Vj3ICoFY3AHOSk9/30dbbSh2OPKU%3D",
+      "metadata": {
+        "aspect_ratio": "1:1",
+        "generation_model": "dall-e-3",
+        "timestamp": "2026-04-08T17:01:22.626Z",
+        "dimensions_px": "1024x1024",
+        "file_size_bytes": 1537616,
+        "quality_score": 1
+      },
+      "shopify_mapping": {
+        "target_type": "product_image",
+        "target_handle": "industrial-sensor-v2",
+        "position": 1
+      }
+    },
+    {
+      "asset_id": "industrial-sensor-v2-lifestyle_context",
+      "product_handle": "industrial-sensor-v2",
+      "product_title": "Industrial Sensor V2",
+      "shot_type": "lifestyle_context",
+      "source_section": "hero",
+      "priority": "medium",
+      "required": false,
+      "intended_usage": "hero lifestyle support image",
+      "used_in_layout": true,
+      "derived_from_theme_rules": true,
+      "generation_needed": false,
+      "prompt": "Professional ecommerce product photograph of a product: \"Industrial Sensor V2\". Camera angle: eye-level perspective. Subject positioned on right third. Minimal, clean contextual environment appropriate for product. Soft, diffused studio lighting with gentle shadows. product in natural use context, aspirational setting. Overall mood: reliable, efficient, professional. High resolution, sharp focus, professionally color-graded. Aspect ratio: 4:5. Style: commercial product photography, ecommerce-optimized.",
+      "status": "prompt_only",
+      "local_path": "/assets/media/media-gen-validation-1775667649681/industrial-sensor-v2/lifestyle-context/industrial-sensor-v2-lifestyle_context.png",
+      "url": null,
+      "metadata": {
+        "aspect_ratio": "4:5",
+        "generation_model": "dall-e-3",
+        "timestamp": "2026-04-08T17:00:52.365Z",
+        "dimensions_px": "1024x1280",
+        "file_size_bytes": null,
+        "quality_score": null
+      },
+      "shopify_mapping": {
+        "target_type": "product_image",
+        "target_handle": "industrial-sensor-v2",
+        "position": 3
+      }
+    },
+    {
+      "asset_id": "industrial-sensor-v2-clean_feature",
+      "product_handle": "industrial-sensor-v2",
+      "product_title": "Industrial Sensor V2",
+      "shot_type": "clean_feature",
+      "source_section": "value-prop",
+      "priority": "medium",
+      "required": true,
+      "intended_usage": "value proposition feature image",
+      "used_in_layout": true,
+      "derived_from_theme_rules": true,
+      "generation_needed": true,
+      "prompt": "Professional ecommerce product photograph of a product: \"Industrial Sensor V2\". Camera angle: three-quarter angle from the left. Subject positioned on left third. Subtle studio gradient background. Soft, diffused studio lighting with gentle shadows. Soft drop shadow beneath product. key features visible, dimensional depth, detail clarity. Overall mood: reliable, efficient, professional. High resolution, sharp focus, professionally color-graded. Aspect ratio: 4:5. Style: commercial product photography, ecommerce-optimized.",
+      "status": "generated",
+      "local_path": "/Users/luiswaidmann/Projects/store-os/outputs/media/media-gen-validation-1775667649681/industrial-sensor-v2/clean-feature/industrial-sensor-v2-clean_feature.png",
+      "url": "https://oaidalleapiprodscus.blob.core.windows.net/private/org-FmXNANxOZWayEiqiOgmBtYqO/user-Ex1bi0B3q6QLW8eCroQx1ONa/img-QsQ0WQOcI1gYQ2QxkFqK6dd7.png?st=2026-04-08T16%3A01%3A21Z&se=2026-04-08T18%3A01%3A21Z&sp=r&sv=2026-02-06&sr=b&rscd=inline&rsct=image/png&skoid=35890473-cca8-4a54-8305-05a39e0bc9c3&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-04-08T03%3A40%3A43Z&ske=2026-04-09T03%3A40%3A43Z&sks=b&skv=2026-02-06&sig=VDXs78UQT%2BfkjwOLkgL4B0LYDFSr/hHjC2DlUhRxwKY%3D",
+      "metadata": {
+        "aspect_ratio": "4:5",
+        "generation_model": "dall-e-3",
+        "timestamp": "2026-04-08T17:01:22.626Z",
+        "dimensions_px": "1024x1280",
+        "file_size_bytes": 2301461,
+        "quality_score": 1
+      },
+      "shopify_mapping": {
+        "target_type": "product_image",
+        "target_handle": "industrial-sensor-v2",
+        "position": 2
+      }
+    },
+    {
+      "asset_id": "industrial-sensor-v2-detail_closeup",
+      "product_handle": "industrial-sensor-v2",
+      "product_title": "Industrial Sensor V2",
+      "shot_type": "detail_closeup",
+      "source_section": "trust-social-proof",
+      "priority": "low",
+      "required": false,
+      "intended_usage": "trust section detail image",
+      "used_in_layout": true,
+      "derived_from_theme_rules": true,
+      "generation_needed": false,
+      "prompt": "Professional ecommerce product photograph of a product: \"Industrial Sensor V2\". Camera angle: macro close-up detail shot. Subject fills the entire frame. Product on matte-white. Soft, diffused studio lighting with gentle shadows. texture, material quality, craftsmanship details. Overall mood: reliable, efficient, professional. High resolution, sharp focus, professionally color-graded. Aspect ratio: 1:1. Style: commercial product photography, ecommerce-optimized.",
+      "status": "prompt_only",
+      "local_path": "/assets/media/media-gen-validation-1775667649681/industrial-sensor-v2/detail-closeup/industrial-sensor-v2-detail_closeup.png",
+      "url": null,
+      "metadata": {
+        "aspect_ratio": "1:1",
+        "generation_model": "dall-e-3",
+        "timestamp": "2026-04-08T17:00:52.365Z",
+        "dimensions_px": "1024x1024",
+        "file_size_bytes": null,
+        "quality_score": null
+      },
+      "shopify_mapping": null
+    }
+  ],
+  "generation_summary": {
+    "products_processed": 1,
+    "total_shots_planned": 5,
+    "prompts_generated": 5,
+    "images_generated": 3,
+    "images_failed": 0,
+    "images_skipped": 2,
+    "mode": "full_generation"
+  },
+  "storage": {
+    "mode": "local",
+    "base_path": "/assets/media/media-gen-validation-1775667649681",
+    "total_files": 0,
+    "total_size_bytes": null
+  },
+  "errors": [],
+  "warnings": []
+}

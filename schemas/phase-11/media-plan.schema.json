@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://store-os.dev/schemas/phase-11/media-plan.schema.json",
+  "title": "Media Plan Artifact",
+  "description": "Layout-aware media plan derived from theme_rules (Phase 10). Replaces the fixed 5-shot taxonomy with section-driven, priority-ordered shot selection. Each planned shot has a source section, priority, and intended usage. Consumed by build-media-assets to drive generation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "derived_from_theme_rules",
+    "store_pattern",
+    "section_coverage",
+    "shot_plan",
+    "total_shot_types",
+    "required_shots",
+    "optional_shots"
+  ],
+  "properties": {
+    "derived_from_theme_rules": {
+      "type": "boolean",
+      "description": "True when shot plan was derived from theme_rules. False when using the 5-shot fallback taxonomy."
+    },
+    "store_pattern": {
+      "type": ["string", "null"],
+      "description": "The store pattern from theme_rules.store_pattern that drove shot selection. Null when using fallback."
+    },
+    "section_coverage": {
+      "type": "array",
+      "description": "Which sections from the homepage section stack need media, and which shot types they require.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["section_type", "section_order", "shots_needed"],
+        "properties": {
+          "section_type": {
+            "type": "string",
+            "enum": ["hero", "featured-collection", "value-prop", "trust-social-proof"]
+          },
+          "section_order": {
+            "type": "integer",
+            "description": "Display order of this section in the homepage layout."
+          },
+          "shots_needed": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Shot type IDs required by this section."
+          }
+        }
+      }
+    },
+    "shot_plan": {
+      "type": "array",
+      "description": "Deduplicated, priority-ordered list of shots to produce. Each entry is unique by shot_type.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["shot_type", "source_section", "required", "priority", "intended_usage", "aspect_ratio"],
+        "properties": {
+          "shot_type": {
+            "type": "string",
+            "enum": ["studio_packshot", "clean_feature", "lifestyle_context", "hero_wide", "detail_closeup"],
+            "description": "The shot type ID."
+          },
+          "source_section": {
+            "type": "string",
+            "description": "The section that drove this shot's inclusion (e.g. 'hero', 'featured-collection', 'baseline', 'fallback')."
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Whether this shot is required by the layout. Required shots are always generated in full_generation mode."
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": "Generation priority. high = first, medium = second, low = last (and skipped in cost-constrained modes)."
+          },
+          "intended_usage": {
+            "type": "string",
+            "description": "Human-readable description of where this image will be used in the layout."
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "enum": ["1:1", "4:5", "16:9", "3:4", "9:16"],
+            "description": "Required aspect ratio for this shot type in this layout context."
+          }
+        }
+      }
+    },
+    "total_shot_types": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total unique shot types in the plan."
+    },
+    "required_shots": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of required shots in the plan."
+    },
+    "optional_shots": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of optional shots in the plan."
+    }
+  }
+}

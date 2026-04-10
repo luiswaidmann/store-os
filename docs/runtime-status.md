@@ -27,6 +27,133 @@ Recent runtime progression merges (on `main`):
 
 ## Last confirmed end-to-end smoke test
 
+**GOLD_PATH_PARTIAL — Schema Name Fix Validated (Execution 14888):**
+**Date:** 2026-04-09
+**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async)
+**Terminal status:** `GOLD_PATH_PARTIAL` — theme fully complete, media absent (grounding/DALL-E skipped this run)
+**Theme deployment:** PHASE_7B3_COMPLETE — 4 sections + 3 assets written to theme 194584281428, **0 errors**, **0 warnings**
+**Schema names:** store-os: Hero (14), store-os: Value Prop (20), store-os: Products (18), store-os: Trust Signals (23) — all ≤ 25 chars ✓
+**Sections written:** hero.liquid, value-prop.liquid, featured-collection.liquid, trust-social-proof.liquid
+**Assets written:** logo-placeholder.svg, favicon-placeholder.svg, hero-placeholder.svg
+**Runtime:** ~97s
+
+**GOLD_PATH_PARTIAL — Storefront Assembly Validated (Execution 14854):**
+**Date:** 2026-04-09
+**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async)
+**Terminal status:** `GOLD_PATH_PARTIAL` — theme fully complete, media partial (1 DALL-E image failed)
+**Chain:** intake → analysis (7 LLM phases) → Shopify writes → theme-rules → grounding → media (8 DALL-E-3 images) → theme + storefront assembly
+**Theme deployment:** PHASE_7B3_COMPLETE — 4 sections + 3 assets + 1 template written to theme 194584281428, 0 errors
+**Storefront assembly:** `templates/index.json` written — homepage wired to 4 store-os sections in order
+**Written files:** hero.liquid, value-prop.liquid, featured-collection.liquid, trust-social-proof.liquid, 3 SVG assets, templates/index.json
+**CTA links:** Resolved to proper Shopify paths (/collections/handle, /pages/handle)
+**Section settings:** Pre-populated from theme_rules (pattern: technical-b2b-specialist)
+**Blocks:** Value-prop columns and trust signals pre-populated with placeholder content
+**Media generation:** PHASE_9_PARTIAL — 8/15 generated, 1 failed (DALL-E intermittent), 6 skipped (optional)
+**Runtime:** ~128s (n8n Cloud)
+
+**GOLD_PATH_COMPLETE — Full End-to-End Validated (Execution 14820):**
+**Date:** 2026-04-09
+**Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async)
+**Terminal status:** `GOLD_PATH_COMPLETE` — all 17 subworkflow calls succeeded
+**Chain:** intake → analysis (7 LLM phases) → Shopify writes (catalog, pages, nav) → theme-rules → media (9 DALL-E-3 images) → theme write
+**Media generation:** PHASE_9_COMPLETE — 9/15 images generated (3 products × 3 required shots), 0 failed, 6 optional skipped
+**Section→media mapping:** hero(6 assets), featured-collection(3), value-prop(3), trust-social-proof(3)
+**Theme deployment:** PHASE_7B3_COMPLETE — 4 sections + 3 assets written to theme 194584281428
+**Grounding:** Bypassed (no product images in Shopify — LLM-generated catalog). Text-only generation mode used.
+**Hardened success criteria:** All Shopify phases now require == COMPLETE || == PARTIAL (was: != FAILED)
+**Runtime:** ~126s (n8n Cloud)
+
+**Persistent Draft Theme CONFIRMED — Theme System Locked:**
+**Date:** 2026-04-09
+**Theme ID:** `194584281428`
+**Theme Name:** `store-os // system-draft`
+**Theme Role:** `unpublished` (draft — NOT published, production theme NOT affected)
+**Shop:** `8zw111-cj.myshopify.com`
+**Created via:** Shopify Admin API POST /themes.json
+**Persisted in:** `test-data/golden-input.json` (STORE_OS_SHOPIFY_THEME_ID), `workflows/n8n/workflow-ids.json` (persistent_theme)
+**Write test 1:** 4 sections + 3 assets → PHASE_7B3_COMPLETE (hero, value-prop, featured-collection, trust-social-proof)
+**Write test 2 (reuse check):** Same theme_id `194584281428` targeted, no new theme created
+**Write test 3 (storefront assembly):** 4 sections + 3 assets + `templates/index.json` → PHASE_7B3_COMPLETE, homepage wired to 4 sections
+**Safety:** Explicit shopify_theme_id always wins. Active production theme NOT modified.
+**Files written to theme:** `sections/store-os-hero.liquid`, `sections/store-os-value-prop.liquid`, `sections/store-os-featured-collection.liquid`, `sections/store-os-trust-social-proof.liquid`, `assets/store-os-logo-placeholder.svg`, `assets/store-os-hero-placeholder.svg`, `assets/store-os-favicon-placeholder.svg`, `templates/index.json`
+
+**Phase 12 CONFIRMED (COMPLETE) — Image Grounding Layer:**
+**Date:** 2026-04-09
+**Method:** Webhook wrapper → `build-media-assets` (ID: krR10um8F1pT0miQ) with `image_grounding` artifact
+**Input:** 1-product payload (basswave-kabellose-kopfhorer) with real Shopify image + theme_rules (specialist-standard, 4-section stack) + image_grounding (Gemini 2.0 Flash)
+**Result:** `PHASE_9_PROMPTS_ONLY` — all grounded prompts correct, all Phase 12 per-asset fields present
+**Grounding model:** gemini-2.0-flash | **Grounding confidence:** 0.82
+**Grounded prompts verified:** All 5 assets contain Gemini-derived physical descriptions (materials, shape, colors) instead of title-only descriptions
+**Phase 12 per-asset fields verified:** generation_mode (grounded_generate) | grounding_source_type (shopify_product_image) | grounded_from_image | grounding_confidence | product_faithfulness_required
+**Detail closeup focus areas:** earcup padding texture, headband adjustment mechanism, microphone boom detail, mint green color finish
+**New workflow:** build-image-grounding (ID: s5aWmVZcerBgc6kM)
+**New schema:** schemas/phase-12/image-grounding.schema.json
+**Schema updated:** schemas/phase-9/media-generation.schema.json (added 5 Phase 12 per-asset fields)
+**Doc:** docs/phase-12-architecture.md
+
+**Phase 9 CONFIRMED (COMPLETE — LIVE GENERATION) — Media Runtime Operational:**
+**Date:** 2026-04-09
+**Method:** `validate-media-generation.js` → webhook wrapper → `build-media-assets` (ID: krR10um8F1pT0miQ)
+**Input:** 1-product payload (industrial-sensor-v2) with `theme_rules` (pattern: technical-b2b-specialist, 4-section stack)
+**Mode:** `full_generation` — allow_media_generation: true, model: dall-e-3
+**Result:** `PHASE_9_COMPLETE` — 3 real images generated by DALL-E-3, downloaded, and persisted to local disk
+**media_plan:** `derived_from_theme_rules: true` | `store_pattern: technical-b2b-specialist`
+**Shot plan:** 5 shot types (3 required, 2 optional) | 3 generated (required+high, required+medium) | 2 skipped (optional)
+**Generated images:**
+- `hero_wide` (16:9, 1.9MB) → `outputs/media/.../hero-wide/industrial-sensor-v2-hero_wide.png`
+- `studio_packshot` (1:1, 1.5MB) → `outputs/media/.../studio-packshot/industrial-sensor-v2-studio_packshot.png`
+- `clean_feature` (4:5, 2.2MB) → `outputs/media/.../clean-feature/industrial-sensor-v2-clean_feature.png`
+**Priority ordering verified:** hero_wide(high) → studio_packshot(high) → clean_feature(medium) | lifestyle_context(medium/optional) skipped | detail_closeup(low/optional) skipped
+**Total runtime:** 56.8s (3 DALL-E-3 API calls + download)
+**Artifact:** `outputs/runs/media-gen-*.json` — includes local_path, file_size_bytes, all Phase 11 fields
+**Errors:** 0 | **Warnings:** 0
+
+**Phase 11 CONFIRMED (PROMPTS_ONLY) — Theme-Driven Media Orchestration:**
+**Date:** 2026-04-08
+**Method:** Standalone sub-workflow test via webhook wrapper → `build-media-assets` (ID: krR10um8F1pT0miQ)
+**Input:** 1-product payload (industrial-sensor-v2) with `theme_rules` (pattern: technical-b2b-specialist, 4-section stack)
+**Result:** `PHASE_9_PROMPTS_ONLY` — execution successful — Phase 11 media_plan and per-asset fields all correct
+**media_plan:** `derived_from_theme_rules: true` | `store_pattern: technical-b2b-specialist`
+**Section coverage:** hero→[hero_wide, lifestyle_context] | value-prop→[clean_feature] | featured-collection→[studio_packshot] | trust-social-proof→[detail_closeup]
+**Shot plan (priority-ordered):** high: hero_wide, studio_packshot | medium: lifestyle_context, clean_feature | low: detail_closeup
+**required_shots: 3 | optional_shots: 2 | total: 5**
+**Phase 11 per-asset fields verified:** source_section ✓ | priority ✓ | required ✓ | intended_usage ✓ | used_in_layout ✓ | derived_from_theme_rules ✓ | generation_needed ✓
+**Generation batch ordering:** required+high first → required+medium → optional+high (low optional skipped)
+**Prompts generated:** 5 (1 per shot type) | **Images generated:** 0 (prompts_only mode)
+**Errors:** 0 | **Warnings:** 1 (expected: PROMPTS_ONLY)
+**New schema:** schemas/phase-11/media-plan.schema.json
+**Schema updated:** schemas/phase-9/media-generation.schema.json (added media_plan + 7 Phase 11 per-asset fields)
+
+**Phase 10 CONFIRMED (COMPLETE) — Theme Rules Engine:**
+**Date:** 2026-04-08
+**Method:** Full orchestrator chain (execution 14747) — `build-theme-rules` runs between Phase 7B.2 Complete and `build-shopify-theme`
+**Input:** `test-data/golden-input.json` (project: suppliedtech)
+**Phase 10 result:** `PHASE_10_COMPLETE` — pattern classified, rules mapped, theme_rules passed to build-shopify-theme
+**Chain result:** `PHASE_7B3_COMPLETE` — no regressions, sections_written: 4, assets_written: 3
+**Pattern classified:** `technical-b2b-specialist` (brand_role=specialist + tone=technical-trustworthy)
+**Section stack decided:** hero(1) → value-prop(2) → featured-collection(3) → trust-social-proof(4)
+**Rules applied:** grid_columns=3, value_prop.column_count=4, trust.proof_mode=evidence-led, trust.block_count=4
+**New workflows:** build-theme-rules (ID: KzFBogj7kusXQqlp)
+**New nodes in orchestrator:** Prepare Theme Rules Input + Run build-theme-rules (continueOnFail)
+**Execution time for theme rules:** ~180ms (no LLM calls, no external APIs)
+
+**Phase 9 CONFIRMED (PROMPTS_ONLY) — Media Generation:**
+**Date:** 2026-04-08
+**Method:** Standalone sub-workflow test via webhook wrapper → `build-media-assets` (ID: krR10um8F1pT0miQ)
+**Input:** 2-product test payload (heavy-duty-cable-ties, safety-goggles-pro) with mass-premium/specialist config
+**Result:** `PHASE_9_PROMPTS_ONLY` — execution successful, ~1.9s — cloud mode
+**Visual system derived:**
+- Background: neutral-studio (mass-premium) | Lighting: soft-studio (technical-trustworthy)
+- Framing: centered-subject (specialist) | Shadow: soft-drop (mass-premium)
+- Mood: reliable, efficient, professional (from brand_traits)
+**Shot taxonomy:** 5 fixed shot types applied to both products (10 total assets)
+**Prompts generated:** 10 deterministic prompts (pure function of inputs)
+**Images generated:** 0 (prompts_only mode — allow_media_generation: false)
+**Shopify mapping:** studio_packshot→pos 1, clean_feature→pos 2, lifestyle_context→pos 3, hero_wide→collection_image
+**Errors:** 0 | **Warnings:** 1 (expected: "PROMPTS_ONLY: allow_media_generation not set")
+**n8n validation:** 0 errors, 12 warnings (all minor — typeVersion hints, error handling suggestions)
+**Not yet integrated into orchestrator chain** — standalone sub-workflow, will be added in future phase
+
 **Phase 7B.3 CONFIRMED (COMPLETE) — Theme Deployment:**
 **Date:** 2026-04-08
 **Method:** `node scripts/run-orchestrator.js --input test-data/golden-input.json` (async)
@@ -114,26 +241,41 @@ Previous confirmed test (Phase 6a):
 Previous confirmed test (Phase 5):
 **Date:** 2026-04-07 | **Result:** `PHASE_5_COMPLETE` — HTTP 200, ~90s
 
-## Current confirmed executable chain
+## Current confirmed executable chain (Gold Path)
 
-The currently confirmed n8n execution path (Phase 7A — 2026-04-07) is:
+The full n8n orchestrator execution chain (17 subworkflow calls, sequential):
 
-- `resolve-runtime-config`
-- `intake-store-input`
-- `import-shopify-data`
-- `build-store-profile`
-- `build-market-intelligence`
-- `build-brand-positioning`
-- `build-competitor-clusters`
-- `build-strategy-synthesis` (Phase 16)
-- `build-offer-architecture` (Phase 6a)
-- `build-content-strategy` (Phase 6b)
-- `build-gtm-plan` (Phase 6c)
-- `build-store-blueprint` (Phase 7A)
-- `build-shopify-catalog` (Phase 7B.1)
-- `build-shopify-pages-navigation` ← **NEW** (Phase 7B.2 — pages REST + navigation GraphQL)
+1. `resolve-runtime-config` (inline Code node — not a subworkflow)
+2. `intake-store-input` (Phase 1 — input normalization)
+3. `import-shopify-data` (Phase 1 — Shopify API fetch)
+4. `build-store-profile` (Phase 1 — profile synthesis)
+5. `build-market-intelligence` (Phase 2 — LLM: gpt-4o)
+6. `build-brand-positioning` (Phase 3 — LLM: gpt-4o)
+7. `build-competitor-clusters` (Phase 4 — LLM: gpt-4o)
+8. `build-strategy-synthesis` (Phase 5 — LLM: gpt-4o, cross-artifact)
+9. `build-offer-architecture` (Phase 6a — LLM: gpt-4o)
+10. `build-content-strategy` (Phase 6b — LLM: gpt-4o)
+11. `build-gtm-plan` (Phase 6c — LLM: gpt-4o)
+12. `build-store-blueprint` (Phase 7A — LLM: gpt-4o)
+13. `build-shopify-catalog` (Phase 7B.1 — Shopify REST writes)
+14. `build-shopify-pages-navigation` (Phase 7B.2 — Shopify REST + GraphQL writes)
+15. `build-theme-rules` (Phase 10 — deterministic, `continueOnFail: true`)
+16. `build-image-grounding` (Phase 12 — conditional: skipped when no product images)
+17. `build-media-assets` (Phase 9 — DALL-E-3 image generation)
+18. `build-shopify-theme` (Phase 7B.3 — Shopify Theme API writes) ← **TERMINAL**
 
-**Async model:** Chains run ~117s+. The webhook returns HTTP 202 within ~2s with an `execution_id`. The CLI polls `GET /api/v1/executions/{id}` until `finished: true`. Cloudflare's 100s timeout is no longer hit. See `docs/async-execution-model.md`.
+**Failure semantics (hardened):**
+- Phases 1–7A (steps 1–12): `status == "SUCCESS"` required, chain halts on failure
+- Phase 7B.1 (step 13): `status == COMPLETE || == PARTIAL` required, FAILED halts chain
+- Phase 7B.2 (step 14): `status == COMPLETE || == PARTIAL` required, FAILED halts chain
+- Phase 10 (step 15): `continueOnFail: true` (optional — theme falls back to blueprint sections)
+- Phase 12 (step 16): Conditional bypass — skipped when no product images; errors caught by normalize node
+- Phase 9 (step 17): `status == COMPLETE || == PARTIAL` required, PROMPTS_ONLY and FAILED halt chain
+- Phase 7B.3 (step 18): `status == COMPLETE || == PARTIAL` required, DRY_RUN/BLOCKED/FAILED halt chain
+
+**Terminal status:** `GOLD_PATH_COMPLETE` (theme + media both fully succeeded) or `GOLD_PATH_PARTIAL` (theme or media had partial results).
+
+**Async model:** Chains run ~130s+. The webhook returns HTTP 202 within ~2s with an `execution_id`. The CLI polls `GET /api/v1/executions/{id}` until `finished: true`. Cloudflare's 100s timeout is no longer hit. See `docs/async-execution-model.md`.
 
 ## Current confirmed inline outputs
 
@@ -149,7 +291,13 @@ The chain currently returns these runtime artifacts inline in cloud mode:
 - `gtm_plan`
 - `store_blueprint`
 - `shopify_catalog_deployment` (Phase 7B.1)
-- `shopify_pages_navigation_deployment` ← **NEW** (Phase 7B.2)
+- `shopify_pages_navigation_deployment` (Phase 7B.2)
+- `theme_rules` (Phase 10 — when available)
+- `image_grounding` (Phase 12 — when products have images)
+- `media_generation` (Phase 9 — DALL-E-3 generation results)
+- `section_media_map` (section→media asset mapping)
+- `product_media_map` (product→media asset mapping)
+- `shopify_theme_deployment` (Phase 7B.3 — includes templates_written, written_files)
 
 ## Runtime Hardening (Phase 16)
 
@@ -409,36 +557,38 @@ orchestrate-phase1
       │                         execution continues asynchronously
   Validate Orchestrate Input ← fast-fail schema check
       │
-  ┌── PHASE CHAIN ────────────────────────────────────────┐
-  │  intake-store-input → import-shopify-data             │
-  │  build-store-profile          (Phase 1)               │
-  │  build-market-intelligence    (Phase 2)               │
-  │  build-brand-positioning      (Phase 3)               │
-  │  build-competitor-clusters    (Phase 4)               │
-  │  build-strategy-synthesis     (Phase 5)               │
-  │  build-offer-architecture     (Phase 6a)              │
-  │  build-content-strategy       (Phase 6b)              │
-  │  build-gtm-plan               (Phase 6c)              │
-  │  build-store-blueprint        (Phase 7A)               │
-  │  build-shopify-catalog        (Phase 7B.1)             │
-  │  build-shopify-pages-navigation (Phase 7B.2) ← TERMINAL │
-  └───────────────────────────────────────────────────────┘
+  ┌── PHASE CHAIN ─────────────────────────────────────────────┐
+  │  intake-store-input → import-shopify-data                  │
+  │  build-store-profile            (Phase 1)                  │
+  │  build-market-intelligence      (Phase 2)                  │
+  │  build-brand-positioning        (Phase 3)                  │
+  │  build-competitor-clusters      (Phase 4)                  │
+  │  build-strategy-synthesis       (Phase 5)                  │
+  │  build-offer-architecture       (Phase 6a)                 │
+  │  build-content-strategy         (Phase 6b)                 │
+  │  build-gtm-plan                 (Phase 6c)                 │
+  │  build-store-blueprint          (Phase 7A)                 │
+  │  build-shopify-catalog          (Phase 7B.1)               │
+  │  build-shopify-pages-navigation (Phase 7B.2)               │
+  │  build-theme-rules              (Phase 10, continueOnFail) │
+  │  build-shopify-theme            (Phase 7B.3) ← TERMINAL   │
+  └────────────────────────────────────────────────────────────┘
       │
-  Phase 7B.2 Complete → returns inline artifacts + metadata
+  Phase 7B.3 Complete → returns inline artifacts + metadata
 
 CALLER FLOW (async)
   1. POST webhook → HTTP 202 { execution_id, status: "started" }  (~2s)
   2. Poll GET /api/v1/executions/{id}?includeData=true  (every 5s)
-  3. finished: true → extract result from Phase 7A Complete node
+  3. finished: true → extract result from Phase 7B.3 Complete node
 
 OUTPUT (extracted from execution data)
   status, execution_id, completed_at
-  next_phase (Phase 7B.3 — theme sections, assets)
   store_profile, market_intelligence, brand_positioning,
   competitor_clusters, strategy_synthesis,
   offer_architecture, content_strategy, gtm_plan,
   store_blueprint, shopify_catalog_deployment,
-  shopify_pages_navigation_deployment (all inline in cloud mode)
+  shopify_pages_navigation_deployment, theme_rules,
+  shopify_theme_deployment (all inline in cloud mode)
 ```
 
 ---
@@ -461,7 +611,13 @@ DIRECT fields are passed through verbatim and override any LLM-generated values.
 
 ## Confirmed next planned runtime step
 
-Next: **Phase 7B.3 — Store Build (theme sections, assets)** — scaffold exists, not yet deployed. See `docs/phase-7b-architecture.md`.
+Next: **Extend theme section types** — add `testimonial-carousel`, `announcement-bar`, `comparison-table` to the rules engine section model; integrate `reason_to_believe[]` into trust section block content; connect `media_placement_rules` to Phase 9 media generation.
+
+Phase 10 is **COMPLETE** — `build-theme-rules` deployed (ID: KzFBogj7kusXQqlp), integrated into orchestrator chain, validated in execution 14747.
+
+Phase 9 is **CONFIRMED (standalone)** — `build-media-assets` deployed (ID: krR10um8F1pT0miQ), prompts_only mode validated. Not yet integrated into orchestrator chain.
+
+Phase 7B.3 is **COMPLETE** — `build-shopify-theme` deployed, theme sections + assets written to Shopify dev theme.
 
 Phase 7B.2 is **COMPLETE** — `build-shopify-pages-navigation` deployed, navigation uses GraphQL Menu API (REST link_lists removed in Shopify 2025-04).
 

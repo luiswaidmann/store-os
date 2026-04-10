@@ -32,7 +32,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// orchestrate-phase1 — Step 1: Resolve Runtime Config\n// Validates all required environment variables and assembles the runtime config.\n// Any CONFIG_MISSING error halts the entire chain here — before any subworkflow runs.\n//\n// TRIGGER INPUT (manual run):\n//   { \"intake_payload\": { \"project_id\": \"...\", ... } }\n//\n// CLOUD MODE (n8n Cloud): process and require('fs') are not available.\n// Pass a smoke_test_config in the trigger input to supply config values:\n//   {\n//     \"intake_payload\": { \"project_id\": \"...\", ... },\n//     \"smoke_test_config\": {\n//       \"STORE_OS_OPENAI_CREDENTIAL_NAME\": \"OpenAI account\",\n//       \"STORE_OS_SHOPIFY_CREDENTIAL_NAME\": \"Shopify account\",\n//       \"STORE_OS_SHOPIFY_SHOP_URL\": \"my-store.myshopify.com\",\n//       \"STORE_OS_LLM_MODEL\": \"gpt-4o\",\n//       \"STORE_OS_ENV\": \"dev\",\n//       \"STORE_OS_SHOPIFY_API_VERSION\": \"2024-01\"\n//     }\n//   }\n\n// Cloud-mode detection: n8n Cloud exposes neither require('fs') nor process\nlet cloudMode = false;\ntry { require('fs'); } catch (_e) { cloudMode = true; }\nif (typeof process === 'undefined') { cloudMode = true; }\n\n// Extract trigger input early — needed for cloud config fallback\nconst triggerRaw   = $input.first().json;\n// Normalize: webhook trigger wraps payload in .body; manual trigger passes it flat\nconst triggerInput = (triggerRaw.body && typeof triggerRaw.body === 'object') ? triggerRaw.body : triggerRaw;\n\n// Cloud-safe env accessor\n// Self-hosted: reads from process.env\n// Cloud:       reads from trigger input's smoke_test_config object\nconst smokeConfig = (cloudMode && triggerInput.smoke_test_config) ? triggerInput.smoke_test_config : {};\nconst getEnv = cloudMode\n  ? (key) => { const v = smokeConfig[key]; return (v && String(v).trim()) ? String(v).trim() : null; }\n  : (key) => { const v = process.env[key]; return (v && v.trim()) ? v.trim() : null; };\n\n// Core vars required in both cloud and self-hosted modes\nconst REQUIRED_ENV_VARS_CORE = [\n  'STORE_OS_OPENAI_CREDENTIAL_NAME',\n  'STORE_OS_SHOPIFY_CREDENTIAL_NAME',\n  'STORE_OS_SHOPIFY_SHOP_URL',\n  'STORE_OS_LLM_MODEL',\n  'STORE_OS_ENV',\n  'STORE_OS_SHOPIFY_API_VERSION',\n];\n\n// Filesystem vars only required in self-hosted mode\nconst REQUIRED_ENV_VARS_FS = ['STORE_OS_PROJECT_ROOT', 'STORE_OS_AJV_SCHEMA_PATH'];\n\nconst REQUIRED_ENV_VARS = cloudMode\n  ? REQUIRED_ENV_VARS_CORE\n  : [...REQUIRED_ENV_VARS_CORE, ...REQUIRED_ENV_VARS_FS];\n\nconst ALLOWED_ENVS = ['dev', 'staging', 'production'];\n\nconst missing = REQUIRED_ENV_VARS.filter((v) => !getEnv(v));\nif (missing.length > 0) {\n  throw new Error(\n    'CONFIG_MISSING: Required environment variables not set: ' + missing.join(', ') +\n    (cloudMode\n      ? '. In n8n Cloud, pass these as smoke_test_config in the trigger input JSON.'\n      : '. Configure them in n8n Settings > Variables or the n8n process environment.')\n  );\n}\n\nconst env = getEnv('STORE_OS_ENV');\nif (!ALLOWED_ENVS.includes(env)) {\n  throw new Error(`CONFIG_MISSING: STORE_OS_ENV must be one of: ${ALLOWED_ENVS.join(', ')}. Got: \"${env}\"`);\n}\n\n// Filesystem path validation — self-hosted only\n// CLOUD SKIP: fs.existsSync requires local filesystem, not available in n8n Cloud\nlet fs;\nlet projectRoot = null;\nlet ajvSchemaPath = null;\n\nif (!cloudMode) {\n  fs = require('fs');\n  projectRoot = getEnv('STORE_OS_PROJECT_ROOT');\n  if (!fs.existsSync(projectRoot)) {\n    throw new Error(`CONFIG_MISSING: STORE_OS_PROJECT_ROOT does not exist: ${projectRoot}`);\n  }\n\n  ajvSchemaPath = getEnv('STORE_OS_AJV_SCHEMA_PATH');\n  if (!fs.existsSync(ajvSchemaPath)) {\n    throw new Error(`CONFIG_MISSING: STORE_OS_AJV_SCHEMA_PATH does not exist: ${ajvSchemaPath}`);\n  }\n}\n\nconst runtimeConfig = {\n  env,\n  project_root:            projectRoot,\n  openai_credential_name:  getEnv('STORE_OS_OPENAI_CREDENTIAL_NAME'),\n  shopify_credential_name: getEnv('STORE_OS_SHOPIFY_CREDENTIAL_NAME'),\n  shopify_shop_url:        getEnv('STORE_OS_SHOPIFY_SHOP_URL'),\n  llm_model:               getEnv('STORE_OS_LLM_MODEL'),\n  shopify_api_version:     getEnv('STORE_OS_SHOPIFY_API_VERSION'),\n  allow_theme_writes:      getEnv('STORE_OS_ALLOW_THEME_WRITES') === 'true',\n  shopify_theme_id:        getEnv('STORE_OS_SHOPIFY_THEME_ID'),\n  ajv_schema_path:         ajvSchemaPath,\n  backup_root:             getEnv('STORE_OS_BACKUP_ROOT'),\n  resolved_at:             new Date().toISOString(),\n  cloud_mode:              cloudMode,\n};\n\nif (cloudMode) {\n  console.warn(\n    'CLOUD_MODE: Running in n8n Cloud compatibility mode. ' +\n    'Config read from trigger input smoke_test_config. ' +\n    'Filesystem operations are disabled for the entire Phase 1 chain. ' +\n    'No artifact persistence or schema validation will occur.'\n  );\n}\n\n// ── Webhook auth guard ────────────────────────────────────────────────────\n// Only enforced when STORE_OS_API_TOKEN is configured.\n// Manual Trigger has no headers → skipped automatically.\n// Webhook Trigger carries headers → token required if STORE_OS_API_TOKEN set.\nconst apiToken = getEnv('STORE_OS_API_TOKEN');\nif (apiToken && triggerRaw.headers) {\n  const authHeader = (triggerRaw.headers['authorization'] || triggerRaw.headers['Authorization'] || '').trim();\n  if (!authHeader.startsWith('Bearer ') || authHeader.slice(7).trim() !== apiToken) {\n    throw new Error(\n      'UNAUTHORIZED_REQUEST: Missing or invalid Authorization header. ' +\n      'Expected: Authorization: Bearer <STORE_OS_API_TOKEN>'\n    );\n  }\n}\n\n// Extract intake_payload from the trigger input\nconst intakePayload = triggerInput.intake_payload;\n\nif (!intakePayload || !intakePayload.project_id) {\n  throw new Error(\n    'MISSING_INPUT: intake_payload with project_id is required. ' +\n    'Provide it as the manual trigger input JSON: { \"intake_payload\": { \"project_id\": \"...\", ... } }'\n  );\n}\n\nreturn [{\n  json: {\n    runtime_config:  runtimeConfig,\n    intake_payload:  intakePayload,\n    chain_step:      'resolve-runtime-config',\n    status:          'SUCCESS',\n  },\n}];\n"
+        "jsCode": "// orchestrate-phase1 — Step 1: Resolve Runtime Config\n// Validates all required environment variables and assembles the runtime config.\n// Any CONFIG_MISSING error halts the entire chain here — before any subworkflow runs.\n//\n// TRIGGER INPUT (manual run):\n//   { \"intake_payload\": { \"project_id\": \"...\", ... } }\n//\n// CLOUD MODE (n8n Cloud): process and require('fs') are not available.\n// Pass a smoke_test_config in the trigger input to supply config values:\n//   {\n//     \"intake_payload\": { \"project_id\": \"...\", ... },\n//     \"smoke_test_config\": {\n//       \"STORE_OS_OPENAI_CREDENTIAL_NAME\": \"OpenAI account\",\n//       \"STORE_OS_SHOPIFY_CREDENTIAL_NAME\": \"Shopify account\",\n//       \"STORE_OS_SHOPIFY_SHOP_URL\": \"my-store.myshopify.com\",\n//       \"STORE_OS_LLM_MODEL\": \"gpt-4o\",\n//       \"STORE_OS_ENV\": \"dev\",\n//       \"STORE_OS_SHOPIFY_API_VERSION\": \"2024-01\"\n//     }\n//   }\n\n// Cloud-mode detection: n8n Cloud exposes neither require('fs') nor process\nlet cloudMode = false;\ntry { require('fs'); } catch (_e) { cloudMode = true; }\nif (typeof process === 'undefined') { cloudMode = true; }\n\n// Extract trigger input early — needed for cloud config fallback\nconst triggerRaw   = $input.first().json;\n// Normalize: webhook trigger wraps payload in .body; manual trigger passes it flat\nconst triggerInput = (triggerRaw.body && typeof triggerRaw.body === 'object') ? triggerRaw.body : triggerRaw;\n\n// Cloud-safe env accessor\n// Self-hosted: reads from process.env\n// Cloud:       reads from trigger input's smoke_test_config object\nconst smokeConfig = (cloudMode && triggerInput.smoke_test_config) ? triggerInput.smoke_test_config : {};\nconst getEnv = cloudMode\n  ? (key) => { const v = smokeConfig[key]; return (v && String(v).trim()) ? String(v).trim() : null; }\n  : (key) => { const v = process.env[key]; return (v && v.trim()) ? v.trim() : null; };\n\n// Core vars required in both cloud and self-hosted modes\nconst REQUIRED_ENV_VARS_CORE = [\n  'STORE_OS_OPENAI_CREDENTIAL_NAME',\n  'STORE_OS_SHOPIFY_CREDENTIAL_NAME',\n  'STORE_OS_SHOPIFY_SHOP_URL',\n  'STORE_OS_LLM_MODEL',\n  'STORE_OS_ENV',\n  'STORE_OS_SHOPIFY_API_VERSION',\n];\n\n// Filesystem vars only required in self-hosted mode\nconst REQUIRED_ENV_VARS_FS = ['STORE_OS_PROJECT_ROOT', 'STORE_OS_AJV_SCHEMA_PATH'];\n\nconst REQUIRED_ENV_VARS = cloudMode\n  ? REQUIRED_ENV_VARS_CORE\n  : [...REQUIRED_ENV_VARS_CORE, ...REQUIRED_ENV_VARS_FS];\n\nconst ALLOWED_ENVS = ['dev', 'staging', 'production'];\n\nconst missing = REQUIRED_ENV_VARS.filter((v) => !getEnv(v));\nif (missing.length > 0) {\n  throw new Error(\n    'CONFIG_MISSING: Required environment variables not set: ' + missing.join(', ') +\n    (cloudMode\n      ? '. In n8n Cloud, pass these as smoke_test_config in the trigger input JSON.'\n      : '. Configure them in n8n Settings > Variables or the n8n process environment.')\n  );\n}\n\nconst env = getEnv('STORE_OS_ENV');\nif (!ALLOWED_ENVS.includes(env)) {\n  throw new Error(`CONFIG_MISSING: STORE_OS_ENV must be one of: ${ALLOWED_ENVS.join(', ')}. Got: \"${env}\"`);\n}\n\n// Filesystem path validation — self-hosted only\n// CLOUD SKIP: fs.existsSync requires local filesystem, not available in n8n Cloud\nlet fs;\nlet projectRoot = null;\nlet ajvSchemaPath = null;\n\nif (!cloudMode) {\n  fs = require('fs');\n  projectRoot = getEnv('STORE_OS_PROJECT_ROOT');\n  if (!fs.existsSync(projectRoot)) {\n    throw new Error(`CONFIG_MISSING: STORE_OS_PROJECT_ROOT does not exist: ${projectRoot}`);\n  }\n\n  ajvSchemaPath = getEnv('STORE_OS_AJV_SCHEMA_PATH');\n  if (!fs.existsSync(ajvSchemaPath)) {\n    throw new Error(`CONFIG_MISSING: STORE_OS_AJV_SCHEMA_PATH does not exist: ${ajvSchemaPath}`);\n  }\n}\n\nconst runtimeConfig = {\n  env,\n  project_root:            projectRoot,\n  openai_credential_name:  getEnv('STORE_OS_OPENAI_CREDENTIAL_NAME'),\n  shopify_credential_name: getEnv('STORE_OS_SHOPIFY_CREDENTIAL_NAME'),\n  shopify_shop_url:        getEnv('STORE_OS_SHOPIFY_SHOP_URL'),\n  llm_model:               getEnv('STORE_OS_LLM_MODEL'),\n  shopify_api_version:     getEnv('STORE_OS_SHOPIFY_API_VERSION'),\n  allow_theme_writes:      getEnv('STORE_OS_ALLOW_THEME_WRITES') === 'true',\n  shopify_theme_id:        getEnv('STORE_OS_SHOPIFY_THEME_ID'),\n  allow_media_generation:  getEnv('STORE_OS_ALLOW_MEDIA_GENERATION') === 'true',\n  media_generation_model:  getEnv('STORE_OS_MEDIA_GENERATION_MODEL') || 'dall-e-3',\n  ajv_schema_path:         ajvSchemaPath,\n  backup_root:             getEnv('STORE_OS_BACKUP_ROOT'),\n  resolved_at:             new Date().toISOString(),\n  cloud_mode:              cloudMode,\n};\n\nif (cloudMode) {\n  console.warn(\n    'CLOUD_MODE: Running in n8n Cloud compatibility mode. ' +\n    'Config read from trigger input smoke_test_config. ' +\n    'Filesystem operations are disabled for the entire Phase 1 chain. ' +\n    'No artifact persistence or schema validation will occur.'\n  );\n}\n\n// ── Webhook auth guard ────────────────────────────────────────────────────\n// Only enforced when STORE_OS_API_TOKEN is configured.\n// Manual Trigger has no headers → skipped automatically.\n// Webhook Trigger carries headers → token required if STORE_OS_API_TOKEN set.\nconst apiToken = getEnv('STORE_OS_API_TOKEN');\nif (apiToken && triggerRaw.headers) {\n  const authHeader = (triggerRaw.headers['authorization'] || triggerRaw.headers['Authorization'] || '').trim();\n  if (!authHeader.startsWith('Bearer ') || authHeader.slice(7).trim() !== apiToken) {\n    throw new Error(\n      'UNAUTHORIZED_REQUEST: Missing or invalid Authorization header. ' +\n      'Expected: Authorization: Bearer <STORE_OS_API_TOKEN>'\n    );\n  }\n}\n\n// Extract intake_payload from the trigger input\nconst intakePayload = triggerInput.intake_payload;\n\nif (!intakePayload || !intakePayload.project_id) {\n  throw new Error(\n    'MISSING_INPUT: intake_payload with project_id is required. ' +\n    'Provide it as the manual trigger input JSON: { \"intake_payload\": { \"project_id\": \"...\", ... } }'\n  );\n}\n\nreturn [{\n  json: {\n    runtime_config:  runtimeConfig,\n    intake_payload:  intakePayload,\n    chain_step:      'resolve-runtime-config',\n    status:          'SUCCESS',\n  },\n}];\n"
       },
       "id": "e5f6a7b8-0005-0005-0005-000000000002",
       "name": "Resolve Runtime Config",
@@ -779,7 +779,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// orchestrate-phase1 — Prepare Store Blueprint Input\n// Assembles Phase 7A input from Phase 6c Complete + upstream artifact refs.\n// Subworkflows do NOT forward upstream artifacts — source them explicitly.\n\nconst phase6cOutput = $input.first().json;\nconst phase5Out     = $node['Phase 5 Complete'].json;\nconst phase6aOut    = $node['Phase 6a Complete'].json;\nconst phase6bOut    = $node['Phase 6b Complete'].json;\nconst preSynth      = $node['Prepare Strategy Synthesis Input'].json;\n\nconst output = {\n  project_id:        phase6cOutput.project_id  || preSynth.project_id,\n  runtime_config:    phase6cOutput.runtime_config || preSynth.runtime_config,\n  strategy_synthesis: phase5Out.strategy_synthesis || null,\n  offer_architecture: phase6aOut.offer_architecture || null,\n  content_strategy:   phase6bOut.content_strategy  || null,\n  gtm_plan:           phase6cOutput.gtm_plan        || null,\n};\n\nif (!output.strategy_synthesis) {\n  throw new Error('Prepare Store Blueprint Input: strategy_synthesis missing from Phase 5 Complete output.');\n}\nif (!output.offer_architecture) {\n  throw new Error('Prepare Store Blueprint Input: offer_architecture missing from Phase 6a Complete output.');\n}\nif (!output.content_strategy) {\n  throw new Error('Prepare Store Blueprint Input: content_strategy missing from Phase 6b Complete output.');\n}\nif (!output.gtm_plan) {\n  throw new Error('Prepare Store Blueprint Input: gtm_plan missing from Phase 6c Complete output.');\n}\n\nconsole.log('Prepare Store Blueprint Input: assembled for project=' + output.project_id);\nreturn [{ json: output }];\n"
+        "jsCode": "// orchestrate-phase1 — Prepare Store Blueprint Input\n// Assembles Phase 7A input from Phase 6c Complete + upstream artifact refs.\n// Subworkflows do NOT forward upstream artifacts — source them explicitly.\n\nconst phase6cOutput = $input.first().json;\nconst phase5Out     = $node['Phase 5 Complete'].json;\nconst phase6aOut    = $node['Phase 6a Complete'].json;\nconst phase6bOut    = $node['Phase 6b Complete'].json;\nconst preSynth      = $node['Prepare Strategy Synthesis Input'].json;\n\n// Grab shopify_import from import-shopify-data (real products + collections with real handles).\n// Passed to build-store-blueprint so the LLM binds to real handles instead of inventing ghost ones.\nconst importOut = ($node['Run import-shopify-data'].json || {});\n\nconst output = {\n  project_id:        phase6cOutput.project_id  || preSynth.project_id,\n  runtime_config:    phase6cOutput.runtime_config || preSynth.runtime_config,\n  strategy_synthesis: phase5Out.strategy_synthesis || null,\n  offer_architecture: phase6aOut.offer_architecture || null,\n  content_strategy:   phase6bOut.content_strategy  || null,\n  gtm_plan:           phase6cOutput.gtm_plan        || null,\n  shopify_import:     importOut.shopify_import      || null,\n};\n\nif (!output.strategy_synthesis) {\n  throw new Error('Prepare Store Blueprint Input: strategy_synthesis missing from Phase 5 Complete output.');\n}\nif (!output.offer_architecture) {\n  throw new Error('Prepare Store Blueprint Input: offer_architecture missing from Phase 6a Complete output.');\n}\nif (!output.content_strategy) {\n  throw new Error('Prepare Store Blueprint Input: content_strategy missing from Phase 6b Complete output.');\n}\nif (!output.gtm_plan) {\n  throw new Error('Prepare Store Blueprint Input: gtm_plan missing from Phase 6c Complete output.');\n}\n\nconsole.log('Prepare Store Blueprint Input: assembled for project=' + output.project_id + ' shopify_import=' + (output.shopify_import ? 'present(products=' + ((output.shopify_import.products||[]).length) + ',collections=' + ((output.shopify_import.collections||[]).length) + ')' : 'missing'));\nreturn [{ json: output }];\n"
       },
       "id": "f2a3b4c5-0007-007a-007a-000000000011",
       "name": "Prepare Store Blueprint Input",
@@ -929,16 +929,25 @@
           },
           "conditions": [
             {
-              "id": "7b1aorch-cond-07b1-07b1-000000000001",
+              "id": "7b1-hard-0001",
               "leftValue": "={{ $json.status }}",
-              "rightValue": "PHASE_7B1_FAILED",
+              "rightValue": "PHASE_7B1_COMPLETE",
               "operator": {
                 "type": "string",
-                "operation": "notEquals"
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "7b1-hard-0002",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "PHASE_7B1_PARTIAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
               }
             }
           ],
-          "combinator": "and"
+          "combinator": "or"
         },
         "options": {}
       },
@@ -1014,16 +1023,25 @@
           },
           "conditions": [
             {
-              "id": "7b2aorch-cond-07b2-07b2-000000000001",
+              "id": "7b2-hard-0001",
               "leftValue": "={{ $json.status }}",
-              "rightValue": "PHASE_7B2_FAILED",
+              "rightValue": "PHASE_7B2_COMPLETE",
               "operator": {
                 "type": "string",
-                "operation": "notEquals"
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "7b2-hard-0002",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "PHASE_7B2_PARTIAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
               }
             }
           ],
-          "combinator": "and"
+          "combinator": "or"
         },
         "options": {}
       },
@@ -1064,14 +1082,42 @@
     },
     {
       "parameters": {
-        "jsCode": "// orchestrate-phase1 — Prepare Theme Input\n// Assembles Phase 7B.3 input from Phase 7B.2 Complete output.\n// Passes store_blueprint + runtime_config to build-shopify-theme.\n\nconst phase7b2Out = $input.first().json;\n\nconst output = {\n  project_id:       phase7b2Out.project_id,\n  runtime_config:   phase7b2Out.runtime_config,\n  store_blueprint:  phase7b2Out.store_blueprint,\n  content_strategy: phase7b2Out.content_strategy,\n};\n\nif (!output.store_blueprint) {\n  throw new Error('Prepare Theme Input: store_blueprint missing from Phase 7B.2 Complete output.');\n}\nif (!output.runtime_config) {\n  throw new Error('Prepare Theme Input: runtime_config missing from Phase 7B.2 Complete output.');\n}\n\nconsole.log('Prepare Theme Input: assembled for project=' + output.project_id);\nreturn [{ json: output }];\n"
+        "jsCode": "// orchestrate-phase1 — Prepare Theme Rules Input (Phase 10)\n// Packages all upstream artifacts for build-theme-rules consumption.\n// build-theme-rules uses these to classify the store pattern and produce theme_rules.\n\nconst phase7b2Out = $input.first().json;\n\nif (!phase7b2Out.store_profile) {\n  throw new Error('Prepare Theme Rules Input: store_profile missing from Phase 7B.2 output.');\n}\nif (!phase7b2Out.brand_positioning) {\n  throw new Error('Prepare Theme Rules Input: brand_positioning missing from Phase 7B.2 output.');\n}\n\nconsole.log('Prepare Theme Rules Input: assembled for project=' + phase7b2Out.project_id);\n\nreturn [{\n  json: {\n    project_id:          phase7b2Out.project_id,\n    runtime_config:      phase7b2Out.runtime_config,\n    store_profile:       phase7b2Out.store_profile,\n    brand_positioning:   phase7b2Out.brand_positioning,\n    market_intelligence: phase7b2Out.market_intelligence || {},\n    competitor_clusters: phase7b2Out.competitor_clusters || {},\n    strategy_synthesis:  phase7b2Out.strategy_synthesis  || {},\n    offer_architecture:  phase7b2Out.offer_architecture  || {},\n    content_strategy:    phase7b2Out.content_strategy    || {},\n    store_blueprint:     phase7b2Out.store_blueprint,\n  },\n}];\n"
+      },
+      "id": "p10-orch-0001",
+      "name": "Prepare Theme Rules Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        12250,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "REPLACE_WITH_BUILD_THEME_RULES_WORKFLOW_ID",
+        "options": {}
+      },
+      "id": "p10-orch-0002",
+      "name": "Run build-theme-rules",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "continueOnFail": true,
+      "position": [
+        12500,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Prepare Theme Input\n// Assembles Phase 7B.3 input from upstream artifacts.\n// Now includes theme_rules (Phase 10) and media_assets (Phase 9).\n\nconst phase7b2Out   = $('Phase 7B.2 Complete').first().json;\nconst themeRulesOut = $('Run build-theme-rules').first().json;\nconst mediaOut      = $('Run build-media-assets').first().json;\n\n// Extract theme_rules if build-theme-rules succeeded\nconst themeRules = (themeRulesOut && themeRulesOut.theme_rules && themeRulesOut.theme_rules.status === 'PHASE_10_COMPLETE')\n  ? themeRulesOut.theme_rules\n  : null;\n\nif (themeRules) {\n  console.log('Prepare Theme Input: theme_rules present — pattern=' + themeRules.store_pattern);\n} else {\n  console.log('Prepare Theme Input: no theme_rules — build-shopify-theme will use blueprint sections');\n}\n\n// Extract media_assets for theme asset binding\nconst mediaAssets = (mediaOut && (mediaOut.status === 'PHASE_9_COMPLETE' || mediaOut.status === 'PHASE_9_PARTIAL'))\n  ? mediaOut.media_assets\n  : [];\n\nconsole.log('Prepare Theme Input: ' + mediaAssets.length + ' media assets available for theme binding');\n\nconst output = {\n  project_id:       phase7b2Out.project_id,\n  runtime_config:   phase7b2Out.runtime_config,\n  store_blueprint:  phase7b2Out.store_blueprint,\n  content_strategy: phase7b2Out.content_strategy,\n  theme_rules:      themeRules,\n  media_assets:     mediaAssets,\n};\n\nif (!output.store_blueprint) {\n  throw new Error('Prepare Theme Input: store_blueprint missing from Phase 7B.2 Complete output.');\n}\nif (!output.runtime_config) {\n  throw new Error('Prepare Theme Input: runtime_config missing from Phase 7B.2 Complete output.');\n}\n\nconsole.log('Prepare Theme Input: assembled for project=' + output.project_id);\nreturn [{ json: output }];"
       },
       "id": "7b3-bridge-0001",
       "name": "Prepare Theme Input",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        12750,
+        14250,
         180
       ]
     },
@@ -1085,7 +1131,7 @@
       "type": "n8n-nodes-base.executeWorkflow",
       "typeVersion": 1,
       "position": [
-        13000,
+        14500,
         180
       ]
     },
@@ -1099,16 +1145,25 @@
           },
           "conditions": [
             {
-              "id": "7b3-bridge-cond-0001",
+              "id": "7b3-hard-0001",
               "leftValue": "={{ $json.status }}",
-              "rightValue": "PHASE_7B3_FAILED",
+              "rightValue": "PHASE_7B3_COMPLETE",
               "operator": {
                 "type": "string",
-                "operation": "notEquals"
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "7b3-hard-0002",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "PHASE_7B3_PARTIAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
               }
             }
           ],
-          "combinator": "and"
+          "combinator": "or"
         },
         "options": {}
       },
@@ -1117,20 +1172,20 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        13250,
+        14750,
         180
       ]
     },
     {
       "parameters": {
-        "jsCode": "// orchestrate-phase1 — Phase 7B.3 Complete\n// Terminal node for the full Phase 1–7B.3 chain.\n// Returns all 12 artifacts inline. Top-level status reflects theme deployment result.\n\nconst phase7b2Out = $('Phase 7B.2 Complete').first().json;\nconst themeOut    = $('Run build-shopify-theme').first().json;\n\n// Determine top-level status from theme deployment\nconst themeStatus = themeOut.status || 'PHASE_7B3_FAILED';\nlet topStatus;\nif (themeStatus === 'PHASE_7B3_COMPLETE') topStatus = 'PHASE_7B3_COMPLETE';\nelse if (themeStatus === 'PHASE_7B3_PARTIAL') topStatus = 'PHASE_7B3_PARTIAL';\nelse if (themeStatus === 'PHASE_7B3_DRY_RUN') topStatus = 'PHASE_7B3_DRY_RUN';\nelse if (themeStatus === 'PHASE_7B3_BLOCKED') topStatus = 'PHASE_7B3_BLOCKED';\nelse topStatus = 'PHASE_7B3_FAILED';\n\nconst summary = {\n  ...phase7b2Out,\n  status: topStatus,\n  next_phase: 'Phase 7B.4 — Store Build (theme publish)',\n\n  shopify_theme_deployment: {\n    status:           themeOut.status,\n    theme_id:         themeOut.theme_id,\n    theme_name:       themeOut.theme_name,\n    sections_written: themeOut.sections_written,\n    assets_written:   themeOut.assets_written,\n    dry_run:          themeOut.dry_run,\n    dry_run_plan:     themeOut.dry_run_plan || undefined,\n    errors:           themeOut.errors,\n    warnings:         themeOut.warnings,\n    shop_url:         themeOut.shop_url,\n    blueprint_summary: themeOut.blueprint_summary,\n    safety_notes:     themeOut.safety_notes,\n  },\n};\n\nreturn [{ json: summary }];\n"
+        "jsCode": "// orchestrate-phase1 — Phase 7B.3 Complete (TERMINAL)\n// Returns all artifacts inline. Includes media generation + section→media mapping.\n// Success requires: theme written + media generated + mappings confirmed.\n\nconst phase7b2Out = $('Phase 7B.2 Complete').first().json;\nconst themeOut    = $('Run build-shopify-theme').first().json;\nconst mediaOut    = $('Run build-media-assets').first().json;\nlet groundOut = null;\ntry { groundOut = $('Run build-image-grounding').first().json; } catch (_e) { /* grounding was bypassed — no images */ }\nconst themeRulesOut = $('Run build-theme-rules').first().json;\n\n// ── Determine top-level status ──\nconst themeStatus = themeOut.status || 'PHASE_7B3_FAILED';\nconst mediaStatus = mediaOut.status || 'PHASE_9_FAILED';\n\nlet topStatus;\nif (themeStatus === 'PHASE_7B3_COMPLETE' && mediaStatus === 'PHASE_9_COMPLETE') {\n  topStatus = 'GOLD_PATH_COMPLETE';\n} else if (themeStatus === 'PHASE_7B3_COMPLETE' && mediaStatus === 'PHASE_9_PARTIAL') {\n  topStatus = 'GOLD_PATH_PARTIAL';\n} else if (themeStatus === 'PHASE_7B3_PARTIAL' || mediaStatus === 'PHASE_9_PARTIAL') {\n  topStatus = 'GOLD_PATH_PARTIAL';\n} else {\n  topStatus = themeStatus;  // DRY_RUN, BLOCKED, etc.\n}\n\n// ── Build section → media mapping ──\nconst mediaAssets = mediaOut.media_assets || [];\nconst sectionMediaMap = {};\nfor (const asset of mediaAssets) {\n  const section = asset.source_section || 'unassigned';\n  if (!sectionMediaMap[section]) sectionMediaMap[section] = [];\n  sectionMediaMap[section].push({\n    asset_id:         asset.asset_id,\n    shot_type:        asset.shot_type,\n    product_handle:   asset.product_handle,\n    status:           asset.status,\n    generation_mode:  asset.generation_mode,\n    grounding_confidence: asset.grounding_confidence,\n    url:              asset.url || null,\n    local_path:       asset.local_path || null,\n  });\n}\n\n// ── Build product → media mapping ──\nconst productMediaMap = {};\nfor (const asset of mediaAssets) {\n  const handle = asset.product_handle;\n  if (!productMediaMap[handle]) productMediaMap[handle] = [];\n  productMediaMap[handle].push({\n    asset_id:   asset.asset_id,\n    shot_type:  asset.shot_type,\n    status:     asset.status,\n    url:        asset.url || null,\n  });\n}\n\n// ── Extract theme_rules ──\nconst themeRules = (themeRulesOut && themeRulesOut.theme_rules && themeRulesOut.theme_rules.status === 'PHASE_10_COMPLETE')\n  ? themeRulesOut.theme_rules\n  : null;\n\n// ── Extract image_grounding summary ──\nconst groundingSummary = (groundOut && groundOut.status)\n  ? {\n      status: groundOut.status,\n      products_analyzed: groundOut.products_analyzed || 0,\n      grounding_model: groundOut.grounding_model || null,\n    }\n  : null;\n\n// ── Assemble final output ──\nconst summary = {\n  ...phase7b2Out,\n  status: topStatus,\n\n  // Phase 10 — Theme Rules\n  theme_rules: themeRules,\n\n  // Phase 12 — Image Grounding\n  image_grounding_summary: groundingSummary,\n\n  // Phase 9 — Media Generation\n  media_generation: {\n    status:             mediaOut.status,\n    mode:               (mediaOut.generation_summary || {}).mode,\n    images_generated:   (mediaOut.generation_summary || {}).images_generated || 0,\n    images_failed:      (mediaOut.generation_summary || {}).images_failed || 0,\n    images_skipped:     (mediaOut.generation_summary || {}).images_skipped || 0,\n    prompts_generated:  (mediaOut.generation_summary || {}).prompts_generated || 0,\n    total_assets:       mediaAssets.length,\n    assets_by_status:   mediaAssets.reduce((acc, a) => { acc[a.status] = (acc[a.status] || 0) + 1; return acc; }, {}),\n  },\n\n  // Visible output mappings\n  section_media_map:  sectionMediaMap,\n  product_media_map:  productMediaMap,\n\n  // Phase 7B.3 — Theme Deployment + Storefront Assembly\n  shopify_theme_deployment: {\n    status:            themeOut.status,\n    theme_id:          themeOut.theme_id,\n    theme_name:        themeOut.theme_name,\n    sections_written:  themeOut.sections_written,\n    assets_written:    themeOut.assets_written,\n    templates_written: themeOut.templates_written || 0,\n    written_files:     themeOut.written_files || [],\n    dry_run:           themeOut.dry_run,\n    dry_run_plan:      themeOut.dry_run_plan || undefined,\n    errors:            themeOut.errors,\n    warnings:          themeOut.warnings,\n    shop_url:          themeOut.shop_url,\n    safety_notes:      themeOut.safety_notes,\n  },\n};\n\nreturn [{ json: summary }];"
       },
       "id": "7b3-bridge-0004",
       "name": "Phase 7B.3 Complete",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        13500,
+        15000,
         60
       ]
     },
@@ -1143,8 +1198,172 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        13500,
+        15000,
         300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Prepare Image Grounding Input (Phase 12)\n// Assembles input for build-image-grounding from upstream artifacts.\n// Adds has_images flag for conditional routing.\n\nconst phase7b2Out = $('Phase 7B.2 Complete').first().json;\nconst importOut   = $('Run import-shopify-data').first().json;\n\n// Get product image URLs from Shopify import (real CDN images)\nconst shopifyImport = importOut.shopify_import || importOut;\nconst rawProducts = shopifyImport.raw_products || shopifyImport.products || [];\n\n// Map product handles to their images from Shopify\nconst productImages = {};\nfor (const p of rawProducts) {\n  const handle = p.handle;\n  if (handle && p.images && p.images.length > 0) {\n    productImages[handle] = p.images;\n  }\n}\n\n// Merge image URLs into store_blueprint products\nconst products = (phase7b2Out.store_blueprint.products || []).map(bp => {\n  const shopifyImages = productImages[bp.handle] || [];\n  return {\n    ...bp,\n    images: shopifyImages.length > 0\n      ? shopifyImages.map(img => ({ src: img.src, alt: img.alt || bp.title }))\n      : (bp.images || []),\n  };\n});\n\nconst productsWithImages = products.filter(p => p.images && p.images.length > 0);\nconst hasImages = productsWithImages.length > 0;\n\nconsole.log('Prepare Image Grounding Input: ' + productsWithImages.length + '/' + products.length + ' products have images. has_images=' + hasImages);\n\nreturn [{\n  json: {\n    has_images:      hasImages,\n    project_id:      phase7b2Out.project_id,\n    runtime_config:  phase7b2Out.runtime_config,\n    store_blueprint: { ...phase7b2Out.store_blueprint, products },\n  },\n}];"
+      },
+      "id": "p12-orch-0001",
+      "name": "Prepare Image Grounding Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        12750,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_BUILD_IMAGE_GROUNDING_WORKFLOW_ID",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "p12-orch-0002",
+      "name": "Run build-image-grounding",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        13000,
+        180
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Prepare Media Assets Input (Phase 9)\n// Assembles input for build-media-assets from all upstream artifacts.\n// Receives input from EITHER:\n//   1. Normalize Grounding Result (when products had images)\n//   2. Has Images To Ground? false branch (when no images available)\n\nconst phase7b2Out    = $('Phase 7B.2 Complete').first().json;\nconst themeRulesOut  = $('Run build-theme-rules').first().json;\n\n// Get grounding data from input (may come from either path)\nconst inputData = $input.first().json;\n\n// Extract theme_rules if build-theme-rules succeeded\nconst themeRules = (themeRulesOut && themeRulesOut.theme_rules && themeRulesOut.theme_rules.status === 'PHASE_10_COMPLETE')\n  ? themeRulesOut.theme_rules\n  : null;\n\n// Extract image_grounding — either from grounding workflow or null\nlet imageGrounding = null;\nif (inputData && inputData.status &&\n    (inputData.status === 'PHASE_12_COMPLETE' || inputData.status === 'PHASE_12_PARTIAL')) {\n  imageGrounding = inputData;\n}\n\nif (themeRules) {\n  console.log('Prepare Media Assets Input: theme_rules present — pattern=' + themeRules.store_pattern);\n} else {\n  console.log('Prepare Media Assets Input: no theme_rules — will use 5-shot fallback');\n}\n\nif (imageGrounding) {\n  console.log('Prepare Media Assets Input: image_grounding present — ' + (imageGrounding.products_analyzed || 0) + ' products analyzed');\n} else {\n  console.log('Prepare Media Assets Input: no image_grounding — will use text-only prompts');\n}\n\nreturn [{\n  json: {\n    project_id:        phase7b2Out.project_id,\n    runtime_config:    phase7b2Out.runtime_config,\n    store_profile:     phase7b2Out.store_profile,\n    brand_positioning: phase7b2Out.brand_positioning,\n    store_blueprint:   phase7b2Out.store_blueprint,\n    content_strategy:  phase7b2Out.content_strategy,\n    theme_rules:       themeRules,\n    image_grounding:   imageGrounding,\n  },\n}];"
+      },
+      "id": "p9-orch-0001",
+      "name": "Prepare Media Assets Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        13250,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "REPLACE_WITH_BUILD_MEDIA_ASSETS_WORKFLOW_ID",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "p9-orch-0002",
+      "name": "Run build-media-assets",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        13500,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "p9-orch-cond-0001",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "PHASE_9_COMPLETE",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "p9-orch-cond-0002",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "PHASE_9_PARTIAL",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "p9-orch-0003",
+      "name": "Media Assets Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        13750,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Halt: Media Assets Failed\n// Reached when build-media-assets does not return PHASE_9_COMPLETE or PHASE_9_PARTIAL.\n\nconst mediaOut = $('Run build-media-assets').first().json;\n\nthrow new Error(\n  'CHAIN_HALT: build-media-assets returned ' + (mediaOut.status || 'unknown') +\n  '. Expected PHASE_9_COMPLETE or PHASE_9_PARTIAL. ' +\n  'Errors: ' + JSON.stringify(mediaOut.errors || [])\n);"
+      },
+      "id": "p9-orch-0004",
+      "name": "Halt - Media Assets Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        14000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "p12-ground-cond-0001",
+              "leftValue": "={{ $json.has_images }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "p12-orch-0010",
+      "name": "Has Images To Ground?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        12875,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// orchestrate-phase1 — Normalize Grounding Result\n// Ensures the grounding step always produces exactly 1 item for downstream consumption.\n// If build-image-grounding returned data, pass it through.\n// If it returned nothing (0 items) or errored, produce a null placeholder.\n\nconst items = $input.all();\n\nif (items.length > 0 && items[0].json && items[0].json.status) {\n  // Grounding returned valid data\n  console.log('Normalize Grounding Result: grounding data present — status=' + items[0].json.status);\n  return items;\n}\n\n// Grounding returned nothing or errored — produce null placeholder\nconsole.log('Normalize Grounding Result: no grounding data — continuing with text-only prompts');\nconst prepInput = $('Prepare Image Grounding Input').first().json;\nreturn [{\n  json: {\n    status: null,\n    project_id: prepInput.project_id,\n    products_analyzed: 0,\n    grounding_model: null,\n    products: [],\n    _grounding_skipped: true,\n  },\n}];"
+      },
+      "id": "p12-orch-0011",
+      "name": "Normalize Grounding Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        13125,
+        60
       ]
     }
   ],
@@ -1827,7 +2046,29 @@
       "main": [
         [
           {
-            "node": "Prepare Theme Input",
+            "node": "Prepare Theme Rules Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Theme Rules Input": {
+      "main": [
+        [
+          {
+            "node": "Run build-theme-rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run build-theme-rules": {
+      "main": [
+        [
+          {
+            "node": "Prepare Image Grounding Input",
             "type": "main",
             "index": 0
           }
@@ -1873,6 +2114,97 @@
           }
         ]
       ]
+    },
+    "Prepare Image Grounding Input": {
+      "main": [
+        [
+          {
+            "node": "Has Images To Ground?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run build-image-grounding": {
+      "main": [
+        [
+          {
+            "node": "Normalize Grounding Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Media Assets Input": {
+      "main": [
+        [
+          {
+            "node": "Run build-media-assets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run build-media-assets": {
+      "main": [
+        [
+          {
+            "node": "Media Assets Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Media Assets Success?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Theme Input",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Halt - Media Assets Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Images To Ground?": {
+      "main": [
+        [
+          {
+            "node": "Run build-image-grounding",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Media Assets Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Grounding Result": {
+      "main": [
+        [
+          {
+            "node": "Prepare Media Assets Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -1881,7 +2213,7 @@
   },
   "_meta": {
     "storeOs": {
-      "phase": "Phase 12/13/14/15/16/7A/7B.1",
+      "phase": "Phase 12/13/14/15/16/7A/7B.1/7B.2/7B.3/10",
       "format": "n8n-executable",
       "sourceSpec": "workflows/runtime/n8n-implementation-map.md",
       "cloudCompatibility": "PARTIAL — the full chain runs in both modes. In cloud mode: no artifact persistence, no schema validation, no checkpoint/log writes. shopify_import, store_profile, market_intelligence, brand_positioning, competitor_clusters, and strategy_synthesis flow inline through bridge nodes. Config is supplied via smoke_test_config in the trigger input (no process.env access).",

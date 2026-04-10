@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://store-os.dev/schemas/phase-9/shot-taxonomy.schema.json",
+  "title": "Shot Taxonomy Schema",
+  "description": "Deterministic shot type definitions. Each product receives the same fixed set of shots with defined camera, composition, and purpose.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["shot_types"],
+  "properties": {
+    "shot_types": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "shot_id",
+          "shot_name",
+          "camera_angle",
+          "composition",
+          "background_type",
+          "purpose",
+          "aspect_ratio",
+          "priority",
+          "required"
+        ],
+        "properties": {
+          "shot_id": {
+            "type": "string",
+            "enum": [
+              "studio_packshot",
+              "clean_feature",
+              "lifestyle_context",
+              "hero_wide",
+              "detail_closeup",
+              "group_shot",
+              "scale_reference"
+            ],
+            "description": "Unique identifier for this shot type."
+          },
+          "shot_name": {
+            "type": "string",
+            "description": "Human-readable name for the shot type."
+          },
+          "camera_angle": {
+            "type": "string",
+            "enum": [
+              "front-center",
+              "three-quarter-left",
+              "three-quarter-right",
+              "top-down",
+              "eye-level",
+              "low-angle",
+              "45-degree-above",
+              "macro-detail"
+            ],
+            "description": "Fixed camera angle for this shot type."
+          },
+          "composition": {
+            "type": "string",
+            "enum": [
+              "centered-subject",
+              "rule-of-thirds-left",
+              "rule-of-thirds-right",
+              "full-frame",
+              "negative-space-right",
+              "negative-space-left",
+              "symmetrical"
+            ],
+            "description": "Composition rule applied to this shot."
+          },
+          "background_type": {
+            "type": "string",
+            "enum": [
+              "pure-white",
+              "studio-gradient",
+              "contextual-environment",
+              "brand-color",
+              "transparent",
+              "surface-only"
+            ],
+            "description": "Background treatment for this specific shot type."
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "conversion",
+              "trust",
+              "clarity",
+              "aspiration",
+              "detail-verification",
+              "social-proof",
+              "hero-impact"
+            ],
+            "description": "Strategic purpose this shot serves in the buyer journey."
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "enum": ["1:1", "4:5", "3:4", "16:9", "9:16", "3:2", "2:3"],
+            "description": "Output aspect ratio for this shot type."
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "description": "Generation priority (1 = highest). Determines order when resource-constrained."
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Whether this shot is mandatory for every product."
+          },
+          "prompt_emphasis": {
+            "type": "string",
+            "description": "Key visual elements to emphasize in the generation prompt."
+          }
+        }
+      }
+    }
+  }
+}

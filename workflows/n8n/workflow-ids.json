@@ -4,7 +4,15 @@
     "purpose": "Used by scripts/deploy-workflow.js to substitute REPLACE_WITH_* placeholders before deploying repo workflow JSON to n8n.",
     "instance": "n8n Cloud — Claude - Code & GPT - Shopify Webbuilder Workflow",
     "warning": "These IDs are instance-specific. Do not use for a different n8n instance without updating all values.",
-    "last_verified": "2026-04-07"
+    "last_verified": "2026-04-09"
+  },
+  "persistent_theme": {
+    "theme_id": "194584281428",
+    "theme_name": "store-os // system-draft",
+    "theme_role": "unpublished",
+    "shop_domain": "8zw111-cj.myshopify.com",
+    "created_at": "2026-04-09T09:41:23+02:00",
+    "note": "Single persistent draft theme for all store-os writes. Never publish this — it is the dev/staging target."
   },
   "workflows": {
     "orchestrate-phase1":        "SCRLaQ9jFVo12zNR",
@@ -22,7 +30,10 @@
     "build-store-blueprint":     "j1JVNqqyidlKUIHX",
     "build-shopify-catalog":          "oZE0Z9fb4ojnKiDd",
     "build-shopify-pages-navigation": "LADq8PuMRuswIxJa",
-    "build-shopify-theme":            "QG5ezHb3qKjKcvvn"
+    "build-theme-rules":              "KzFBogj7kusXQqlp",
+    "build-shopify-theme":            "QG5ezHb3qKjKcvvn",
+    "build-media-assets":             "krR10um8F1pT0miQ",
+    "build-image-grounding":          "s5aWmVZcerBgc6kM"
   },
   "placeholder_map": {
     "REPLACE_WITH_INTAKE_STORE_INPUT_WORKFLOW_ID":           "intake-store-input",
@@ -38,12 +49,15 @@
     "REPLACE_WITH_BUILD_STORE_BLUEPRINT_WORKFLOW_ID":        "build-store-blueprint",
     "REPLACE_WITH_BUILD_SHOPIFY_CATALOG_WORKFLOW_ID":             "build-shopify-catalog",
     "REPLACE_WITH_BUILD_SHOPIFY_PAGES_NAVIGATION_WORKFLOW_ID":    "build-shopify-pages-navigation",
-    "REPLACE_WITH_BUILD_SHOPIFY_THEME_WORKFLOW_ID":              "build-shopify-theme"
+    "REPLACE_WITH_BUILD_THEME_RULES_WORKFLOW_ID":                "build-theme-rules",
+    "REPLACE_WITH_BUILD_SHOPIFY_THEME_WORKFLOW_ID":              "build-shopify-theme",
+    "REPLACE_WITH_BUILD_MEDIA_ASSETS_WORKFLOW_ID":               "build-media-assets",
+    "REPLACE_WITH_BUILD_IMAGE_GROUNDING_WORKFLOW_ID":            "build-image-grounding"
   },
   "credential_placeholders": {
     "_note": "Credential IDs are instance-specific and must be set manually in n8n. These placeholders appear in subworkflow JSON files and require the numeric credential ID from n8n Settings > Credentials (visible in the URL when editing a credential).",
     "REPLACE_WITH_N8N_OPENAI_CREDENTIAL_ID": {
-      "used_in": ["build-market-intelligence.n8n.json", "build-brand-positioning.n8n.json", "build-competitor-clusters.n8n.json", "build-strategy-synthesis.n8n.json", "build-offer-architecture.n8n.json", "build-content-strategy.n8n.json", "build-gtm-plan.n8n.json", "build-store-blueprint.n8n.json"],
+      "used_in": ["build-market-intelligence.n8n.json", "build-brand-positioning.n8n.json", "build-competitor-clusters.n8n.json", "build-strategy-synthesis.n8n.json", "build-offer-architecture.n8n.json", "build-content-strategy.n8n.json", "build-gtm-plan.n8n.json", "build-store-blueprint.n8n.json", "build-media-assets.n8n.json"],
       "credential_type": "OpenAI API",
       "n8n_credential_name": "OpenAI store-os",
       "value": "5CfwoK6S974OrztD"
@@ -54,6 +68,12 @@
       "n8n_credential_name": "Shopify SuppliedTech Admin",
       "value": "CO1JGlTR5RJ9Cs6x",
       "note": "import-shopify-data migrated from shopifyApi to shopifyOAuth2Api (2026-04-08). All Shopify workflows now use the same OAuth2 credential."
+    },
+    "STORE_OS_GEMINI_CREDENTIAL_ID": {
+      "used_in": ["build-image-grounding.n8n.json"],
+      "credential_type": "googlePalmApi",
+      "n8n_credential_name": "Google Gemini(PaLM) Api account",
+      "value": "ISGPBEdBrApjlhNC"
     },
     "STORE_OS_SHOPIFY_OAUTH2_CREDENTIAL_ID": {
       "used_in": ["import-shopify-data.n8n.json", "build-shopify-catalog.n8n.json", "build-shopify-pages-navigation.n8n.json"],

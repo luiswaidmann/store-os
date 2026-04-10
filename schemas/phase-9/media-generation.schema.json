@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://store-os.dev/schemas/phase-9/media-generation.schema.json",
+  "title": "Media Generation Output Schema",
+  "description": "Structured output artifact from Phase 9 media generation. Contains visual system, shot plan, generated prompts, and asset manifest. Phase 11 extends this with media_plan (section-driven shot selection) and per-asset layout provenance fields.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "project_id",
+    "completed_at",
+    "visual_system",
+    "shot_taxonomy",
+    "media_assets",
+    "generation_summary",
+    "storage"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "PHASE_9_COMPLETE",
+        "PHASE_9_PARTIAL",
+        "PHASE_9_PROMPTS_ONLY",
+        "PHASE_9_FAILED"
+      ],
+      "description": "Terminal status of media generation phase."
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "visual_system": {
+      "$ref": "visual-system.schema.json",
+      "description": "The resolved visual system used for this generation run."
+    },
+    "shot_taxonomy": {
+      "$ref": "shot-taxonomy.schema.json",
+      "description": "The shot taxonomy applied to all products."
+    },
+    "media_plan": {
+      "oneOf": [
+        { "$ref": "../phase-11/media-plan.schema.json" },
+        { "type": "null" }
+      ],
+      "description": "Phase 11 section-driven media plan. Present when theme_rules were available; null when using legacy 5-shot fallback."
+    },
+    "media_assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "asset_id",
+          "product_handle",
+          "shot_type",
+          "prompt",
+          "status",
+          "metadata"
+        ],
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "pattern": "^[a-z0-9-]+$",
+            "description": "Deterministic ID: {product_handle}-{shot_type}"
+          },
+          "product_handle": {
+            "type": "string",
+            "description": "Product handle from store_blueprint."
+          },
+          "product_title": {
+            "type": "string",
+            "description": "Product display title."
+          },
+          "shot_type": {
+            "type": "string",
+            "enum": [
+              "studio_packshot",
+              "clean_feature",
+              "lifestyle_context",
+              "hero_wide",
+              "detail_closeup",
+              "group_shot",
+              "scale_reference"
+            ]
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The deterministic generation prompt produced by the template system."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "generated",
+              "prompt_only",
+              "failed",
+              "skipped"
+            ],
+            "description": "Whether this asset was generated, only prompted, or failed."
+          },
+          "local_path": {
+            "type": ["string", "null"],
+            "description": "Local filesystem path (null in cloud mode)."
+          },
+          "url": {
+            "type": ["string", "null"],
+            "description": "Remote URL if image was generated via API."
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["aspect_ratio", "generation_model", "timestamp"],
+            "properties": {
+              "aspect_ratio": {
+                "type": "string",
+                "enum": ["1:1", "4:5", "3:4", "16:9", "9:16", "3:2", "2:3"]
+              },
+              "generation_model": {
+                "type": "string",
+                "description": "Model used for generation (e.g., dall-e-3, placeholder)."
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "dimensions_px": {
+                "type": "string",
+                "description": "Output dimensions in pixels (e.g., 1024x1024)."
+              },
+              "file_size_bytes": {
+                "type": ["integer", "null"]
+              },
+              "quality_score": {
+                "type": ["number", "null"],
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Optional quality gate score (0-1)."
+              }
+            }
+          },
+          "shopify_mapping": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "target_type": {
+                "type": "string",
+                "enum": ["product_image", "collection_image", "theme_asset", "page_image"]
+              },
+              "target_handle": {
+                "type": "string"
+              },
+              "position": {
+                "type": ["integer", "null"],
+                "description": "Image position in Shopify gallery (1-based)."
+              }
+            },
+            "description": "Pre-computed Shopify delivery mapping (Phase 9G)."
+          },
+          "source_section": {
+            "type": ["string", "null"],
+            "description": "Phase 11: The homepage section that drove this shot's inclusion (e.g. 'hero', 'featured-collection', 'baseline', 'fallback')."
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": "Phase 11: Generation priority. high = first, medium = second, low = last (may be skipped in cost-constrained modes)."
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Phase 11: Whether this shot is required by the layout. Required shots are always generated in full_generation mode."
+          },
+          "intended_usage": {
+            "type": ["string", "null"],
+            "description": "Phase 11: Human-readable description of where this image will be used in the layout."
+          },
+          "used_in_layout": {
+            "type": "boolean",
+            "description": "Phase 11: True when this shot was derived from the active theme_rules section stack; false for fallback shots."
+          },
+          "derived_from_theme_rules": {
+            "type": "boolean",
+            "description": "Phase 11: True when shot selection was driven by theme_rules; false when using the 5-shot fallback taxonomy."
+          },
+          "generation_needed": {
+            "type": "boolean",
+            "description": "Phase 11: Whether this shot should be generated (required=true or priority=high). false = prompt-only, skip generation."
+          },
+          "generation_mode": {
+            "type": ["string", "null"],
+            "enum": ["reuse", "grounded_generate", "generate", null],
+            "description": "Phase 12: How this asset should be produced. reuse = use source image as-is, grounded_generate = generate using visual grounding, generate = text-only generation."
+          },
+          "grounding_source_type": {
+            "type": ["string", "null"],
+            "description": "Phase 12: Source of grounding data (e.g. 'shopify_product_image'). null when ungrounded."
+          },
+          "grounded_from_image": {
+            "type": ["string", "null"],
+            "description": "Phase 12: URL of the source image used for visual grounding. null when ungrounded."
+          },
+          "grounding_confidence": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Phase 12: Confidence score of the grounding analysis (0-1). null when ungrounded."
+          },
+          "product_faithfulness_required": {
+            "type": "boolean",
+            "description": "Phase 12: Whether this asset must faithfully represent the actual product appearance."
+          }
+        }
+      }
+    },
+    "generation_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "products_processed",
+        "total_shots_planned",
+        "prompts_generated",
+        "images_generated",
+        "images_failed",
+        "mode"
+      ],
+      "properties": {
+        "products_processed": { "type": "integer", "minimum": 0 },
+        "total_shots_planned": { "type": "integer", "minimum": 0 },
+        "prompts_generated": { "type": "integer", "minimum": 0 },
+        "images_generated": { "type": "integer", "minimum": 0 },
+        "images_failed": { "type": "integer", "minimum": 0 },
+        "images_skipped": { "type": "integer", "minimum": 0 },
+        "mode": {
+          "type": "string",
+          "enum": ["full_generation", "prompts_only", "dry_run"],
+          "description": "Execution mode. prompts_only = no image API calls."
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "base_path"],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["local", "cloud_inline", "cloud_url"],
+          "description": "Storage backend used for this run."
+        },
+        "base_path": {
+          "type": ["string", "null"],
+          "description": "Root path for local storage (null in cloud mode)."
+        },
+        "total_files": { "type": "integer", "minimum": 0 },
+        "total_size_bytes": { "type": ["integer", "null"] }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "asset_id": { "type": "string" },
+          "error_type": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

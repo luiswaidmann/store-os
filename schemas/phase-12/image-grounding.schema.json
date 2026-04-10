@@ -1,0 +1,131 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://store-os.dev/schemas/phase-12/image-grounding.schema.json",
+  "title": "Image Grounding Artifact",
+  "description": "Structured visual understanding of existing Shopify product images, produced by Gemini Vision analysis. Drives product-faithful media generation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "project_id", "completed_at", "products_analyzed", "grounding_model", "products"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["PHASE_12_COMPLETE", "PHASE_12_PARTIAL", "PHASE_12_FAILED"],
+      "description": "Terminal status of image grounding phase."
+    },
+    "project_id": { "type": "string", "minLength": 1 },
+    "completed_at": { "type": "string", "format": "date-time" },
+    "products_analyzed": { "type": "integer", "minimum": 0 },
+    "total_images_analyzed": { "type": "integer", "minimum": 0 },
+    "grounding_model": {
+      "type": "string",
+      "description": "Model used for visual analysis (e.g. gemini-2.0-flash)."
+    },
+    "products": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["product_handle", "source_images_analyzed", "visual_analysis", "grounding_prompt_additions", "source_image_assessment"],
+        "properties": {
+          "product_handle": { "type": "string" },
+          "product_title": { "type": "string" },
+          "primary_image_url": { "type": ["string", "null"] },
+          "source_images_analyzed": { "type": "integer", "minimum": 0 },
+          "visual_analysis": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["category", "form_factor", "materials", "primary_colors", "color_description", "distinctive_features", "surface_finish", "ecommerce_suitability"],
+            "properties": {
+              "category": { "type": "string", "description": "Product category confirmed from visual inspection." },
+              "form_factor": { "type": "string", "description": "Physical shape/silhouette description." },
+              "materials": { "type": "array", "items": { "type": "string" }, "description": "Identified materials from visual cues." },
+              "primary_colors": { "type": "array", "items": { "type": "string" }, "description": "Hex color values of dominant product colors." },
+              "color_description": { "type": "string", "description": "Human-readable color summary." },
+              "distinctive_features": { "type": "array", "items": { "type": "string" }, "description": "Key visual features that make this product recognizable." },
+              "dimensions_estimate": { "type": ["string", "null"], "description": "Relative size estimate from visual cues." },
+              "orientation": { "type": ["string", "null"], "description": "Primary product orientation in source images." },
+              "surface_finish": { "type": "string", "description": "Surface texture/finish (matte, glossy, brushed, etc.)." },
+              "brand_markings": { "type": ["string", "null"], "description": "Visible brand text, logos, or labels." },
+              "background_quality": { "type": "string", "description": "Source image background quality assessment." },
+              "lighting_quality": { "type": "string", "description": "Source image lighting quality assessment." },
+              "ecommerce_suitability": {
+                "type": "string",
+                "enum": ["high", "medium", "low"],
+                "description": "Overall suitability of existing images for ecommerce use."
+              },
+              "improvement_suggestions": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Specific suggestions for improving product imagery."
+              }
+            }
+          },
+          "grounding_prompt_additions": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["product_description_grounded", "material_keywords", "shape_keywords"],
+            "properties": {
+              "product_description_grounded": {
+                "type": "string",
+                "description": "Detailed physical description of the product derived from visual analysis. Used to ground generation prompts."
+              },
+              "material_keywords": {
+                "type": "string",
+                "description": "Comma-separated material terms for prompt injection."
+              },
+              "shape_keywords": {
+                "type": "string",
+                "description": "Comma-separated shape/form terms for prompt injection."
+              },
+              "detail_focus_areas": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Areas to emphasize in detail/closeup shots."
+              }
+            }
+          },
+          "source_image_assessment": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["image_url", "quality_score", "reuse_recommendation"],
+              "properties": {
+                "image_url": { "type": "string" },
+                "quality_score": { "type": "number", "minimum": 0, "maximum": 1 },
+                "usable_as": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["product_image", "hero_banner", "collection_image", "lifestyle", "detail_shot", "not_usable"]
+                  }
+                },
+                "issues": { "type": "array", "items": { "type": "string" } },
+                "reuse_recommendation": {
+                  "type": "string",
+                  "enum": ["keep", "enhance", "replace"],
+                  "description": "keep = use as-is, enhance = edit/improve, replace = generate new."
+                }
+              }
+            }
+          },
+          "analysis_error": {
+            "type": ["string", "null"],
+            "description": "Error message if analysis failed for this product."
+          }
+        }
+      }
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "product_handle": { "type": "string" },
+          "error_type": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}

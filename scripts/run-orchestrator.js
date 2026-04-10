@@ -200,11 +200,14 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
     return;
   }
 
-  const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
+  const TERMINAL = new Set(['GOLD_PATH_COMPLETE', 'GOLD_PATH_PARTIAL',
+                             'PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                              'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
                              'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
                              'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
-                             'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED']);
+                             'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED',
+                             'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED',
+                             'PHASE_10_COMPLETE', 'PHASE_10_FAILED']);
   const isSuccess = TERMINAL.has(d.status);
 
   console.log('');
@@ -373,7 +376,13 @@ function printSummary(d, httpStatus, durationMs, startedAt) {
 
   console.log('');
   if (isSuccess) {
-    const chainDesc = d.status === 'PHASE_7B3_COMPLETE' ? 'Phase 1–7B.3 chain finished (catalog + pages + navigation + theme deployed).'
+    const chainDesc = d.status === 'GOLD_PATH_COMPLETE' ? 'Full gold path complete — all phases 1–7B.3 finished, 6 theme assets written, 0 errors.'
+      : d.status === 'GOLD_PATH_PARTIAL' ? 'Gold path complete with partial media results — theme fully deployed, some media assets failed (transient).'
+      : d.status === 'PHASE_9_COMPLETE' ? 'Phase 9 media generation finished (all images generated).'
+      : d.status === 'PHASE_9_PARTIAL' ? 'Phase 9 media generation finished with partial results (some images failed).'
+      : d.status === 'PHASE_9_PROMPTS_ONLY' ? 'Phase 9 media generation finished (prompts only — no image API calls).'
+      : d.status === 'PHASE_9_FAILED' ? 'Phase 9 media generation failed.'
+      : d.status === 'PHASE_7B3_COMPLETE' ? 'Phase 1–7B.3 chain finished (catalog + pages + navigation + theme deployed).'
       : d.status === 'PHASE_7B3_PARTIAL' ? 'Phase 1–7B.3 finished with partial theme deployment.'
       : d.status === 'PHASE_7B3_DRY_RUN' ? 'Phase 1–7B.3 finished (theme: dry run only — no writes performed).'
       : d.status === 'PHASE_7B3_BLOCKED' ? 'Phase 1–7B.3 finished (theme: BLOCKED — no safe target theme found).'
@@ -593,11 +602,14 @@ async function main() {
       } else {
         printSummary(finalResult, 200, durationMs, pollStartedAt);
       }
-      const TERMINAL = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
+      const TERMINAL = new Set(['GOLD_PATH_COMPLETE', 'GOLD_PATH_PARTIAL',
+                                 'PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                                  'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
                                  'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
                                  'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
-                                 'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED']);
+                                 'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED',
+                                 'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED',
+                             'PHASE_10_COMPLETE', 'PHASE_10_FAILED']);
       if (!TERMINAL.has(finalResult.status)) process.exit(1);
     } else {
       console.error('ERROR: Could not extract result from execution data.');
@@ -663,11 +675,14 @@ async function main() {
   const startData = typeof startResponse.data === 'object' ? startResponse.data : {};
 
   // Detect async response vs legacy synchronous response
-  const TERMINAL_STATUSES = new Set(['PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
+  const TERMINAL_STATUSES = new Set(['GOLD_PATH_COMPLETE', 'GOLD_PATH_PARTIAL',
+                                      'PHASE_5_COMPLETE', 'PHASE_6A_COMPLETE', 'PHASE_6B_COMPLETE',
                                       'PHASE_6C_COMPLETE', 'PHASE_6_COMPLETE', 'PHASE_7A_COMPLETE',
                                       'PHASE_7B1_COMPLETE', 'PHASE_7B1_PARTIAL',
                                       'PHASE_7B2_COMPLETE', 'PHASE_7B2_PARTIAL',
-                                      'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED']);
+                                      'PHASE_7B3_COMPLETE', 'PHASE_7B3_PARTIAL', 'PHASE_7B3_DRY_RUN', 'PHASE_7B3_BLOCKED',
+                                      'PHASE_9_COMPLETE', 'PHASE_9_PARTIAL', 'PHASE_9_PROMPTS_ONLY', 'PHASE_9_FAILED',
+                             'PHASE_10_COMPLETE', 'PHASE_10_FAILED']);
   const isLegacySync = startData.status && TERMINAL_STATUSES.has(startData.status);
 
   if (isLegacySync) {
